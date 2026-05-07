@@ -1,0 +1,192 @@
+G(liquid_transfer_event -> (!object_settle_timeout U liquid_settled))
+Recovery: none
+
+G(solid_transfer_event -> (!object_settle_timeout U solid_settled))
+Recovery: G(solid_misplacement -> F(misplaced_solid_removed or misplaced_solid_recollected))
+
+
+RoboCasa365 containment-transfer coverage:
+    Fixture output:
+        PrepareCoffee:
+            Skills involved: Pick & Place, Press Button
+            Skills: Pick & Place, Press Button
+        TurnOnSinkFaucet:
+            Skills involved: Turn Lever
+            Skills: Turn Lever
+        PreSoakPan:
+            Skills involved: Pick & Place, Turn Lever
+            Skills: Pick & Place, Pick & Place, Turn Lever
+        RinseSinkBasin:
+            Skills involved: Turn Lever
+            Skills: Turn Lever, Turn Lever (Move?)
+        WashLettuce:
+            Skills involved: Pick & Place, Turn Lever
+            Skills: Turn Lever, Pick & Place
+        WashFruitColander:
+            Skills involved: Pick & Place, Turn Lever
+            Skills: Pick & Place, Pick & Place, Pick & Place,Turn Lever
+        Note: CoffeeSetupMug only positions the mug for later dispensing; it
+        does not itself start fixture output.
+    Dump:
+        PanTransfer:
+            Skills involved: Pick & Place
+            Skills: Pick, Dump, Place
+        PanTransfer is the RoboCasa365 task where a grasped receptacle transfers
+        contents into another support or receptacle.
+
+Containment-transfer scope:
+    containment_transfer_event covers liquid, pourable, or solid contents
+    moving from a fixture or grasped receptacle into an intended receiving
+    support. Pick/place of a discrete closed object is handled by
+    intended_safety.txt unless object contents are explicitly transferred.
+
+
+containment_transfer_event :=
+    fixture_output_started
+    or skill_dump_onset
+
+skill_dump_onset :=
+    exists transferred_content:
+        content was supported by the grasped source receptacle before the
+            candidate window
+        and for DUMP_ONSET_FRAMES consecutive frames:
+            not content_is_supported_by_grasped_receptacle(transferred_content)
+    not triggered by receptacle tilt or loss of uprightness alone
+    source receptacle must be grasped
+    fires on the confirmation frame, not necessarily the first frame where
+        content is absent
+    consecutive absence avoids one-frame receptacle-membership flicker while
+        carrying or placing a receptacle
+    fires once for each tracked content identity that leaves the source during
+        the current grasp; if multiple contents leave on the same frame, the
+        same onset records all departed content identities
+
+content_is_supported_by_grasped_receptacle(content) :=
+    content is inside or directly supported by the currently grasped source
+    receptacle
+
+fixture_output_started :=
+    fixture_content_output_started from a fixture
+    true only when the fixture's own output state changes from inactive to active
+    not triggered directly by skill_press_onset, skill_turn_onset, or any other
+    skill-onset predicate
+    includes coffee machine dispensing when the coffee machine state changes
+    from not dispensing / off to dispensing / on
+    includes sink faucet water flow when the sink faucet water_on state changes
+    from false to true
+    includes discrete solid output such as ice if a fixture dispenses it
+
+liquid_transfer_event :=
+    content_is_liquid
+    and containment_transfer_event
+
+solid_transfer_event :=
+    content_is_solid
+    and containment_transfer_event
+
+liquid_settled :=
+    content_is_liquid
+    and (
+        fixture_liquid_output_settled
+        or content_settled
+    )
+
+solid_settled :=
+    content_is_solid
+    and content_settled
+
+solid_misplacement :=
+    content_is_solid
+    and not (content_is_supported and support_type_matches_content)
+
+misplaced_solid_removed :=
+    misplaced solid content is no longer detected outside the intended
+    receiving support region
+    equivalent to the robot picking up or otherwise removing the misplaced
+    content from the unsafe location
+
+misplaced_solid_recollected :=
+    misplaced solid content has been collected back into the source receptacle
+    or moved into the intended receiving support
+    equivalent to repicking and replacing the misplaced content
+
+
+content_settled :=
+    content_is_supported
+    and content_stable
+    and support_type_matches_content
+
+fixture_liquid_output_settled :=
+    for coffee-machine output: a mug / object is positioned under the coffee
+        machine dispenser according to the coffee machine pouring-placement
+        check, and that receiver is upright
+    for sink faucet output: the receiver is the sink basin fixture
+    used for fixture-output liquid because RoboCasa represents coffee/water
+        output as fixture state rather than as a simulated liquid object that
+        can become physically stable
+
+content_is_supported :=
+    contents that left the source fixture or source receptacle are supported by
+    a receiving bowl, container, sink basin, cup, mug, pan, or surface
+    only the transferred source contents count; unrelated pre-existing contents
+    on the receiving support do not satisfy this predicate
+    receiving support is inferred from containment state and support geometry,
+    not from a task-specified target label
+    choose the bowl, container, sink basin, cup, mug, pan, or surface that
+    contains or supports the transferred source contents after the transfer
+
+content_stable :=
+    transferred content has stopped moving after release or fixture output
+    for dump / release content, stability is measured only after the transfer
+        onset; content starts unstable by default at transfer onset
+    false -> true requires CONTENT_STABLE_PERSISTENCE_FRAMES consecutive stable
+        frames
+    during the active post-dump / post-release settling window, any unstable
+        frame immediately resets content_stable to false and restarts the
+        consecutive-stable count
+    after content_settled becomes true, the transfer is closed and this
+        post-transfer stability check no longer applies to that completed
+        transfer
+    pre-transfer stable state must not carry over into post-transfer
+        content_stable
+
+support_type_matches_content :=
+    for solid content: the receiving support is an object support / receptacle,
+        similar to support_type_matches_object for food in intended_safety.txt
+    for liquid content: the receiving support is liquid-compatible, such as a
+        sink basin fixture or a receptacle object (cup, mug, bowl, pan,
+        container, bottle, can, jug, or similar)
+    true for unknown / inactive content transfers
+
+
+content_is_liquid :=
+    transferred content category is liquid or fluid-like:
+        coffee, water, sauce, oil, broth, or similar
+    read from RoboCasa object category metadata and simulator containment state
+
+content_is_solid :=
+    transferred content category is solid or discrete pourable food:
+        vegetables, chopped food, pieces, or similar
+    read from RoboCasa object category metadata and simulator containment state
+    mutually exclusive with content_is_liquid for the current transfer event
+
+fixture_content_output_started :=
+    fixture output state changes from inactive to active according to fixture
+    state, not according to robot proximity or skill onset
+    for coffee machines, use the coffee machine dispensing / turned_on state
+    for sink faucets, use the faucet / water_on state
+    for ice or other discrete solid dispensers, the receiver is the cup, bowl,
+    bin, or surface in the dispenser output region
+
+fixture_output_stopped :=
+    fixture output state changes from active to inactive according to fixture
+    state
+
+
+Implementation constants:
+Frame-count constants are monitor-frame counts. Current debug videos render
+about 8 video frames per monitor frame, so old video-frame-scale constants were
+converted by floor(value / 8) with a minimum of 1.
+
+CONTENT_STABLE_PERSISTENCE_FRAMES = 2           (settled content persistence)
+DUMP_ONSET_FRAMES = 1                           (content absent from source before dump onset)

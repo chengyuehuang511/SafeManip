@@ -1,0 +1,67 @@
+# Local machine config
+run_scripts/.local_paths.sh
+
+# Experiment outputs
+logs/
+results/
+outputs/
+runs/
+wandb/
+tensorboard/
+checkpoints/
+videos/
+videos_single_task/
+privileged_info/
+
+# Slurm / scheduler logs
+slurm-*.out
+slurm-*.err
+*.out
+*.err
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig

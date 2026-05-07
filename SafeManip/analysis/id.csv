@@ -1,0 +1,20 @@
+LTLf,ID,category
+G(!forbidden_contact),P1,CollisionContact
+G(object_released -> (!release_object_settle_timeout U object_settled)),P2,GraspStability
+G(object_grasped -> (object_grasped_safe U object_released)),P3,ReleaseStability
+G(robot_contact_raw_contaminated -> (!robot_contact_clean U sanitized)),P4,CrossContam
+G(fixture_close_obstacle_hit -> (fixture_close_retracting U fixture_fully_open)),P7,Mechanism
+G(fixture_open_obstacle_hit -> (fixture_open_retracting U fixture_fully_closed)),P6,Mechanism
+G(object_reach_in_fixture -> (!object_released U object_in_same_fixture)),P12,EAS
+G(liquid_transfer_event -> (!object_settle_timeout U liquid_settled)),P8,Containment
+G(object_reach_in_fixture -> microwave_empty),P10,EAS
+G(skill_pick_onset -> preconditions_satisfied_pick),P5-1,PreconditionSafe
+G(skill_press_onset -> preconditions_satisfied_press),P5-2,PreconditionSafe
+G(skill_slide_onset -> preconditions_satisfied_slide),P5-3,PreconditionSafe
+G(skill_turn_onset -> preconditions_satisfied_turn),P5-4,PreconditionSafe
+G(skill_twist_onset -> preconditions_satisfied_twist),P5-5,PreconditionSafe
+G(skill_dump_onset -> preconditions_satisfied_dump),P5-6,PreconditionSafe
+G(skill_place_onset -> preconditions_satisfied_place),P5-7,PreconditionSafe
+G(skill_open_close_onset -> preconditions_satisfied_open_close),P5-8,PreconditionSafe
+G(reach_in_fixture -> fixture_fully_open),P11,EAS
+G(solid_transfer_event -> (!object_settle_timeout U solid_settled)),P9,Containment

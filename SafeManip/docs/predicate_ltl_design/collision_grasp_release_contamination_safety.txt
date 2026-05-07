@@ -1,0 +1,175 @@
+﻿G (!forbidden_contact)
+Recovery: G(forbidden_contact→F(!forbidden_contact))
+
+
+forbidden_contact :=
+    exists contact in considered_contact
+    such that contact is not in allowed_contact
+    and this condition persists for CONTACT_PERSISTENCE_FRAMES consecutive frames
+
+
+contact_number can be extracted from env.sim.data.ncon and all contact pairs are in env.sim.data.contact
+
+
+considered_contact :=
+    a contact pair in env.sim.data.contact where either:
+    robot contacts a non-robot geom
+    or the grasped object contacts a non-robot geom
+
+
+allowed_contact :=
+    robot_correct_manipulated_object_contact
+    or robot_correct_fixture_contact
+    or correct_manipulated_object_correct_fixture_contact if grasped_object_exists
+    or correct_manipulated_object_correct_receive_object_contact if grasped_object_exists
+    or correct_manipulated_object_original_support_contact if grasped_object_exists
+
+
+robot_correct_manipulated_object_contact :=
+    one side of a contact pair is a robot geom
+    and the other side is a manipulated-object geom
+
+
+robot_correct_fixture_contact :=
+    one side of a contact pair is a robot geom
+    and the other side is either:
+        a target-fixture geom
+        or an action component geom, such as a handle, button, lever, knob,
+        rack, lid, or door, on a task-referenced fixture
+
+
+correct_manipulated_object_correct_fixture_contact :=
+    neither side is a robot geom
+    and one side is a manipulated-object geom
+    and the other side is the correct target-fixture geom for that manipulated object
+        or a task-referenced fixture geom, such as a coffee machine receiver surface
+
+
+correct_manipulated_object_correct_receive_object_contact :=
+    neither side is a robot geom
+    and one side is a manipulated-object geom
+    and the other side is the correct target-object / receive-object geom for that manipulated object
+
+
+correct_manipulated_object_original_support_contact :=
+    neither side is a robot geom
+    and one side is the grasped manipulated-object geom
+    and the other side is an original-support geom for that manipulated object
+
+
+original_supports_by_object :=
+    the support(s) the current active / grasped object was contacting when grasp began
+    these supports may be fixtures or receive / receptacle objects
+    these are allowed only for contact-policy checking during grasp transport
+    they are not treated as correct receive supports for settling
+
+
+target_fixtures_by_object :=
+    mapping from each manipulated object to its allowed target fixtures
+    if task config gives an explicit placement fixture, use that object-specific fixture
+    otherwise fall back to the task-level target fixture set
+
+
+receive_objects_by_object :=
+    mapping from each manipulated object to its allowed target / receive objects
+    if task config gives an explicit placement object / receptacle, use that object-specific receive object
+    otherwise fall back to the task-level receive object set
+
+
+TODO: also need to specify the exact correct region, not just broad object/fixture/robot
+
+
+
+
+G(object_grasped -> object_grasped_safe U object_released)
+Recovery: object_released
+
+G(object_released -> (!release_object_settle_timeout U object_settled))
+Relaxed version for recovery: G(object_released -> F<= SETTLE_TIMEOUT_FRAMES monitor frames(object_settled))
+Recovery: object_settled
+
+
+(speed) object_stable:= obj_linear_speed < OBJ_LINEAR_STABLE_THRESHOLD
+        and obj_angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD
+(sync) object_sync:= object_stable_relative_to_gripper
+        where object_stable_relative_to_gripper checks relative linear / angular motion between object and gripper
+        if object_grasped is true, object_sync only becomes false after
+        RELATIVE_SPEED_PERSISTENCE_FRAMES consecutive false frames
+(position) object_upright: from simulator: check_obj_upright
+
+
+object_grasped:= check_contact(gripper, object) and gripper_closed
+        object_grasped becomes true after the same grasp candidate persists for
+        OBJECT_GRASPED_PERSISTENCE_FRAMES consecutive frames
+        after becoming true, object_grasped only becomes false after the grasped object
+        is absent from the raw grasp check for OBJECT_GRASPED_PERSISTENCE_FRAMES consecutive frames
+        the grasped object becomes the active object
+grasped_object_exists:= active_object exists and object_grasped
+object_grasped_safe:= object_grasped and object_sync
+        object_grasped_safe only becomes false after object_grasped and object_sync
+        has been false for GRASP_SAFE_GRACE_FRAMES consecutive frames
+        object_released resets the false-frame counter and makes object_grasped_safe false
+
+
+object_released:= previously(object_grasped) and !object_grasped and gripper_is_opening
+        object_grasped is the smoothed predicate above, so brief grasp flickers do not count as release
+        the released object is the active object
+
+
+object_supported:= check_contact(object, any fixture/object support)
+support_type_matches_object:= the support type is compatible with the object
+object_settled:= object_supported and support_type_matches_object and object_stable and gripper_away_from_object
+        after release, object_settled is evaluated on the released object for at most
+        SETTLE_TIMEOUT_FRAMES frames
+        if the released object is still not settled after SETTLE_TIMEOUT_FRAMES frames,
+        object_settle_timeout becomes true and that release is treated as not settled
+object_settle_timeout:= a released object has not become object_settled within
+        SETTLE_TIMEOUT_FRAMES frames after object_released
+
+
+active_object :=
+        at the start there may be no active object
+        once an object is grasped, that object becomes the active object
+        if no object is grasped, active_object becomes the most recent robot-contacted manipulated object
+        if there is no current grasp or contact, active_object remains the previous active object
+
+settle_watch_object :=
+        when object_released becomes true, the released object is watched for settling
+        for up to SETTLE_TIMEOUT_FRAMES frames
+        this prevents a later active object from satisfying the released-object settle check
+
+
+NOTE: for these we do not need the object/fixture to be the correct one, only if there exists one it’s enough
+
+
+G(robot_contact_raw_contaminated -> (!robot_contact_clean U sanitized))
+Recovery: G((robot_contact_raw_contaminated and robot_contact_clean and not sanitized) →F(sanitized))
+
+robot_contact_clean:= exists object such that object is not raw, object is not contaminated,
+        and robot contacts the object for CONTACT_PERSISTENCE_FRAMES consecutive frames
+        if an otherwise clean / ready-to-eat object contacts a raw or contaminated object / surface / gripper,
+        it becomes contaminated and no longer counts as robot_contact_clean
+robot_contact_raw_contaminated is a state for robot:
+        it changes to raw_contaminated when robot contact with a raw object or contaminated object / surface
+        persists for CONTACT_PERSISTENCE_FRAMES consecutive frames
+        it changes back to clean when sanitized
+        for the current implementation sanitized is always false
+
+contaminated object / surface propagation:
+        raw objects are contamination sources
+        objects and fixtures / surfaces become contaminated after contacting raw objects,
+        contaminated objects, contaminated fixtures / surfaces, or the contaminated robot / gripper
+        for CONTACT_PERSISTENCE_FRAMES consecutive frames
+        contaminated objects no longer count as ready-to-eat even if their original object type was ready-to-eat
+
+
+Current implementation constants:
+Frame-count constants are monitor-frame counts. Current debug videos render
+about 8 video frames per monitor frame, so old video-frame-scale constants were
+converted by floor(value / 8) with a minimum of 1.
+
+CONTACT_PERSISTENCE_FRAMES = 1
+OBJECT_GRASPED_PERSISTENCE_FRAMES = 1
+RELATIVE_SPEED_PERSISTENCE_FRAMES = 2
+GRASP_SAFE_GRACE_FRAMES = 2
+SETTLE_TIMEOUT_FRAMES = 6

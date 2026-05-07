@@ -1,0 +1,564 @@
+G(skill_pick_onset -> preconditions_safe_pick)
+Recovery: none
+
+G(skill_press_onset -> preconditions_safe_press)
+Recovery: none
+
+G(skill_turn_onset -> preconditions_safe_turn)
+Recovery: none
+
+G(skill_slide_onset -> preconditions_safe_slide)
+Recovery: none
+
+G(skill_twist_onset -> preconditions_safe_twist)
+Recovery: none
+
+G(skill_open_close_onset -> preconditions_safe_open_close)
+Recovery: none
+
+G(skill_place_onset -> preconditions_safe_place)
+Recovery: none
+
+G(skill_dump_onset -> preconditions_safe_dump)
+Recovery: none
+preconditions_safe_dump := dump-specific destination-readiness requirements
+    dump shares place-style destination-readiness requirements;
+    for dump, the checked object is the contents inside the grasped receptacle,
+    not the grasped receptacle itself; the support for dump is the bowl,
+    container, or surface receiving the contents
+
+RoboCasa365 skill coverage from robocasa365_categorization.csv:
+    Pick / Place:
+        CoffeeSetupMug, PickPlaceCounterToCabinet, PickPlaceCounterToStove,
+        PickPlaceDrawerToCounter, PickPlaceSinkToCounter, PickPlaceToasterToCounter,
+        DeliverStraw, GetToastedBread, KettleBoiling, LoadDishwasher,
+        PackIdenticalLunches, PreSoakPan, PrepareCoffee, SearingMeat,
+        SetUpCuttingStation, StackBowlsCabinet, SteamInMicrowave,
+        StoreLeftoversInBowl, ArrangeBreadBasket, ArrangeTea, BreadSelection,
+        CategorizeCondiments, CuttingToolSelection, GarnishPancake, GatherTableware,
+        HeatKebabSandwich, MakeIceLemonade, PortionHotDogs, RecycleBottlesByType,
+        SeparateFreezerRack, WaffleReheat, WashFruitColander, WeighIngredients
+    Open / Close:
+        CloseBlenderLid, CloseFridge, CloseToasterOvenDoor, OpenCabinet,
+        OpenDrawer, OpenStandMixerHead, DeliverStraw, LoadDishwasher,
+        SetUpCuttingStation, SteamInMicrowave, ArrangeBreadBasket, ArrangeTea,
+        CuttingToolSelection, GarnishPancake, HeatKebabSandwich,
+        MakeIceLemonade, WaffleReheat, WeighIngredients
+    Press:
+        TurnOnMicrowave, TurnOnElectricKettle, PrepareCoffee, SteamInMicrowave, WaffleReheat
+    Turn / Twist:
+        TurnOffStove, TurnOnSinkFaucet, KettleBoiling, PreSoakPan,
+        RinseSinkBasin, SearingMeat, HeatKebabSandwich, WashLettuce,
+        WashFruitColander
+        Note: RoboCasa365 names stove/toaster-oven knob operation as Twist Knob;
+        stove and toaster-oven knobs/dials/timers are twistable, sink faucet
+        handles/spouts are turnable, and bottle/jar caps are twistable object targets.
+    Slide:
+        SlideDishwasherRack, LoadDishwasher
+    Dump:
+        PanTransfer
+    Scrub:
+        ScrubCuttingBoard
+    Stir:
+        StirVegetables
+    Navigation:
+        NavigateKitchen and navigation substeps in composite tasks do not introduce
+        a separate object/fixture precondition in this file; safety is checked when
+        the navigation ends in a manipulation skill onset.
+
+Heat-compatibility attributes:
+    cookable covers objects or contents that are safe to heat, boil, warm, or cook
+    microwavable and toastable remain more specific compatibility attributes for
+    microwave and toaster workflows
+
+
+skill_pick_onset :=
+    previously(not object_grasped)
+    and gripper_moving_towards_object
+    and gripper_near_object
+    and not object_grasped
+    and object_is_manipulable
+    persisting for SKILL_ONSET_FRAMES consecutive frames
+    fires at most once for the current pick_approach_object; repeated approach
+    bursts toward the same object do not create additional pick onsets
+    edge case: after slip, gripper still closing but was never re-opened ->
+        previously(not object_grasped) blocks re-activation
+    edge case: gripper closes while passing near an object incidentally ->
+        gripper_moving_towards_object + gripper_near_object require deliberate approach
+    the one-shot latch resets when the approach is abandoned, the approach
+    object changes, or an object becomes grasped
+
+skill_press_onset :=
+    gripper_moving_towards_target
+    and gripper_near_target
+    and not target_contacted
+    and target_is_pressable
+    persisting for SKILL_ONSET_FRAMES consecutive frames
+    Note: target is the exact pressable element (button or kettle lever), not the enclosing fixture;
+    same naming convention applies to turn, slide, twist
+
+skill_turn_onset :=
+    gripper_moving_towards_target
+    and gripper_near_target
+    and not target_contacted
+    and target_is_turnable
+    persisting for SKILL_ONSET_FRAMES consecutive frames
+    Note: target is the sink faucet handle or spout component, not the enclosing fixture
+
+skill_slide_onset :=
+    gripper_moving_towards_target
+    and gripper_near_target
+    and not target_contacted
+    and target_is_slideable
+    persisting for SKILL_ONSET_FRAMES consecutive frames
+    Note: target is the slideable part (rack or tray);
+    drawer opening belongs to open/close in RoboCasa365 and is openable/closeable.
+
+skill_twist_onset :=
+    gripper_moving_towards_target
+    and gripper_near_target
+    and not target_contacted
+    and target_is_twistable
+    persisting for SKILL_ONSET_FRAMES consecutive frames
+    Note: target is the twistable element (knob, dial, timer, lid, cap, rotating collar)
+
+skill_open_close_onset :=
+    gripper_moving_towards_target
+    and gripper_near_target
+    and not target_contacted
+    and target_is_openable
+    and target_is_closeable
+    persisting for SKILL_ONSET_FRAMES consecutive frames
+    open and close share the same onset; direction is inferred from current joint state
+    Note: target is the openable/closeable part (door panel, drawer, lid, head, flap),
+    not the fixture body
+
+skill_dump_onset :=
+    object_grasped
+    and grasped_object_is_receptacle
+    and exists transferred_content:
+        previously(content_is_supported_by_grasped_receptacle(transferred_content))
+        and not content_is_supported_by_grasped_receptacle(transferred_content)
+    persisting for DUMP_ONSET_FRAMES consecutive frames
+    fires once for each tracked content identity that leaves the source during
+        the current grasp; if multiple contents leave on the same frame, the
+        same onset records all departed content identities
+    resets when object_released
+    not triggered by receptacle tilt or loss of uprightness alone
+
+content_is_supported_by_grasped_receptacle(content) :=
+    content is inside or directly supported by the currently grasped source
+    receptacle
+
+grasped_receptacle_is_upright :=
+    RoboCasa object-utils upright check for the grasped receptacle
+    implementation: OU.check_obj_upright(env, obj_name=grasped_receptacle)
+    used for receptacle safety checks, but not for skill_dump_onset
+    evaluated only when grasped_object_is_receptacle and grasped_receptacle_has_contents
+
+gripper_moving_towards_target :=
+    the same nearest target has decreasing 3D distance to the gripper
+    for PICK_APPROACH_PERSISTENCE_FRAMES consecutive frames
+    uses gripper-to-target center distance as an approach-intent signal
+    does not require the gripper fingers to already be closing
+    does not require gripper_near_target; nearness is checked separately per skill onset
+
+approach_target :=
+    the sustained gripper_moving_towards_target candidate
+    used for preconditions before the target is contacted
+    separate from active_object, which may still refer to the previous grasped /
+    manipulated object until a new target is established
+
+gripper_near_target :=
+    gripper position is within REACH_THRESHOLD of any target in the scene
+    does not require the target to be the task-specified target
+
+
+skill_place_onset :=
+    previously(object_grasped)
+    and not object_grasped
+    and gripper_is_opening
+    same event as object_released
+    fires at most once for the released object
+    object_grasped is defined in 4ltls.txt
+    edge case: aborted opening while the object is still grasped does not fire
+        skill_place_onset until the grasp is actually released
+
+
+manipulated_object :=
+    for pick (at skill_pick_onset): the graspable object closest to the gripper
+        within REACH_THRESHOLD; not required to be task-specified
+    for place (at skill_place_onset): the currently grasped object
+        equivalent to active_object in 4ltls.txt
+    for dump (at skill_dump_onset): the content inside the currently grasped
+        receptacle; the grasped receptacle is the source container, not the
+        object being placed by the dump
+preconditions_safe_pick :=
+    object_region_clear
+    and object_stable                              (reuse from 4ltls.txt)
+    evaluated against pick_approach_object at skill_pick_onset
+    object_stable uses STABLE_PERSISTENCE_FRAME frames for both
+    true→false and false→true transitions
+    object_stable persistence is updated for every scene object every frame so
+    inactive pick candidates do not keep stale stability state
+
+object_region_clear :=
+    gripper path to pick_approach_object is not obstructed
+    simulator approximation: no foreign object AABB may obstruct the space
+    between the current gripper/finger AABB and the pick object AABB by more
+    than PATH_OBSTRUCTION_OVERLAP_ALLOWANCE
+    blocker checks exclude the gripper endpoint and pick object endpoint AABBs
+    themselves, so only objects in the space between the gripper and object
+    count as approach blockers
+    the pick object's current supporting object(s), e.g. the surface or
+    receptacle it is sitting on/in, are excluded from blockers because they are
+    support rather than approach obstruction
+
+preconditions_safe_press :=
+    target_region_clear
+    and target_stable                              (equivalent to object_stable from 4ltls.txt)
+    and fixture_ready_for_press
+    Note: target must resolve to the pressable component (button or kettle lever) not the enclosing fixture
+
+fixture_ready_for_press :=
+    target_is_pressable
+    and conditions are implications — vacuously true when the fixture does not match
+    (target_fixture_is_coffee_machine -> dispensing_receptacle_in_area and dispensing_receptacle_is_receptacle)
+    and (target_fixture_is_microwave   -> microwave_door_closed and heat_carriers_empty_or_contents_heat_safe_for_microwave)
+    and (target_fixture_is_oven        -> oven_door_closed and heat_carriers_empty_or_contents_heat_safe_for_oven)
+    and (target_fixture_is_dishwasher  -> contained_objects_are_dishwashable and dishwasher_door_closed)
+    and (target_fixture_is_blender     -> contained_objects_are_mixable and blender_lid_on_if_contents)
+    and (target_fixture_is_toaster     -> heat_carriers_empty_or_contents_toastable)
+    all other fixtures: no additional constraint
+    This predicate is only about action/content compatibility; it does not check
+    target_region_clear or the motion path.
+
+dispensing_receptacle_in_area :=
+    a valid receptacle object is aligned with the liquid dispensing site
+    includes cups, mugs, bowls, pots, pans, and similar receptacles
+
+dispensing_receptacle_is_receptacle :=
+    object in the dispensing area satisfies receptacle_object
+
+preconditions_safe_turn :=
+    target_region_clear
+    and target_stable                              (equivalent to object_stable from 4ltls.txt)
+    and fixture_ready_for_turn
+    Note: target is the sink faucet handle or spout component, not the enclosing fixture
+
+fixture_ready_for_turn :=
+    target_is_turnable
+    and conditions are implications — vacuously true when the fixture does not match
+    and (target_fixture_is_sink_faucet -> sink_contents_are_washable and sink_drain_not_blocked)
+    all other fixtures: no additional constraint
+    This predicate is only about action/content compatibility; it does not check
+    target_region_clear or the motion path.
+
+preconditions_safe_slide :=
+    target_region_clear
+    and target_stable                              (equivalent to object_stable from 4ltls.txt)
+    and fixture_ready_for_slide
+    and slide_path_clear
+    Note: target is the slideable part (rack or tray);
+    drawer opening belongs to open/close in RoboCasa365 and is openable/closeable.
+
+fixture_ready_for_slide :=
+    target_is_slideable
+    and conditions are implications — vacuously true when the fixture does not match
+    and (target_fixture_is_openable -> fixture_open_for_slide)
+    (target_fixture_is_dishwasher_rack -> rack_contents_are_dishwashable)
+    dishwasher door only needs to be open enough for rack motion, not fully open
+    all other slide targets: no additional constraint
+    This predicate is only about action/content compatibility; slide_path_clear
+    separately checks the swept corridor.
+
+fixture_open_for_slide :=
+    target fixture is at least partially open enough for sliding motion
+    implementation threshold: fixture open fraction >= 0.5
+
+slide_path_clear :=
+    the swept volume of the target along its slide axis is free of obstructions
+    simulator approximation: no foreign object AABB may overlap the swept corridor
+    from the target's current AABB to its end-of-travel AABB by more than
+    PATH_OBSTRUCTION_OVERLAP_ALLOWANCE
+    objects already inside the target fixture are excluded from fixture-action
+    path blockers; dishwasher contents should not block dishwasher rack sliding
+
+preconditions_safe_twist :=
+    target_region_clear
+    and target_stable                              (equivalent to object_stable from 4ltls.txt)
+    and fixture_ready_for_twist
+    and target_receptacle_upright_if_has_contents  (twist-specific: separated from base)
+    Note: target_region_clear is evaluated against the twist target part
+    (knob, lid, cap, rotating collar); the upright/content check is evaluated
+    against the target receptacle or container attached to that part
+
+fixture_ready_for_twist :=
+    target_is_twistable
+    and conditions are implications — vacuously true when the target does not match
+    (target_fixture_is_stove_or_heating_knob -> cookware_on_burner and (not cookware_has_contents or cookware_contents_are_heat_safe))
+    and (target_fixture_is_oven_knob -> oven_door_closed and heat_carriers_empty_or_contents_heat_safe_for_oven)
+    and (target_fixture_is_toaster_or_toaster_oven_knob -> heat_carriers_empty_or_contents_toastable)
+    and (target_is_bottle_or_jar_or_thermos -> attached_receptacle_is_twistable_or_openable)
+    and (target_receptacle_has_contents -> contents_are_pourable_or_food_safe_for_container)
+    all other twist targets: no additional constraint
+    This predicate is only about whether the twist target and attached container
+    are compatible with twisting; upright/content-spill safety is checked by
+    target_receptacle_upright_if_has_contents.
+
+target_receptacle_upright_if_has_contents :=
+    not target_receptacle_has_contents
+    or target_receptacle_upright
+    receptacles or containers with contents must be upright before twisting to avoid spillage
+
+target_receptacle_has_contents :=
+    target receptacle or container contains any object, liquid, or pourable contents
+    read from RoboCasa object category metadata and simulator containment state
+
+heat_carriers_empty_or_contents_heat_safe_for_microwave / oven / toaster :=
+    heat carriers are bowls, mugs, cups, pans, pots, trays, cookware, or other
+    receptacle-like objects inside/on the heating fixture
+    empty heat carriers are allowed
+    if the carrier contains contents, the contained objects must be compatible
+    with that fixture: microwavable for microwave, cookable/food for oven or
+    stove, toastable/bread/cookable/food for toaster or toaster oven
+
+preconditions_safe_open_close :=
+    target_region_clear
+    and target_stable                              (equivalent to object_stable from 4ltls.txt)
+    and fixture_ready_for_open_close
+    and articulation_path_clear
+    Note: target is the openable/closeable part (door panel, drawer, lid, head, flap),
+    not the fixture body
+
+fixture_ready_for_open_close :=
+    target_is_openable
+    and target_is_closeable
+    and conditions are implications — vacuously true when the fixture does not match
+    (target_fixture_is_microwave_or_oven_or_toaster_oven -> heat_carriers_empty_or_contents_heat_safe_for_that_fixture)
+    and (target_fixture_is_dishwasher -> contained_objects_are_dishwashable)
+    and (target_fixture_is_fridge_or_freezer -> contained_objects_are_fridgable_or_freezable)
+    all other open/close targets: no additional constraint
+    This predicate is only about target/action/content compatibility; articulation_path_clear
+    separately checks the swept hinge or slide path.
+
+articulation_path_clear :=
+    the swept volume of the target along its hinge arc or slide axis is free of obstructions
+    simulator approximation: no foreign object AABB may overlap the swept volume of
+    the target AABB through its full articulation range by more than
+    PATH_OBSTRUCTION_OVERLAP_ALLOWANCE
+
+preconditions_safe_dump :=
+    dump_support_region_clear
+    and support_stable
+    and dump_support_geometry_valid
+    and dump_support_type_matches_content
+    and dump_support_hygienic_for_content
+    and dump_support_objects_clean_for_content
+    and dump_support_not_cluttered_for_fragile_content
+    dump shares place-style destination-readiness requirements, but every
+    object-dependent predicate is evaluated against transferred_content, not the
+    grasped source receptacle; the support for dump is the bowl, container, or
+    surface receiving the contents
+
+
+target_region_clear :=
+    gripper path to target is not obstructed
+    target is the actionable component or part, not the enclosing fixture;
+    for example, pressing a microwave uses the button as target, and pressing an electric
+    kettle uses the lever as target, not the enclosing fixture body
+    simulator approximation: no foreign object AABB may obstruct the space
+    between the current gripper/finger AABB and the approach_target AABB by
+    more than PATH_OBSTRUCTION_OVERLAP_ALLOWANCE
+    blocker checks exclude the endpoint AABBs themselves, so contact/overlap
+    with the gripper endpoint or target endpoint is not counted as a path
+    obstruction
+    the corridor uses exported gripper link positions and exported object
+    bounding boxes; it does not use a centerline collision radius
+    the approach target's current supporting object(s), e.g. the receptacle or
+    container it is sitting on/in, are excluded from blockers because they are
+    the target's support rather than an approach obstruction
+    PLACEMENT_MARGIN is not used for region_clear; this predicate is path-blocking,
+    not a general nearness / clutter predicate
+    vertically separated objects on other shelves / floors should not block the approach
+
+target_upright_if_receptacle :=
+    not receptacle_object
+    or object_upright                              (object_upright reused from 4ltls.txt)
+    receptacles must be upright before acting to avoid spilling contents
+
+receptacle_object :=
+    object category has receptacle geometry or is normally used to hold contents:
+        bowl, cup, mug, pot, pan, tray, container, tupperware, bottle, can, or similar
+    read from RoboCasa object category metadata at pick time
+    treated as static for the duration of the current pick-place episode
+
+
+preconditions_safe_place :=
+    support_region_clear
+    and support_stable
+    and support_geometry_valid
+    and support_type_matches_object
+    and support_hygienic_for_manipulated_object
+    and support_objects_clean_for_manipulated_object
+    and support_not_cluttered_for_fragile_manipulated_object
+    all conditions evaluated against manipulated_object at skill_place_onset (see 4ltls.txt)
+    support is identified via inferred_support (defined below); not required to be task-specified
+
+inferred_support :=
+    candidates are ordered by semantic priority before geometry:
+        1. task-specified receive / target objects for the manipulated_object
+        2. fixture surfaces
+        3. other receptacle-like objects
+    arbitrary non-receptacle objects, including food objects, are not valid inferred supports
+        unless the task success relation explicitly names them as receive / target objects
+    among valid candidates, choose the support below the manipulated object with
+    the shortest XY footprint / edge distance to the manipulated_object footprint
+    at skill_place_onset
+    object and fixture support candidates use AABB footprint / edge distance;
+    fixture center or site distance is only a fallback when fixture geometry is unavailable
+    if footprints overlap in XY, this distance is 0 even when the support and
+    object centers are offset
+    read directly from simulator object positions — no raycast needed
+
+support_region_clear :=
+    manipulated_object swept path to inferred_support is not obstructed
+    simulator approximation: no foreign object AABB may obstruct the space
+    between the current manipulated_object AABB and the manipulated_object AABB
+    translated to inferred_support
+    blocker checks exclude the start and support endpoint AABBs themselves, so
+    carried payload contact at the start or normal placement contact at the
+    destination endpoint is not counted as a path obstruction
+    only manipulated_object (see 4ltls.txt active_object) is excluded from the count
+    if manipulated_object is a grasped receptacle, contents tracked as moving with
+    that receptacle are also excluded because they are part of the carried payload
+    for dump preconditions, transferred_content is also excluded from the count
+    because the contents are the object being placed by the dump
+    for object obstacles and the manipulated object, the corridor uses exported
+    object bounding boxes; it does not use a centerline collision radius
+    PLACEMENT_MARGIN is not used for region_clear; this predicate is path-blocking,
+    not a general nearness / clutter predicate
+    PATH_OBSTRUCTION_OVERLAP_ALLOWANCE is not used for placement because the
+    object is expected to drop directly onto the support
+    unlike support_cluttered, this is directional: objects away from the approach path
+    should not block placement just because they are near the support
+
+dump_support_region_clear :=
+    support_region_clear evaluated for transferred_content rather than the
+    grasped source receptacle
+    transferred_content itself is excluded from blockers at dump onset, so a
+    valid dump cannot block itself once the contents enter the receiving region
+    the same endpoint-excluding swept-path check is used: only objects in the
+    space between transferred_content and receiving support count as blockers
+
+support_stable :=
+    support linear velocity < OBJ_LINEAR_STABLE_THRESHOLD
+    and support angular velocity < OBJ_ANGULAR_STABLE_THRESHOLD
+    uses same thresholds as object_stable in 4ltls.txt
+    stable / unstable transitions must persist for STABLE_PERSISTENCE_FRAME frames
+    before the reported support_stable predicate changes value
+
+support_geometry_valid :=
+    support surface is flat enough, large enough, and orientation-compatible
+    with the manipulated_object footprint and stable pose
+
+dump_support_geometry_valid :=
+    support_geometry_valid evaluated for transferred_content rather than the
+    grasped source receptacle
+
+support_type_matches_object :=
+    (not manipulated_object_is_food or not support_is_fixture)
+    no pouring tasks exist in RoboCasa, so the liquid-receptacle constraint is omitted
+
+dump_support_type_matches_content :=
+    support_type_matches_object evaluated for transferred_content rather than
+    the grasped source receptacle
+    solid contents require an object/receptacle receiver
+    liquid contents require a receptacle receiver or compatible sink fixture
+
+manipulated_object_is_food :=
+    manipulated_object category is edible or food-related
+    read from RoboCasa object category metadata at pick time
+
+support_is_fixture :=
+    support is the structural body of a fixture (fridge door, cabinet frame, drawer body, oven door)
+    as opposed to a placement surface within or beside a fixture (shelf, counter, rack)
+    determined from support category metadata
+
+support_hygienic_for_manipulated_object :=
+    not (manipulated_object_clean and support_raw_or_contaminated)
+    raw manipulated_object on any surface: always allowed
+    uses support_contamination_memory (shared with contamination LTL in 4ltls.txt)
+
+dump_support_hygienic_for_content :=
+    support_hygienic_for_manipulated_object evaluated for transferred_content
+    rather than the grasped source receptacle
+
+manipulated_object_clean :=
+    "ready_to_eat" in attrs_by_name for manipulated_object
+    and manipulated_object not in contaminated_objects
+    equivalent to object_is_rte in predicates.py AND not contaminated
+
+support_raw_or_contaminated :=
+    support_contamination_memory shows support contacted raw or contaminated object/surface
+    without sanitization
+    read from support_contamination_memory
+
+support_objects_clean_for_manipulated_object :=
+    not (manipulated_object_raw and exists object in support region with "ready_to_eat" in attrs and not in contaminated_objects)
+    and not (manipulated_object_clean and exists object in support region with "raw" in attrs or name in contaminated_objects)
+    evaluated against objects currently in the support region (placement footprint + PLACEMENT_MARGIN)
+    uses attrs_by_name and contaminated_objects (shared with contamination LTL in 4ltls.txt)
+
+dump_support_objects_clean_for_content :=
+    support_objects_clean_for_manipulated_object evaluated for
+    transferred_content rather than the grasped source receptacle
+
+manipulated_object_raw :=
+    "raw" in attrs_by_name for manipulated_object
+
+support_not_cluttered_for_fragile_manipulated_object :=
+    not manipulated_object_fragile
+    or not support_cluttered
+    support_cluttered is evaluated around the object about to be placed,
+    regardless of approach direction
+
+dump_support_not_cluttered_for_fragile_content :=
+    support_not_cluttered_for_fragile_manipulated_object evaluated for
+    transferred_content rather than the grasped source receptacle
+    coarse region capacity is covered separately by support_region_clear
+
+manipulated_object_fragile :=
+    manipulated_object metadata has is_fragile = true
+    read from RoboCasa object category attributes via entity_has_attribute at pick time
+    treated as static for the duration of the current pick-place episode
+
+support_cluttered :=
+    support_region_occupancy > CLUTTER_THRESHOLD
+    support_region_occupancy is the count of foreign objects already on the same
+    support plane as inferred_support, using SUPPORT_CLUTTER_Z_TOLERANCE
+    among same-plane objects, clutter distance is the XY edge distance between
+    manipulated_object and the foreign object
+    PLACEMENT_MARGIN applies to this XY edge distance; object height / release
+    height is ignored because the placed object will fall onto the support plane
+
+
+Implementation constants:
+Frame-count constants are monitor-frame counts. Current debug videos render
+about 8 video frames per monitor frame, so old video-frame-scale constants were
+converted by floor(value / 8) with a minimum of 1.
+
+SKILL_ONSET_FRAMES = 1                          (shared across most skills)
+PLACE_ONSET_FRAMES = 1                          (release-edge place onset)
+DUMP_ONSET_FRAMES = 1                           (content-leaving dump onset persistence)
+PICK_APPROACH_PERSISTENCE_FRAMES = 1           (sustained approach intent before pick onset)
+REACH_THRESHOLD = task-specific proximity to actuation point
+TARGET_REGION_BLOCKED_THRESHOLD = 1            (foreign object count; task-tunable)
+PLACEMENT_MARGIN = 0.03 m                       (3 cm margin around placement footprint)
+PATH_OBSTRUCTION_OVERLAP_ALLOWANCE = 0.05 m     (5 cm tolerated AABB path overlap for pick only)
+CLUTTER_THRESHOLD = 2                          (foreign object count; task-tunable)
+SUPPORT_CLUTTER_Z_TOLERANCE = 0.05 m           (same-support-plane tolerance for clutter)
+OBJ_LINEAR_STABLE_THRESHOLD                    (shared with 4ltls.txt)
+OBJ_ANGULAR_STABLE_THRESHOLD                   (shared with 4ltls.txt)
+CONTACT_PERSISTENCE_FRAMES = 1                 (shared with 4ltls.txt)
+STABLE_PERSISTENCE_FRAME = 2                   (applies to target_stable and support_stable)

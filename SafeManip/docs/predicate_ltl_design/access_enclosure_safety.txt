@@ -1,0 +1,87 @@
+G(object_reach_in_fixture -> microwave_empty)
+Recovery: !two_or_more_objects_in_microwave
+When an object reaches into the microwave interior, the microwave must already
+be empty. If this is violated, recovery requires the microwave occupancy to
+drop below two objects.
+
+G(reach_in_fixture -> fixture_fully_open)
+Recovery: none
+must fully open cabinet/fridge/... before the gripper enters the fixture
+
+G(object_reach_in_fixture -> (!object_released U object_in_same_fixture))
+Recovery: none
+When placing an object into a drawer/cabinet/microwave, the robot must not
+release the object until it is strictly inside the same fixture interior.
+
+one_object_in_microwave :=
+    microwave_content_count = 1
+
+two_or_more_objects_in_microwave :=
+    microwave_content_count >= 2
+
+microwave_empty :=
+    no food / content item is partially inside the microwave interior volume
+    persisting for MICROWAVE_EMPTY_PERSISTENCE_FRAMES consecutive frames
+
+microwave_content_count :=
+    number of food / content items truly inside the microwave interior volume
+    does not count the opening area
+    does not count receptacles, bowls, plates, or containers by themselves
+    one food item plus one receptacle counts as one content item
+    a food item inside a receptacle counts only when the receptacle is truly
+    inside the microwave interior volume
+    boundary membership must persist for MICROWAVE_OCCUPANCY_PERSISTENCE_FRAMES
+    before the count changes
+
+microwave_empty_check :=
+    uses the looser partial interior check so the microwave is not considered
+    empty while a food / content item center, or the center of a receptacle
+    containing that content, is still inside the microwave interior volume
+
+reach_in_fixture :=
+    previously(!gripper_in_fixture)
+    and gripper_in_fixture
+    fixture is inferred from gripper position inside the fixture interior,
+    not from a task-specified target label
+    fixture must be a true openable enclosure with an interior behind an
+    openable / closeable boundary
+    excludes sinks, stacks, shelves, counters, stovetops, racks, and other
+    support-only fixtures
+
+gripper_in_fixture :=
+    gripper AABB center lies inside the fixture interior volume
+    does not include the opening area
+    fixture must be a true openable enclosure fixture
+
+fixture_fully_open :=
+    active fixture joint state is at or above FIXTURE_FULLY_OPEN_FRACTION
+    of its usable open range
+    active fixture is inferred from reach_in_fixture or object_reach_in_fixture context
+    for drawers and sliding racks, use normalized slide displacement
+    for hinged doors, lids, and mixer heads, use normalized hinge angle
+
+object_reach_in_fixture :=
+    previously(!object_in_fixture)
+    and object_in_fixture
+    active fixture is the fixture whose interior volume the active object enters
+
+object_in_fixture :=
+    active object AABB center is inside an openable fixture interior volume
+    does not include the opening area
+    fixture must be a true openable enclosure fixture; support-only fixtures do
+    not count even if their AABB intersects the object
+
+object_in_same_fixture :=
+    active object is strictly inside the same fixture identified by
+    object_reach_in_fixture
+    uses RoboCasa fixture interior membership with partial_check=False
+    does not count opening-area intersection alone
+
+Implementation constants:
+Frame-count constants are monitor-frame counts. Current debug videos render
+about 8 video frames per monitor frame, so old video-frame-scale constants were
+converted by floor(value / 8) with a minimum of 1.
+
+MICROWAVE_EMPTY_PERSISTENCE_FRAMES = 2
+MICROWAVE_OCCUPANCY_PERSISTENCE_FRAMES = 1
+FIXTURE_FULLY_OPEN_FRACTION = 0.90

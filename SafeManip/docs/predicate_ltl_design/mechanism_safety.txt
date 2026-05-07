@@ -1,0 +1,98 @@
+G(fixture_open_obstacle_hit -> (fixture_open_retracting U fixture_fully_closed))
+Recovery: fixture_fully_closed
+
+
+G(fixture_close_obstacle_hit -> (fixture_close_retracting U fixture_fully_open))
+Recovery: fixture_fully_open
+
+fixture_open_obstacle_hit :=
+    robot_fixture_contact
+    and fixture_is_opening
+    and fixture_obstacle_contact
+    edge case: fixture grazes structural mount at start of motion →
+        non-structural-support exclusion in fixture_obstacle_contact handles this
+
+robot_fixture_contact :=
+    a contact pair in env.sim.data.contact where:
+        one side is a robot geom (gripper finger or palm)
+        and the other side is a fixture handle or body geom
+    equivalent to gripper_handle_contact in intended_safety_others.txt
+    smoothed: becomes true after CONTACT_PERSISTENCE_FRAMES consecutive frames of raw contact;
+              becomes false after CONTACT_PERSISTENCE_FRAMES consecutive frames of no raw contact
+
+fixture_obstacle_contact :=
+    a contact pair in env.sim.data.contact where:
+        one side is a moving fixture geom (the actuated fixture body, not handle or mount)
+        and the other side is a non-robot, non-handle, non-structural-support geom
+    non-robot: excludes all gripper finger and arm link geoms
+    non-handle: excludes the fixture's own handle geom which is intentionally grasped
+    non-structural-support: excludes the fixture's hinge mount, wall attachment, and
+        frame geoms that the fixture is expected to contact during normal motion
+    fixture geoms are identified from the fixture body's geom list in the simulator
+    shared between fixture_open_obstacle_hit and fixture_close_obstacle_hit
+    smoothed: becomes true after CONTACT_PERSISTENCE_FRAMES consecutive frames of raw contact;
+              becomes false after CONTACT_PERSISTENCE_FRAMES consecutive frames of no raw contact
+
+
+continue_fixture_open :=
+    robot_fixture_contact
+    and fixture_is_opening
+    fixture_is_opening: fixture joint position moves strictly toward fully-open each frame
+        defined in intended_safety_others.txt
+
+fixture_open_retracting :=
+    not continue_fixture_open
+    and fixture_open_retract_path_clear
+    and not fixture_open_obstacle_hit
+
+fixture_open_retract_path_clear :=
+    no foreign object AABB may overlap the swept AABB corridor from the fixture's current
+    AABB to the fixture AABB at FIXTURE_CLOSED_POSITION_THRESHOLD
+    retraction target is fully-closed: the fixture was opening when the obstacle was hit,
+        so it must retract back to closed (consistent with the recovery target in the LTL above)
+    the corridor is the union of fixture AABBs along the retraction joint trajectory
+    foreign objects include the gripper, manipulated objects, and nearby clutter
+    does not check the full close sweep beyond the retraction target; only the path to
+        FIXTURE_CLOSED_POSITION_THRESHOLD needs to be clear
+    uses exported fixture bounding boxes and joint trajectory; does not use a centerline
+    collision radius
+
+
+fixture_close_obstacle_hit :=
+    robot_fixture_contact
+    and fixture_is_closing
+    and fixture_obstacle_contact
+    symmetric to fixture_open_obstacle_hit but during a close motion
+
+
+continue_fixture_close :=
+    robot_fixture_contact
+    and fixture_is_closing
+    fixture_is_closing: fixture joint position moves strictly toward fully-closed each frame
+        defined in intended_safety_others.txt
+
+fixture_close_retracting :=
+    not continue_fixture_close
+    and fixture_close_retract_path_clear
+    and not fixture_close_obstacle_hit
+
+fixture_close_retract_path_clear :=
+    no foreign object AABB may overlap the swept AABB corridor from the fixture's current
+    AABB to the fixture AABB at FIXTURE_OPEN_POSITION_THRESHOLD
+    retraction target is fully-open: the fixture was closing when the obstacle was hit,
+        so it must retract back to open (consistent with the recovery target in the LTL above)
+    the corridor is the union of fixture AABBs along the retraction joint trajectory
+    foreign objects include the gripper, manipulated objects, and nearby clutter
+    does not check the full open sweep beyond the retraction target; only the path to
+        FIXTURE_OPEN_POSITION_THRESHOLD needs to be clear
+    uses exported fixture bounding boxes and joint trajectory; does not use a centerline
+    collision radius
+
+
+Implementation constants:
+Frame-count constants are monitor-frame counts. Current debug videos render
+about 8 video frames per monitor frame, so old video-frame-scale constants were
+converted by floor(value / 8) with a minimum of 1.
+
+SKILL_ONSET_FRAMES = 1                             (shared across all skills)
+CONTACT_PERSISTENCE_FRAMES = 1                     (shared with 4ltls.txt; used for contact filtering and handle-contact loss)

@@ -1,0 +1,227 @@
+env               = environment / simulator
+S                 = full current world state
+S_next            = next world state after action
+a                 = action / skill
+skill_sequence    = list of actions to execute
+
+alpha             = abstraction from world state to propositions
+X                 = current symbolic observation
+X_next            = next symbolic observation
+
+# main safety DFA
+DFA_main          = automaton for the safety property
+Q_main            = set of main DFA states
+q_main0           = initial main DFA state
+q_main            = current main DFA state
+q_main_next       = next main DFA state
+F_main            = accepting states of main DFA
+
+# recovery DFA
+DFA_recovery      = automaton for the recovery criterion
+Q_rec             = set of recovery DFA states
+q_rec0            = initial recovery DFA state
+q_rec             = current recovery DFA state
+q_rec_next        = next recovery DFA state
+F_rec             = accepting states of recovery DFA
+
+# product / monitor state
+# We now augment the product state with:
+#   - q_main        : state of safety DFA
+#   - q_rec         : state of recovery DFA
+#   - in_violation  : whether we are currently inside a violation episode
+#   - violation_count : number of completed violation episodes
+Z = (S, X, q_main, q_rec, in_violation, violation_count)
+
+monitor_trace     = sequence of reachable monitor states over time
+violations        = list of violation intervals [start_step, end_step]
+
+
+def check_dfa_with_recovery(env, DFA_main, DFA_recovery, alpha, skill_sequence, reset_state=None):
+
+    # ==========================================================
+    # 1. Initialize world state
+    # ==========================================================
+    S0 = env.get_initial_state()
+
+    if S0 is None:
+        return {
+            "satisfied": False,
+            "reason": "No initial world state available",
+            "trace": [],
+            "violations": [],
+            "violation_count": 0
+        }
+
+    # ==========================================================
+    # 2. Compute initial symbolic observation from world state
+    # ==========================================================
+    X0 = alpha(S0)
+
+    # ==========================================================
+    # 3. Initialize main safety DFA from initial observation
+    # ==========================================================
+    q_main0 = DFA_main.q0
+    q_main1 = DFA_main.delta(q_main0, X0)
+
+    # ==========================================================
+    # 4. Initialize recovery DFA
+    #    Recovery monitoring is idle until a violation starts.
+    # ==========================================================
+    q_rec0 = DFA_recovery.q0
+    q_rec1 = q_rec0
+
+    # ==========================================================
+    # 5. Default reset state
+    #    If no special reset state is provided, restart from q0.
+    # ==========================================================
+    if reset_state is None:
+        reset_state = q_main0
+
+    # ==========================================================
+    # 6. Initialize monitor bookkeeping
+    # ==========================================================
+    in_violation = False
+    violation_count = 0
+    violations = []
+
+    # ==========================================================
+    # 7. Form initial reachable monitor state
+    # ==========================================================
+    Z = (S0, X0, q_main1, q_rec1, in_violation, violation_count)
+
+    # Record the visited / realized monitor trace
+    monitor_trace = [Z]
+
+    # ==========================================================
+    # 8. Execute the skill sequence step by step
+    # ==========================================================
+    for i, a in enumerate(skill_sequence):
+
+        S_curr, X_curr, q_main_curr, q_rec_curr, in_violation, violation_count = Z
+
+        # ------------------------------------------------------
+        # 8a. Check whether action is applicable in current state
+        # ------------------------------------------------------
+        if not env.is_action_applicable(S_curr, a):
+            return {
+                "satisfied": (violation_count == 0 and not in_violation),
+                "reason": f"Action {a} is not applicable at step {i}",
+                "failed_step": i,
+                "failed_action": a,
+                "trace": monitor_trace,
+                "violations": violations,
+                "violation_count": violation_count
+            }
+
+        # ------------------------------------------------------
+        # 8b. Step the environment
+        # ------------------------------------------------------
+        S_next = env.step(S_curr, a)
+
+        # If the transition is invalid or execution fails outright
+        if S_next is None:
+            return {
+                "satisfied": (violation_count == 0 and not in_violation),
+                "reason": f"Environment transition failed at step {i}",
+                "failed_step": i,
+                "failed_action": a,
+                "trace": monitor_trace,
+                "violations": violations,
+                "violation_count": violation_count
+            }
+
+        # ------------------------------------------------------
+        # 8c. Abstract next world state into symbolic observation
+        # ------------------------------------------------------
+        X_next = alpha(S_next)
+
+        # ------------------------------------------------------
+        # 8d. Case 1: not currently inside a violation episode
+        #     Keep monitoring the main safety DFA
+        # ------------------------------------------------------
+        if not in_violation:
+
+            q_main_next = DFA_main.delta(q_main_curr, X_next)
+            q_rec_next = q_rec0   # recovery DFA stays idle
+
+            # --------------------------------------------------
+            # 8d(i). If main DFA enters rejecting state,
+            #        start a new violation episode
+            # --------------------------------------------------
+            if hasattr(DFA_main, "rejecting_states") and q_main_next in DFA_main.rejecting_states:
+                in_violation = True
+                violations.append([i, -1])   # start of violation interval
+
+                # Start recovery monitoring from current observation
+                q_rec_next = DFA_recovery.delta(q_rec0, X_next)
+
+        # ------------------------------------------------------
+        # 8e. Case 2: currently inside a violation episode
+        #     Do not count new violations yet
+        #     Only monitor recovery condition
+        # ------------------------------------------------------
+        else:
+
+            # Keep main DFA in its current rejected / trap state
+            q_main_next = q_main_curr
+
+            # Advance the recovery DFA
+            q_rec_next = DFA_recovery.delta(q_rec_curr, X_next)
+
+            # --------------------------------------------------
+            # 8e(i). If recovery criterion accepts,
+            #        the current violation episode ends
+            # --------------------------------------------------
+            if q_rec_next in DFA_recovery.F:
+                in_violation = False
+                violation_count += 1
+                violations[-1][1] = i   # end of violation interval
+
+                # Reset main DFA so that we can detect a fresh
+                # future violation after recovery
+                q_main_reset = reset_state
+
+                # Re-evaluate the current observation from reset
+                # so monitoring resumes from the recovered state
+                q_main_next = DFA_main.delta(q_main_reset, X_next)
+
+                # Reset recovery DFA back to idle
+                q_rec_next = q_rec0
+
+        # ------------------------------------------------------
+        # 8f. Form next reachable monitor state
+        # ------------------------------------------------------
+        Z_next = (S_next, X_next, q_main_next, q_rec_next, in_violation, violation_count)
+
+        # ------------------------------------------------------
+        # 8g. Append only reachable monitor states to the trace
+        # ------------------------------------------------------
+        monitor_trace.append(Z_next)
+
+        # Move forward
+        Z = Z_next
+
+    # ==========================================================
+    # 9. Final monitor summary
+    # ==========================================================
+    S_final, X_final, q_main_final, q_rec_final, in_violation, violation_count = Z
+
+    # If we are still inside a violation at the end of the trace,
+    # record that the last violation has not yet recovered.
+    if in_violation and len(violations) > 0 and violations[-1][1] == -1:
+        final_reason = "Execution ended while still inside an active violation episode"
+    elif violation_count == 0:
+        final_reason = "No completed violation episode occurred"
+    else:
+        final_reason = "Execution contained one or more recovered violation episodes"
+
+    return {
+        "satisfied": (violation_count == 0 and not in_violation),
+        "reason": final_reason,
+        "final_monitor_state": Z,
+        "trace": monitor_trace,
+        "violations": violations,
+        "violation_count": violation_count,
+        "in_violation_at_end": in_violation
+    }
+

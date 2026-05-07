@@ -1,0 +1,152 @@
+env        	= environment / simulator
+S          	= full current world state
+S_next     	= next world state after action
+a          	= action / skill
+skill_sequence = list of actions to execute
+
+alpha      	= abstraction from world state to propositions
+X          	= current symbolic observation
+X_next     	= next symbolic observation
+
+DFA        	= automaton from LTLf
+Q          	= set of DFA states
+q0         	= initial DFA state
+q          	= current DFA state
+q_next     	= next DFA state
+delta      	= DFA transition function
+F          	= accepting DFA states
+
+# product / monitor state
+Z = (S, X, q)
+product_trace  = sequence of product states over time
+
+
+def check_dfa_with_reachable_product(env, DFA, alpha, skill_sequence):
+
+    # ==========================================================
+    # 1. Initialize world state
+    # ==========================================================
+    S0 = env.get_initial_state()
+
+    if S0 is None:
+        return {
+            "satisfied": False,
+            "reason": "No initial world state available",
+            "trace": []
+        }
+
+    # ==========================================================
+    # 2. Compute initial symbolic observation from world state
+    # ==========================================================
+    X0 = alpha(S0)
+
+    # ==========================================================
+    # 3. Initialize DFA from initial observation
+    #	We include the initial world observation in the trace.
+    # ==========================================================
+    q0 = DFA.q0
+    q1 = DFA.delta(q0, X0)
+
+    # ==========================================================
+    # 4. Form initial reachable product state
+    #	Product state stores:
+    #  	S = full world state
+    #  	X = symbolic observation
+    #  	q = DFA state
+    # ==========================================================
+    Z = (S0, X0, q1)
+
+    # Record the visited / realized product trace
+    product_trace = [Z]
+
+    # ==========================================================
+    # 5. Execute the skill sequence step by step
+    # ==========================================================
+    for i, a in enumerate(skill_sequence):
+
+        S_curr, X_curr, q_curr = Z
+
+        # ------------------------------------------------------
+        # 5a. Check whether action is applicable in current state
+        # ------------------------------------------------------
+        if not env.is_action_applicable(S_curr, a):
+            return {
+                "satisfied": False,
+                "reason": f"Action {a} is not applicable at step {i}",
+                "failed_step": i,
+                "failed_action": a,
+                "trace": product_trace
+            }
+
+        # ------------------------------------------------------
+        # 5b. Step the environment
+        # ------------------------------------------------------
+        S_next = env.step(S_curr, a)
+
+        # If the transition is invalid or execution fails outright
+        if S_next is None:
+            return {
+                "satisfied": False,
+                "reason": f"Environment transition failed at step {i}",
+                "failed_step": i,
+                "failed_action": a,
+                "trace": product_trace
+            }
+
+        # ------------------------------------------------------
+        # 5c. Abstract next world state into symbolic observation
+        # ------------------------------------------------------
+        X_next = alpha(S_next)
+
+        # ------------------------------------------------------
+        # 5d. Update DFA with the full next observation
+        # 	IMPORTANT:
+        # 	do NOT step on each predicate change individually
+        # ------------------------------------------------------
+        q_next = DFA.delta(q_curr, X_next)
+
+        # ------------------------------------------------------
+        # 5e. Form next reachable product state
+        # ------------------------------------------------------
+        Z_next = (S_next, X_next, q_next)
+
+        # ------------------------------------------------------
+        # 5f. Append only reachable product states to the trace
+        # ------------------------------------------------------
+        product_trace.append(Z_next)
+
+        # ------------------------------------------------------
+        # 5g. Optional early rejection check
+        # ------------------------------------------------------
+        if hasattr(DFA, "rejecting_states") and q_next in DFA.rejecting_states:
+            return {
+                "satisfied": False,
+                "reason": f"Entered rejecting DFA state at step {i}",
+                "failed_step": i,
+                "failed_action": a,
+                "trace": product_trace
+            }
+
+        # Move forward
+        Z = Z_next
+
+    # ==========================================================
+    # 6. Final acceptance check
+    # ==========================================================
+    S_final, X_final, q_final = Z
+
+    if q_final in DFA.F:
+        return {
+            "satisfied": True,
+            "reason": "Final DFA state is accepting",
+            "final_product_state": Z,
+            "trace": product_trace
+        }
+    else:
+        return {
+            "satisfied": False,
+            "reason": "Final DFA state is not accepting",
+            "final_product_state": Z,
+            "trace": product_trace
+        }
+
