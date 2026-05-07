@@ -19,6 +19,7 @@ SafeManip/
 |   |   `-- predicate_ltl_design/
 |   `-- install_mona.sh       # MONA installer for DFA construction
 |-- run_scripts/              # Slurm launch and evaluation scripts
+|-- examples/                 # Qualitative safety-category videos and monitor outputs
 |-- launch_groot.sh           # GR00T evaluation launcher
 |-- launch_openpi.sh          # OpenPI evaluation launcher
 `-- install.sh                # Repository setup helper
@@ -215,6 +216,12 @@ Scheduler logs are written under:
 
 ```text
 logs/eval/
+```
+
+Qualitative safety-category examples are available in:
+
+```text
+/nethome/chuang475/testnvme/projects/SafeManip/examples
 ```
 
 ## Analysis and Paper Figures
