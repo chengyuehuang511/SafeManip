@@ -217,6 +217,14 @@ Scheduler logs are written under:
 logs/eval/
 ```
 
+## Analysis and Paper Figures
+
+To obtain the data needed to regenerate graphs reported in the paper, refer to the analysis instructions in:
+
+```text
+SafeManip/analysis/README.md
+```
+
 ## Manual Monitor Invocation
 
 The monitor can be run directly on an exported privileged trajectory:
