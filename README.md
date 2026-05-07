@@ -221,7 +221,7 @@ logs/eval/
 Qualitative safety-category examples are available in:
 
 ```text
-/nethome/chuang475/testnvme/projects/SafeManip/examples
+SafeManip/examples
 ```
 
 ## Analysis and Paper Figures
