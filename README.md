@@ -9,6 +9,9 @@ SafeManip evaluates robotic manipulation policies with privileged simulator stat
 ```text
 SafeManip/
 |-- Isaac-GR00T/              # GR00T policy and evaluation integration
+|   `-- scripts/
+|       |-- run_single_task.py           # Single-task GR00T eval entry point
+|       `-- run_single_task_identical.py # Fixed-scene variant (seed-locked reset)
 |-- openpi/                   # OpenPI policy and evaluation integration
 |-- robocasa/                 # RoboCasa fork with privileged-state export
 |-- SafeManip/
@@ -17,11 +20,15 @@ SafeManip/
 |   |-- docs/
 |   |   |-- dfa_pseudo_code/
 |   |   `-- predicate_ltl_design/
+|   |-- validate_identical_scene.py  # Checks fixed-scene rollouts share one scene
 |   `-- install_mona.sh       # MONA installer for DFA construction
 |-- run_scripts/              # Slurm launch and evaluation scripts
 |-- examples/                 # Qualitative safety-category videos and monitor outputs
 |-- launch_groot.sh           # GR00T evaluation launcher
 |-- launch_openpi.sh          # OpenPI evaluation launcher
+|-- groot-identical.sh        # Fixed-scene ("identical episode") GR00T launcher
+|-- requirements.txt          # Pinned dependency snapshot (alternative to install.sh)
+|-- install_flash_attn.sh     # Helper to build/install flash-attn
 `-- install.sh                # Repository setup helper
 ```
 
@@ -60,6 +67,25 @@ Specification and design notes:
 
 Use a Python environment compatible with the policy stack being evaluated. The evaluation stack uses local editable installs so that the RoboCasa privileged-state changes and policy integration code are picked up directly from this repository.
 
+Two installation paths are supported:
+
+- **Editable flow (recommended for development):** the `install.sh`-based steps below, which clone RoboSuite and install the local `robocasa` / `Isaac-GR00T` / `openpi` packages in editable mode.
+- **Pinned snapshot (recommended for reproducing a known-good environment):** a fully transitive, version-pinned `requirements.txt` captured from a working environment (Python 3.10):
+
+  ```bash
+  pip install -r requirements.txt
+  ```
+
+  Run it from the repository root so the repo-relative editables (`-e ./Isaac-GR00T`, `-e ./robocasa`) resolve. Install `torch` first and the editables/flash-attn last.
+
+`flash-attn` rarely builds cleanly through plain `pip`. Use the helper, which loads the build toolchain and compiles it with the pinned version:
+
+```bash
+bash install_flash_attn.sh
+```
+
+Edit the placeholder paths inside `install_flash_attn.sh` (environment, project directory, cache locations) before running it.
+
 ### Shared RoboCasa and Monitor Setup
 
 Install the simulator dependencies first. Clone RoboSuite into the repository root, then install it in editable mode:
@@ -68,6 +94,14 @@ Install the simulator dependencies first. Clone RoboSuite into the repository ro
 git clone https://github.com/ARISE-Initiative/robosuite.git robosuite
 pip install -e robosuite
 ```
+
+> **⚠️ RoboSuite version:** This stack is validated against RoboSuite **1.5.2** at commit
+> `232ce7d4a6ed89c949a9aba024a05c8c32fdd08b` (`v1.5.2-6-g232ce7d4`, on `master`). The bare
+> clone above tracks `master`, which moves; for a reproducible setup, check out the pinned
+> commit (`cd robosuite && git checkout 232ce7d4a6ed89c949a9aba024a05c8c32fdd08b`) or install
+> via the pinned `requirements.txt`, which already references this commit. The `v1.5.2` tag
+> alone is **not** sufficient (the validated commit is 6 commits past it). This applies to all
+> three RoboSuite clone steps below.
 
 Then install the local RoboCasa fork and monitor dependencies:
 
@@ -190,6 +224,37 @@ OPENPI_MODEL_VARIANT=pi0 OPENPI_MODEL_FAMILY=pretraining N_EPISODES=50 bash run_
 ```
 
 Task lists are defined in `run_scripts/sbatch_groot_test.sh` and `run_scripts/sbatch_openpi_test.sh`.
+
+## Fixed-Scene (Identical Episode) Evaluation
+
+The standard launchers vary the scene across episodes. For experiments that need
+every episode to replay the **same scene and the same initial state**
+(seed-locked, so only the policy's own stochasticity varies), use the fixed-scene
+launcher:
+
+```bash
+TASK=PackIdenticalLunches N_EPISODES=50 SEED=42 bash groot-identical.sh
+```
+
+This calls `Isaac-GR00T/scripts/run_single_task_identical.py`, which takes the
+same arguments as `run_single_task.py` but monkey-patches the environment factory
+so every reset reuses one seed. The scene is fully determined by `SEED`; changing
+`SEED` selects a different (but still single, repeated) scene. Outputs are written
+under `results/groot_identical/<model_family>/`. Checkpoint, conda, and scheduler
+settings are resolved from `run_scripts/.local_paths.sh` exactly as for the other
+launchers (override `MODEL_PATH`, `TASK`, `SPLIT`, `N_EPISODES`, `SEED`, `VIDEO_DIR`
+via the environment).
+
+To confirm the rollouts genuinely share one scene and initial state:
+
+```bash
+python SafeManip/validate_identical_scene.py \
+  results/groot_identical/<model_family>/evals/target/PackIdenticalLunches/rollout_data/PackIdenticalLunches--*/
+```
+
+The validator compares layout/style, fixtures, and object placement across
+episodes and reports `PASS` when the scene is identical (later-frame divergence
+from policy stochasticity is expected and reported as informational only).
 
 ## Outputs
 
