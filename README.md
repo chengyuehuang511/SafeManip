@@ -4,10 +4,7 @@
 
 ### A Property-Driven Benchmark for Temporal Safety Evaluation in Robotic Manipulation
 
-[![Paper](https://img.shields.io/badge/arXiv-2605.12386-b31b1b.svg)](https://arxiv.org/abs/2605.12386)
-[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
-
-**[📄 Paper](https://arxiv.org/abs/2605.12386)**
+[![arXiv](https://img.shields.io/badge/arXiv-2605.12386-b31b1b.svg)](https://arxiv.org/abs/2605.12386)
 
 </div>
 
