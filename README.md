@@ -1,8 +1,21 @@
+<div align="center">
+
 # SafeManip
 
-This anonymized repository accompanies **SafeManip: A Property-Driven Benchmark for Temporal Safety Evaluation in Robotic Manipulation**.
+### A Property-Driven Benchmark for Temporal Safety Evaluation in Robotic Manipulation
+
+[![Paper](https://img.shields.io/badge/arXiv-2605.12386-b31b1b.svg)](https://arxiv.org/abs/2605.12386)
+[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
+
+**[📄 Paper](https://arxiv.org/abs/2605.12386)**
+
+</div>
+
+---
 
 SafeManip evaluates robotic manipulation policies with privileged simulator state and temporal safety specifications. The codebase provides RoboCasa instrumentation, symbolic predicates, LTL/DFA monitors, policy evaluation launchers, and analysis utilities for summarizing safety outcomes.
+
+For full details, see the paper: **[SafeManip: A Property-Driven Benchmark for Temporal Safety Evaluation in Robotic Manipulation](https://arxiv.org/abs/2605.12386)**.
 
 ## Contents
 
@@ -320,3 +333,16 @@ The following are intentionally ignored:
 - generated videos, checkpoints, caches, and Python build artifacts
 
 If monitor JSON files are missing, inspect the corresponding scheduler `.out` file for `Failed to run symbolic monitor`.
+
+## Citation
+
+If this repository helps with your work, please cite:
+
+```bibtex
+@article{huang2026safemanip,
+  title={SafeManip: A Property-Driven Benchmark for Temporal Safety Evaluation in Robotic Manipulation},
+  author={Huang, Chengyue and Huynh, Khang Vo and Elbaum, Sebastian and Kira, Zsolt and Feng, Lu},
+  journal={arXiv preprint arXiv:2605.12386},
+  year={2026}
+}
+```
