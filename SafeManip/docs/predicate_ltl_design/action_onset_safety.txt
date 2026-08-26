@@ -548,10 +548,10 @@ Frame-count constants are monitor-frame counts. Current debug videos render
 about 8 video frames per monitor frame, so old video-frame-scale constants were
 converted by floor(value / 8) with a minimum of 1.
 
-SKILL_ONSET_FRAMES = 1                          (shared across most skills)
+SKILL_ONSET_FRAMES = 2                          (shared across most skills)
 PLACE_ONSET_FRAMES = 1                          (release-edge place onset)
 DUMP_ONSET_FRAMES = 1                           (content-leaving dump onset persistence)
-PICK_APPROACH_PERSISTENCE_FRAMES = 1           (sustained approach intent before pick onset)
+PICK_APPROACH_PERSISTENCE_FRAMES = 2           (sustained approach intent before pick onset)
 REACH_THRESHOLD = task-specific proximity to actuation point
 TARGET_REGION_BLOCKED_THRESHOLD = 1            (foreign object count; task-tunable)
 PLACEMENT_MARGIN = 0.03 m                       (3 cm margin around placement footprint)
