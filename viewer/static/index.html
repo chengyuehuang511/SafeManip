@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>SafeManip Monitor Viewer</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>SafeManip Monitor Viewer</h1>
+    <div class="root-path" id="root-path">loading root…</div>
+    <nav class="tab-bar">
+      <button id="tab-eval" class="tab-btn active">Eval Results</button>
+      <button id="tab-training" class="tab-btn">Training Data</button>
+    </nav>
+    <button id="theme-toggle" class="theme-toggle">☀️ light mode</button>
+  </header>
+
+  <div class="layout" id="screen-eval">
+    <aside class="sidebar">
+      <div class="picker">
+        <label>Task</label>
+        <select id="task-select"><option>loading…</option></select>
+      </div>
+      <div class="episode-list" id="episode-list"></div>
+    </aside>
+
+    <main class="main">
+      <div id="empty-state" class="empty-state">
+        Pick a task, then an episode, to inspect it.
+      </div>
+
+      <div id="episode-view" class="episode-view hidden">
+        <div class="episode-header">
+          <h2 id="ep-title"></h2>
+          <div id="ep-badge" class="badge"></div>
+        </div>
+        <p id="ep-description" class="ep-description"></p>
+        <div id="ep-meta" class="ep-meta"></div>
+
+        <div id="sync-row" class="sync-row hidden">
+          <button id="sync-play-btn" class="sync-play-btn">▶ Play both</button>
+          <span class="sync-hint">plays/pauses/seeks both videos together, however you control either one</span>
+        </div>
+        <div class="video-row">
+          <div class="video-col">
+            <div class="video-col-label">Original</div>
+            <video id="video" controls preload="metadata"></video>
+          </div>
+          <div class="video-col" id="recon-col">
+            <div class="video-col-label">Reconstructed (from privileged info)</div>
+            <video id="recon-video" controls preload="metadata"></video>
+          </div>
+        </div>
+        <div id="recon-panel" class="recon-panel hidden"></div>
+
+        <div class="bar-legend">
+          <span class="bar-legend-item"><span class="legend-glyph legend-start">▸</span> starts monitoring, labeled with which object/fixture it's about (highest tier)</span>
+          <span class="bar-legend-item"><span class="legend-glyph legend-violated">✗</span> violated (middle tier — transition frame only, a run of consecutive violated frames only gets one mark)</span>
+          <span class="bar-legend-item"><span class="legend-glyph legend-end">◆</span> ends, resolved or episode end (tier closest to the bar)</span>
+          <span class="bar-legend-item"><span class="legend-dash"></span> dashed line pins each mark to its exact frame — kinds are stacked at different heights so they never overlap even on the same frame</span>
+        </div>
+        <div class="columns">
+          <section class="violations">
+            <h3>Violations (<span id="viol-count">0</span>)</h3>
+            <div id="violations-list"></div>
+          </section>
+          <section class="satisfied">
+            <h3>Satisfied properties (<span id="sat-count">0</span>)</h3>
+            <div id="satisfied-list"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="layout hidden" id="screen-training">
+    <aside class="sidebar">
+      <div class="picker">
+        <label>Task</label>
+        <select id="td-task-select"><option>loading…</option></select>
+      </div>
+      <div class="episode-list" id="td-episode-list"></div>
+    </aside>
+
+    <main class="main">
+      <div id="td-empty-state" class="empty-state">
+        Pick a task, then an episode, to view its ground-truth reconstruction.
+      </div>
+
+      <div id="td-episode-view" class="episode-view hidden">
+        <div class="episode-header">
+          <h2 id="td-ep-title"></h2>
+        </div>
+        <p id="td-ep-lang" class="ep-description"></p>
+        <div id="td-ep-meta" class="ep-meta"></div>
+
+        <div id="td-sync-row" class="sync-row hidden">
+          <button id="td-sync-play-btn" class="sync-play-btn">▶ Play both</button>
+          <span class="sync-hint">plays/pauses/seeks both videos together, however you control either one</span>
+        </div>
+        <div class="video-row video-row-wide">
+          <div class="video-col video-col-wide">
+            <div class="video-col-label">Original (from the training dataset — robot0_agentview_left | robot0_agentview_right | robot0_eye_in_hand)</div>
+            <video id="td-original-video" controls preload="metadata"></video>
+          </div>
+          <div class="video-col video-col-wide">
+            <div class="video-col-label">Reconstructed (ground-truth state playback — same 3 camera views)</div>
+            <video id="td-video" controls preload="metadata"></video>
+          </div>
+        </div>
+
+        <!-- Postprocess symbolic-monitor panel: privileged_information_<N>.json /
+             _monitor.json produced by SafeManip/monitor/extract_privileged_from_dataset.py
+             from this same ground-truth training episode (a separate, additive
+             analysis pass -- see that script's docstring). Hidden/replaced with
+             a hint if that pipeline hasn't been run for this episode yet. -->
+        <section id="td-monitor-section" class="monitor-section">
+          <div id="td-monitor-missing" class="card-hint hidden"></div>
+          <div id="td-monitor-body" class="hidden">
+            <div id="td-monitor-meta" class="ep-meta"></div>
+            <div class="columns">
+              <section class="violations">
+                <h3>Violations (<span id="td-viol-count">0</span>)</h3>
+                <div id="td-violations-list"></div>
+              </section>
+              <section class="satisfied">
+                <h3>Satisfied properties (<span id="td-sat-count">0</span>)</h3>
+                <div id="td-satisfied-list"></div>
+              </section>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

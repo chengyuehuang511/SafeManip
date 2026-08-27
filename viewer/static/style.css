@@ -1,0 +1,559 @@
+* { box-sizing: border-box; }
+
+:root {
+  --bg: #14161a;
+  --bg-alt: #1c1f24;
+  --bg-alt2: #23262c;
+  --bg-input: #14161a;
+  --border: #2a2d33;
+  --border-alt: #33363d;
+  --text: #e6e8eb;
+  --text-dim: #c7cad1;
+  --text-muted: #8a8f98;
+  --accent: #5b7fff;
+  --accent-bg: #33405e;
+  --accent-text: #dce6ff;
+  --ok-bg: #1e3a2a;
+  --ok-text: #7ee8a8;
+  --fail-bg: #3a1e1e;
+  --fail-text: #ff9b9b;
+  --warn-bg: #3a2a1e;
+  --warn-text: #ffcf87;
+  --explanation-bg: #241f16;
+  --explanation-text: #ffcf87;
+  --link-text: #9fc4ff;
+  --missed-border: #3a2d1e;
+}
+
+html[data-theme="light"] {
+  --bg: #f5f6f8;
+  --bg-alt: #ffffff;
+  --bg-alt2: #eef0f3;
+  --bg-input: #ffffff;
+  --border: #d9dce1;
+  --border-alt: #c7ccd3;
+  --text: #1c1f24;
+  --text-dim: #3a3f47;
+  --text-muted: #6b7280;
+  --accent: #3b5fe0;
+  --accent-bg: #dbe4ff;
+  --accent-text: #1c3aa9;
+  --ok-bg: #dff3e6;
+  --ok-text: #1e7d47;
+  --fail-bg: #fbe2e2;
+  --fail-text: #b23a3a;
+  --warn-bg: #fdecd2;
+  --warn-text: #92620d;
+  --explanation-bg: #fdf3e2;
+  --explanation-text: #7a5100;
+  --link-text: #2457c9;
+  --missed-border: #e7cfa0;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+header h1 { font-size: 18px; margin: 0; }
+.root-path { font-size: 12px; color: var(--text-muted); font-family: monospace; }
+
+.tab-bar { display: flex; gap: 6px; align-self: center; }
+.tab-btn {
+  background: var(--bg-alt2);
+  border: 1px solid var(--border-alt);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tab-btn:hover { background: var(--accent-bg); }
+.tab-btn.active { background: var(--accent-bg); color: var(--accent-text); border-color: var(--accent); }
+
+.theme-toggle {
+  margin-left: auto;
+  align-self: center;
+  background: var(--bg-alt2);
+  border: 1px solid var(--border-alt);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.theme-toggle:hover { background: var(--accent-bg); }
+
+.layout { display: flex; height: calc(100vh - 53px); }
+
+.sidebar {
+  width: 300px;
+  border-right: 1px solid var(--border);
+  padding: 14px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.picker { margin-bottom: 12px; }
+.picker label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.picker select {
+  width: 100%;
+  padding: 6px;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.rollout-dir { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-family: monospace; }
+
+.ep-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 8px;
+  margin-bottom: 4px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-left: 3px solid #888;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+.ep-row.success { border-left-color: #3bb273; }
+.ep-row.failure { border-left-color: #d64545; }
+.ep-row:hover { background: var(--bg-alt2); }
+.ep-row.active { background: var(--accent-bg); outline: 1px solid var(--accent); }
+.ep-num { font-weight: 600; min-width: 36px; }
+
+.mini-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: var(--bg-alt2);
+}
+.mini-badge.s-ok { background: var(--ok-bg); color: var(--ok-text); }
+.mini-badge.s-fail { background: var(--fail-bg); color: var(--fail-text); }
+.mini-badge.viol { background: var(--warn-bg); color: var(--warn-text); }
+.mini-badge.ok { background: var(--ok-bg); color: var(--ok-text); }
+
+.main { flex: 1; overflow-y: auto; padding: 20px 28px; }
+.empty-state { color: var(--text-muted); font-size: 14px; margin-top: 40px; }
+.hidden { display: none !important; }
+
+.episode-header { display: flex; align-items: center; gap: 12px; }
+.episode-header h2 { margin: 0; font-size: 18px; }
+.badge { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.badge-ok { background: var(--ok-bg); color: var(--ok-text); }
+.badge-fail { background: var(--fail-bg); color: var(--fail-text); }
+
+.ep-description { color: var(--text-dim); margin: 6px 0; }
+.ep-meta { color: var(--text-muted); font-size: 12px; margin-bottom: 14px; font-family: monospace; }
+
+video {
+  width: 100%;
+  max-width: 480px;
+  background: #000;
+  border-radius: 8px;
+  display: block;
+}
+
+.sync-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.sync-play-btn {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent);
+  color: var(--accent-text);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sync-play-btn:hover { filter: brightness(1.1); }
+.sync-hint { font-size: 11px; color: var(--text-muted); }
+
+.video-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 6px; }
+.video-col { flex: 1; min-width: 240px; max-width: 480px; }
+.video-col.hidden { display: none; }
+.video-col-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+  /* reserves space for 2 lines regardless of how many the label actually
+     wraps to, so two side-by-side columns with differently-long labels
+     still start their <video> at the same y position (confirmed bug:
+     without this, a label that wraps to 2 lines pushes its video down
+     relative to a column whose label fits on 1 line, so the two videos
+     visibly don't line up even though they're in the same flex row). */
+  min-height: 2.6em;
+  line-height: 1.3em;
+}
+
+/* Training Data tab's original/reconstructed pair: no other content shares
+   this row, so let the two videos fill the full row width instead of the
+   480px cap used elsewhere (e.g. eval tab, which reserves space for the
+   violations/satisfied columns below). */
+.video-row-wide { flex-wrap: nowrap; }
+.video-col-wide { max-width: none; min-width: 0; }
+.video-col-wide video { max-width: none; }
+@media (max-width: 900px) {
+  .video-row-wide { flex-wrap: wrap; }
+}
+
+.frame-readout {
+  max-width: 480px;
+  margin: 6px 0 12px;
+  padding: 6px 10px;
+  background: var(--bg-alt2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.recon-panel {
+  margin: 6px 0 18px;
+  padding: 12px 14px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.monitor-section {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.recon-summary-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.recon-stats { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text-muted); }
+.recon-stat strong { color: var(--text); font-family: monospace; }
+.recon-stat.warn strong { color: var(--warn-text); }
+
+.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 1000px) { .columns { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.violation-card { border-left: 3px solid #d64545; }
+.satisfied-card { border-left: 3px solid #3bb273; }
+
+.card-head strong { font-family: monospace; font-size: 13px; }
+.card-desc { color: var(--text-dim); font-size: 13px; margin: 4px 0; }
+.card-explanation {
+  color: var(--explanation-text);
+  font-size: 12.5px;
+  background: var(--explanation-bg);
+  border-radius: 6px;
+  padding: 8px;
+  margin: 6px 0;
+}
+.card-hint { color: var(--text-muted); font-size: 12px; margin: 4px 0; }
+
+.raw-explanation { margin: 6px 0; }
+.raw-explanation summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  user-select: none;
+}
+.raw-explanation summary:hover { color: var(--text-dim); }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-alt2);
+  border: 1px solid var(--border-alt);
+  color: var(--link-text);
+  border-radius: 999px;
+  padding: 4px 10px 4px 12px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.chip:hover { background: var(--accent-bg); }
+.chip-label { color: var(--text-dim); }
+.chip-time { font-family: monospace; font-weight: 600; }
+
+.ltl-line {
+  margin: 4px 0 8px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.ltl-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.ltl-line code {
+  font-family: monospace;
+  background: var(--accent-bg);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.predicate-breakdown { margin: 10px 0; }
+
+/* One row per bar: the whole-LTL summary first, its decomposition (nested
+   sub-predicates indented) underneath — every bar gets the same set of
+   dashed start/violated/end ticks so they read off one shared time axis. */
+.predicate-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  /* reserves room above the bar for its tiered mark glyphs + frame-number
+     (+ object name, on the "start" tier) labels (see .bar-mark below —
+     tiers stack up to ~75px tall) so they don't overlap the row above. */
+  margin-top: 78px;
+}
+/* the first row still needs the full clearance above since marks render on
+   every row including the top LTL summary bar -- without this it pokes up
+   into the LTL formula line above the breakdown block. */
+.predicate-row.ltl-summary-row { margin-bottom: 8px; }
+.predicate-row.ltl-summary-row .predicate-label {
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+}
+/* wraps to multiple lines instead of truncating -- a long label (e.g. "the
+   specific fixture the gripper entered is fully open") no longer gets
+   cut off, and doesn't need to since it just grows this row's height,
+   leaving the fixed 200px label column (and therefore every bar's left
+   edge below) untouched. */
+.predicate-label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
+}
+/* sub-predicate rows are indented via the label's own padding, not the
+   row's -- indenting the whole grid row would shift its timeline column
+   too, misaligning that bar's left edge against every top-level bar above
+   and below it. */
+.predicate-row.sub .predicate-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-left: 18px;
+}
+.predicate-label.extra { color: var(--accent); font-style: italic; }
+.predicate-timeline {
+  display: flex;
+  position: relative;
+  height: 16px;
+  border-radius: 4px;
+  overflow: visible; /* so the ▾ mark glyphs can poke a couple px above the bar */
+  border: 1px solid var(--border);
+}
+.predicate-run {
+  border: none;
+  height: 100%;
+  padding: 0;
+  cursor: pointer;
+  min-width: 2px;
+}
+.predicate-run:first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+.predicate-run:last-child { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+.predicate-run.run-true { background: var(--ok-text); }
+.predicate-run.run-false { background: var(--fail-text); }
+.predicate-run.run-unknown { background: var(--border-alt); }
+
+/* start/violated/end ticks, shared across every bar so they line up like a
+   common time axis: a short glyph + frame number sitting above the bar, with
+   a dashed line running down through it to pin it to an exact frame.
+   Consecutive violated frames are already collapsed server-side to one mark
+   at the transition, but start/violated/end can still land on the same or
+   adjacent frames (e.g. an "instant" property checks at a single frame), so
+   each kind still gets its own height tier so their labels stack instead of
+   overlapping: end sits right above the bar, violated above that, start
+   highest. Unlike a fixed-pixel guess, `bottom` and `--dash-height` are set
+   per element by computeMarkTierLayout() in app.js, from what's actually
+   present for this card (e.g. no "violated" tier reserved at all for a
+   satisfied property, since there's nothing to put there) and how tall each
+   tier's own label actually is (a "start" mark only grows a 3rd line when it
+   carries an object/fixture name) -- so both the gap *and* each tier's own
+   height adapt to the real content instead of a magic number. */
+.bar-mark {
+  position: absolute;
+  /* bottom is set inline per-element (see markTimeline in app.js); this is
+     just a safe fallback if that ever fails to apply */
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  cursor: pointer;
+  z-index: 4;
+}
+.bar-mark-object {
+  font-size: 7.5px;
+  line-height: 1.2;
+  white-space: nowrap;
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bar-mark-frame {
+  font-size: 8px;
+  font-family: monospace;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.bar-mark-glyph { font-size: 8.5px; line-height: 1; }
+.bar-mark::after {
+  content: "";
+  position: absolute;
+  top: 100%; /* right below this tier's own box, however tall its label made it */
+  left: 50%;
+  width: 0;
+  height: var(--dash-height, 16px);
+  border-left: 1.5px dashed currentColor;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.bar-mark:hover { filter: brightness(1.4); z-index: 5; }
+
+.bar-mark-end { color: var(--ok-text); }
+.bar-mark-violated { color: var(--fail-text); font-weight: 700; }
+.bar-mark-start { color: var(--link-text); }
+
+/* legend for the bar marks above, shown once per violations/satisfied panel
+   rather than repeated on every card */
+.bar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 6px 0 14px;
+  padding: 6px 10px;
+  background: var(--bg-alt2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.bar-legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-glyph { font-size: 11px; font-weight: 700; }
+.legend-start { color: var(--link-text); }
+.legend-violated { color: var(--fail-text); }
+.legend-end { color: var(--ok-text); }
+.legend-dash {
+  display: inline-block;
+  width: 0;
+  height: 11px;
+  border-left: 1.5px dashed var(--text-muted);
+  margin-right: 2px;
+}
+
+@media (max-width: 600px) {
+  .predicate-row { grid-template-columns: 1fr; }
+}
+
+.ai-draft {
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+}
+.ai-draft-head {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-text);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.ai-draft-chip {
+  text-transform: none;
+  font-weight: 500;
+  background: var(--bg-alt);
+  border-radius: 8px;
+  padding: 1px 6px;
+}
+.ai-draft-body { font-size: 12.5px; color: var(--accent-text); }
+
+.verdict-controls { display: flex; gap: 6px; margin-top: 8px; }
+.verdict-btn {
+  background: var(--bg-alt2);
+  border: 1px solid var(--border-alt);
+  color: var(--text-dim);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.verdict-btn:hover { background: var(--accent-bg); }
+.verdict-btn.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-text); }
+
+.note-box {
+  width: 100%;
+  margin-top: 6px;
+  min-height: 46px;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.missed-panel {
+  margin-top: 24px;
+  padding: 14px;
+  background: var(--bg-alt);
+  border: 1px solid var(--missed-border);
+  border-radius: 8px;
+}
+.missed-panel h3 { margin-top: 0; }
+.missed-box { min-height: 70px; }
+.overall-verdict { margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
+
+.muted { color: var(--text-muted); font-size: 12px; }
+.loading { color: var(--text-muted); font-size: 12px; padding: 8px; }
