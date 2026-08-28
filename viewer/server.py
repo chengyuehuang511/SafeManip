@@ -55,6 +55,26 @@ DEFAULT_TRAINING_CAMERAS = ["robot0_agentview_left", "robot0_agentview_right", "
 # reconstruct_training_data.py); this is an additive analysis pass over
 # already-reconstructed episodes, not a new video source.
 TRAINING_PRIVILEGED_DIR = Path(__file__).parent.parent / "SafeManip" / "monitor" / "output"
+# Second, independently-computed postprocess method, from
+# SafeManip/monitor/extract_privileged_from_dataset_sampled.py: samples
+# get_privileged_information() every N raw frames (matching a live rollout's
+# actual call cadence) instead of every frame + scaled thresholds. Kept in a
+# separate directory precisely so it can be browsed side by side with
+# TRAINING_PRIVILEGED_DIR's results, not as a replacement for them -- see
+# TRAINING_MONITOR_METHODS below and that script's module docstring.
+TRAINING_PRIVILEGED_DIR_SAMPLED = Path(__file__).parent.parent / "SafeManip" / "monitor" / "output_sampled"
+
+TRAINING_MONITOR_METHODS = {
+    "scaled": {
+        "dir": TRAINING_PRIVILEGED_DIR,
+        "label": "Scaled thresholds (full per-frame resolution)",
+    },
+    "sampled": {
+        "dir": TRAINING_PRIVILEGED_DIR_SAMPLED,
+        "label": "Sampled every N frames (unscaled thresholds, matches live cadence)",
+    },
+}
+DEFAULT_TRAINING_MONITOR_METHOD = "scaled"
 
 DEFAULT_ROOT = (
     "/nethome/chuang475/testnvme/projects/SafeManip/results/evals/"
@@ -439,16 +459,29 @@ def list_training_episodes(task):
         # privileged_information_<N>_monitor.json instead of a live rollout's
         # monitor output. None (not False/0) if not yet processed, so the
         # frontend can distinguish "not run yet" from "run and clean".
+        # success/num_violations shown in the sidebar row reflect the
+        # default method (DEFAULT_TRAINING_MONITOR_METHOD); "methods"
+        # reports the same pair for *every* method that has been run for
+        # this episode, so the frontend's method selector can show results
+        # from either without a second round-trip guess about what's
+        # available.
         entry["success"] = None
         entry["num_violations"] = None
-        monitor_path = TRAINING_PRIVILEGED_DIR / task / f"privileged_information_{ep}_monitor.json"
-        if monitor_path.is_file():
+        entry["methods"] = {}
+        for method_key, method_info in TRAINING_MONITOR_METHODS.items():
+            monitor_path = method_info["dir"] / task / f"privileged_information_{ep}_monitor.json"
+            if not monitor_path.is_file():
+                continue
             try:
                 mon = json.loads(monitor_path.read_text())
-                entry["success"] = ((mon.get("replay_summary") or {}).get("success"))
-                entry["num_violations"] = mon.get("num_violated_instances")
+                m_success = (mon.get("replay_summary") or {}).get("success")
+                m_num_violations = mon.get("num_violated_instances")
             except Exception:
-                pass
+                continue
+            entry["methods"][method_key] = {"success": m_success, "num_violations": m_num_violations}
+            if method_key == DEFAULT_TRAINING_MONITOR_METHOD:
+                entry["success"] = m_success
+                entry["num_violations"] = m_num_violations
         episodes.append(entry)
     episodes.sort(key=lambda e: e["episode"])
     return episodes
@@ -1198,21 +1231,27 @@ def api_episode(task, episode):
     }
 
 
-def api_training_monitor(task, episode):
+def api_training_monitor(task, episode, method=DEFAULT_TRAINING_MONITOR_METHOD):
     """Training-data-tab counterpart to `api_episode`: same violations/
     satisfied/predicate-breakdown shape (built by the same `load_monitor_view`
-    helper), sourced from SafeManip/monitor/extract_privileged_from_dataset.py's
+    helper), sourced from SafeManip/monitor/extract_privileged_from_dataset*.py's
     output instead of a live eval rollout, with video coming from the
     *existing* ground-truth reconstruction (reconstruct_training_data.py) --
-    this endpoint never renders video itself. Returns an `error` (not a raised
-    exception) if either the reconstruction video or the privileged/monitor
-    json don't exist yet, so the UI can show "not processed yet" rather than
-    a raw stack trace: this pipeline runs as an explicit separate batch step,
-    not automatically alongside video reconstruction."""
+    this endpoint never renders video itself. `method` selects which of
+    TRAINING_MONITOR_METHODS' independently-computed result sets to read
+    (see that dict) -- both stay browsable side by side, neither is treated
+    as canonical. Returns an `error` (not a raised exception) if either the
+    reconstruction video or the privileged/monitor json don't exist yet, so
+    the UI can show "not processed yet" rather than a raw stack trace: this
+    pipeline runs as an explicit separate batch step, not automatically
+    alongside video reconstruction."""
+    if method not in TRAINING_MONITOR_METHODS:
+        method = DEFAULT_TRAINING_MONITOR_METHOD
+
     video_path = training_episode_paths(task, episode)["video"]
     if not video_path.is_file():
         return {
-            "task": task, "episode": episode,
+            "task": task, "episode": episode, "method": method,
             "error": "no training-data reconstruction video for this episode yet -- "
                      "run replay/official_playback/reconstruct_training_data.py first",
         }, 404
@@ -1227,32 +1266,34 @@ def api_training_monitor(task, episode):
     fps, video_duration = ffprobe_info(video_path)
     fps = fps or fallback_fps
 
-    base_dir = TRAINING_PRIVILEGED_DIR / task
+    base_dir = TRAINING_MONITOR_METHODS[method]["dir"] / task
     mv = load_monitor_view(base_dir, episode, fps, video_duration)
     if mv is None:
         return {
-            "task": task, "episode": episode,
+            "task": task, "episode": episode, "method": method,
             "video_url": f"/td_video?task={quote(task)}&episode={episode}",
             "fps": fps, "video_duration": video_duration,
-            "error": "no privileged_information_<episode>_monitor.json for this episode yet -- "
-                     "run SafeManip/monitor/extract_privileged_from_dataset.py "
-                     "(with --run_monitor, the default) first",
+            "error": f"no privileged_information_<episode>_monitor.json for this episode/method "
+                     f"({TRAINING_MONITOR_METHODS[method]['label']}) yet -- run "
+                     f"SafeManip/monitor/extract_privileged_from_dataset{'_sampled' if method == 'sampled' else ''}.py "
+                     f"(with --run_monitor, the default) first",
         }
 
-    # separate annotation namespace from the eval tab (see annotation_path --
-    # sanitizes to a filename, so this is just a distinct task key, not a
-    # distinct storage mechanism) so verdicts/notes on a training episode
-    # never collide with an eval episode that happens to share a task name.
-    ann = load_annotations(f"training__{task}", episode)
+    # separate annotation namespace per method too, not just per training
+    # task -- a verdict/note on the "scaled" result shouldn't silently
+    # apply to the "sampled" one for the same episode, since they can
+    # legitimately disagree (that's the whole point of comparing them).
+    ann = load_annotations(f"training__{task}__{method}", episode)
 
     return {
         "task": task,
         "episode": episode,
+        "method": method,
         "video_url": f"/td_video?task={quote(task)}&episode={episode}",
         **mv,
         "annotations": ann,
         "reconstruction": None,
-        "annotation_task_key": f"training__{task}",
+        "annotation_task_key": f"training__{task}__{method}",
     }
 
 
@@ -1497,12 +1538,19 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/training_monitor":
             task = qs.get("task", [None])[0]
             episode = qs.get("episode", [None])[0]
+            method = qs.get("method", [DEFAULT_TRAINING_MONITOR_METHOD])[0]
             if not task or episode is None:
                 return self._send_json({"error": "missing task/episode"}, 400)
-            result = api_training_monitor(task, int(episode))
+            result = api_training_monitor(task, int(episode), method=method)
             status = result[1] if isinstance(result, tuple) else 200
             body = result[0] if isinstance(result, tuple) else result
             return self._send_json(body, status)
+
+        if parsed.path == "/api/training_monitor_methods":
+            return self._send_json({
+                "default": DEFAULT_TRAINING_MONITOR_METHOD,
+                "methods": {k: {"label": v["label"]} for k, v in TRAINING_MONITOR_METHODS.items()},
+            })
 
         if parsed.path == "/td_video":
             task = qs.get("task", [None])[0]

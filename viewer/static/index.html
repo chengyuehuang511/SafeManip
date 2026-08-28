@@ -126,6 +126,14 @@
              analysis pass -- see that script's docstring). Hidden/replaced with
              a hint if that pipeline hasn't been run for this episode yet. -->
         <section id="td-monitor-section" class="monitor-section">
+          <!-- Two independently-computed postprocess methods, kept side by
+               side for comparison (neither replaces the other) -- see
+               SafeManip/monitor/extract_privileged_from_dataset.py vs
+               extract_privileged_from_dataset_sampled.py. -->
+          <div class="picker" id="td-method-picker">
+            <label>Postprocess method</label>
+            <select id="td-method-select"><option>loading…</option></select>
+          </div>
           <div id="td-monitor-missing" class="card-hint hidden"></div>
           <div id="td-monitor-body" class="hidden">
             <div id="td-monitor-meta" class="ep-meta"></div>

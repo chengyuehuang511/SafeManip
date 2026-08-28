@@ -24,7 +24,7 @@ const reconVideo = el("#recon-video");
 // picker, no monitor/violations (just ground-truth reconstructed video + the
 // recorded language instruction). See server.py's api_training_* /
 // replay/official_playback/README.md.
-const tdState = { task: null, episode: null, loaded: false };
+const tdState = { task: null, episode: null, loaded: false, monitorMethod: null };
 const tdTaskSelect = el("#td-task-select");
 const tdEpisodeList = el("#td-episode-list");
 const tdEmptyState = el("#td-empty-state");
@@ -223,7 +223,7 @@ function selectTrainingEpisode(task, ep, rowEl) {
     tdSyncRow.classList.add("hidden");
   }
 
-  loadTrainingMonitor(task, ep.episode);
+  loadTrainingMonitor(task, ep.episode, tdState.monitorMethod);
 }
 
 // --------------------------------------------------------------------------
@@ -236,7 +236,37 @@ function selectTrainingEpisode(task, ep, rowEl) {
 // the fetch URL differ.
 // --------------------------------------------------------------------------
 
-async function loadTrainingMonitor(task, episode) {
+let tdMethodsLoaded = false;
+
+async function ensureTrainingMonitorMethods() {
+  if (tdMethodsLoaded) return;
+  tdMethodsLoaded = true;
+  const select = el("#td-method-select");
+  try {
+    const data = await fetchJSON("/api/training_monitor_methods");
+    tdState.monitorMethod = tdState.monitorMethod || data.default;
+    select.innerHTML = "";
+    for (const [key, info] of Object.entries(data.methods)) {
+      const opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = info.label;
+      if (key === tdState.monitorMethod) opt.selected = true;
+      select.appendChild(opt);
+    }
+    select.addEventListener("change", () => {
+      tdState.monitorMethod = select.value;
+      if (tdState.task && tdState.episode != null) {
+        loadTrainingMonitor(tdState.task, tdState.episode, tdState.monitorMethod);
+      }
+    });
+  } catch (e) {
+    select.innerHTML = "<option>failed to load methods</option>";
+  }
+}
+
+async function loadTrainingMonitor(task, episode, method) {
+  await ensureTrainingMonitorMethods();
+  method = method || tdState.monitorMethod;
   const missing = el("#td-monitor-missing");
   const body = el("#td-monitor-body");
   missing.classList.add("hidden");
@@ -247,7 +277,7 @@ async function loadTrainingMonitor(task, episode) {
   let detail;
   try {
     detail = await fetchJSON(
-      `/api/training_monitor?task=${encodeURIComponent(task)}&episode=${episode}`
+      `/api/training_monitor?task=${encodeURIComponent(task)}&episode=${episode}&method=${encodeURIComponent(method)}`
     );
   } catch (e) {
     missing.textContent = `failed to load monitor results: ${e}`;
