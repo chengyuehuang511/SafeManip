@@ -55,10 +55,20 @@
         <div id="recon-panel" class="recon-panel hidden"></div>
 
         <div class="bar-legend">
-          <span class="bar-legend-item"><span class="legend-glyph legend-start">▸</span> starts monitoring, labeled with which object/fixture it's about (highest tier)</span>
-          <span class="bar-legend-item"><span class="legend-glyph legend-violated">✗</span> violated (middle tier — transition frame only, a run of consecutive violated frames only gets one mark)</span>
-          <span class="bar-legend-item"><span class="legend-glyph legend-end">◆</span> ends, resolved or episode end (tier closest to the bar)</span>
-          <span class="bar-legend-item"><span class="legend-dash"></span> dashed line pins each mark to its exact frame — kinds are stacked at different heights so they never overlap even on the same frame</span>
+          <div class="bar-legend-row">
+            <strong>top "LTL (overall)" bar</strong> — one property's occurrences, whole-episode summary:
+            <span class="bar-legend-item"><span class="legend-glyph legend-start">▸</span> starts monitoring, labeled with which object/fixture it's about</span>
+            <span class="bar-legend-item"><span class="legend-glyph legend-violated">✗</span> violated (a run of consecutive violated frames only gets one mark, at the transition)</span>
+            <span class="bar-legend-item"><span class="legend-glyph legend-end">◆</span> ends, resolved or episode end</span>
+          </div>
+          <div class="bar-legend-row">
+            <strong>every bar below it</strong> — that specific atom/sub-predicate's own true/false transitions:
+            <span class="bar-legend-item"><span class="legend-glyph legend-rise">▲</span> became true</span>
+            <span class="bar-legend-item"><span class="legend-glyph legend-fall">▼</span> became false</span>
+          </div>
+          <div class="bar-legend-row">
+            <span class="bar-legend-item"><span class="legend-dash"></span> dashed line pins each mark to its exact frame — different kinds on the same bar are stacked at different heights so they never overlap</span>
+          </div>
         </div>
         <div class="columns">
           <section class="violations">

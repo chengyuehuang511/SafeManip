@@ -471,11 +471,11 @@ def api_training_episodes(task):
     return {"task": task, "episodes": episodes}
 
 
-def load_raw_dynamic(rollout_dir, episode):
-    """Load privileged_information_<N>.json's per-frame dynamic info list.
-
-    Cached (bounded LRU-ish dict) since these files run several MB and the
-    same episode is re-read every time /api/episode is requested.
+def _load_raw_info_data(rollout_dir, episode):
+    """Load + cache the full parsed privileged_information_<N>.json (both
+    privileged_dynamic_info and privileged_static_info), keyed by (path,
+    mtime). Cached since these files run several MB and the same episode is
+    re-read every time /api/episode is requested.
     """
     p = raw_info_path(rollout_dir, episode)
     if not p.is_file():
@@ -487,14 +487,47 @@ def load_raw_dynamic(rollout_dir, episode):
             return _raw_info_cache[key]
     try:
         data = json.loads(p.read_text())
-        frames = data.get("privileged_dynamic_info")
     except Exception:
-        frames = None
+        data = None
     with _raw_info_lock:
-        _raw_info_cache[key] = frames
+        _raw_info_cache[key] = data
         while len(_raw_info_cache) > _RAW_INFO_CACHE_MAX:
             _raw_info_cache.pop(next(iter(_raw_info_cache)))
-    return frames
+    return data
+
+
+def load_raw_dynamic(rollout_dir, episode):
+    """Load privileged_information_<N>.json's per-frame dynamic info list."""
+    data = _load_raw_info_data(rollout_dir, episode)
+    return data.get("privileged_dynamic_info") if data else None
+
+
+def load_object_display_names(rollout_dir, episode):
+    """role-slot name (e.g. "obj", "obj2", "container" — what role_sets and
+    every predicate actually reference) -> a human-readable object category
+    (e.g. "mug", "kettle", "tray"), read from
+    privileged_static_info.task.episode_meta.object_cfgs.
+
+    Some tasks (e.g. ArrangeBreadBasket) already use descriptive role names
+    ("bread", "basket") so this ends up mapping them to themselves; others
+    (e.g. ArrangeTea) use generic slots ("obj", "obj2") whose real identity
+    only lives in this static config, not in role_sets/predicates.
+    """
+    data = _load_raw_info_data(rollout_dir, episode)
+    if not data:
+        return {}
+    try:
+        cfgs = data["privileged_static_info"]["task"]["episode_meta"]["object_cfgs"]
+    except Exception:
+        return {}
+    names = {}
+    for cfg in cfgs or []:
+        role = cfg.get("name")
+        if not role:
+            continue
+        display = cfg.get("obj_groups") or (cfg.get("info") or {}).get("cat") or role
+        names[role] = display
+    return names
 
 
 def _frame_predicate_value(frame, key):
@@ -585,14 +618,19 @@ def _true_runs(trace):
     return runs
 
 
-def _active_object_by_frame(raw_frames):
+def _active_object_by_frame(raw_frames, object_names=None):
     """Best-effort entity label per frame: role_sets.active_object, which the
     monitor already sets to whichever object/fixture the current predicate
-    evaluation round is about (bread, basket, the microwave, ...)."""
+    evaluation round is about. Some tasks use descriptive role names already
+    (bread, basket, the microwave); others use generic slots (obj, obj2) --
+    `object_names` (from load_object_display_names) maps those to their real
+    category (mug, kettle, ...) when available, else the raw role name."""
+    object_names = object_names or {}
     out = []
     for frame in raw_frames:
         preds = (frame.get("data") or {}).get("predicates") or {}
-        out.append((preds.get("role_sets") or {}).get("active_object"))
+        role = (preds.get("role_sets") or {}).get("active_object")
+        out.append(object_names.get(role, role) if role else role)
     return out
 
 
@@ -977,7 +1015,8 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
         occurrences, marks = [], []
         if meta:
             full_traces_for_meta = {k: boolean_trace(raw_frames, k, 0, episode_last) for k in display_keys}
-            active_object_by_frame = _active_object_by_frame(raw_frames)
+            object_names = load_object_display_names(base_dir, episode)
+            active_object_by_frame = _active_object_by_frame(raw_frames, object_names)
             occurrences = compute_occurrences(meta, full_traces_for_meta, active_object_by_frame, episode_last)
             for occ in occurrences:
                 if occ.get("activation") and occ["activation"].get("frame") is not None:

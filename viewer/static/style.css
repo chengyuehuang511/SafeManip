@@ -459,16 +459,22 @@ video {
 }
 .bar-mark:hover { filter: brightness(1.4); z-index: 5; }
 
+/* whole-LTL summary bar only: shared occurrence-level marks (see
+   computeMarkTierLayout + markTimeline in app.js) */
 .bar-mark-end { color: var(--ok-text); }
 .bar-mark-violated { color: var(--fail-text); font-weight: 700; }
 .bar-mark-start { color: var(--link-text); }
 
+/* every other bar (each atom/sub-predicate): this bar's own true/false
+   transitions (see markOwnTransitions in app.js) -- a single small tier,
+   colored by which way the value flipped, not the LTL-level semantics above */
+.bar-mark-rise { color: var(--ok-text); }
+.bar-mark-fall { color: var(--fail-text); }
+.bar-mark-unknown { color: var(--text-muted); }
+
 /* legend for the bar marks above, shown once per violations/satisfied panel
    rather than repeated on every card */
 .bar-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
   margin: 6px 0 14px;
   padding: 6px 10px;
   background: var(--bg-alt2);
@@ -477,11 +483,20 @@ video {
   font-size: 11px;
   color: var(--text-muted);
 }
+.bar-legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 2px 0;
+}
 .bar-legend-item { display: flex; align-items: center; gap: 4px; }
 .legend-glyph { font-size: 11px; font-weight: 700; }
 .legend-start { color: var(--link-text); }
 .legend-violated { color: var(--fail-text); }
 .legend-end { color: var(--ok-text); }
+.legend-rise { color: var(--ok-text); }
+.legend-fall { color: var(--fail-text); }
 .legend-dash {
   display: inline-block;
   width: 0;

@@ -109,8 +109,14 @@ async function init() {
   }
   taskSelect.addEventListener("change", () => loadEpisodes(taskSelect.value));
   if (data.tasks.length) {
-    taskSelect.value = data.tasks[0];
-    loadEpisodes(data.tasks[0]);
+    // ?task=<name>&episode=<n> deep-links straight to a specific episode
+    // (also just a normal, shareable way to point someone at one -- not
+    // only a debugging aid).
+    const params = new URLSearchParams(location.search);
+    const wantTask = params.get("task");
+    const task = wantTask && data.tasks.includes(wantTask) ? wantTask : data.tasks[0];
+    taskSelect.value = task;
+    loadEpisodes(task, params.get("episode"));
   }
 }
 
@@ -282,10 +288,11 @@ function renderTrainingMonitor(detail) {
   slist.innerHTML = "";
   for (const s of detail.satisfied) slist.appendChild(renderSatisfied(s, detail.annotations));
 
+  resolveMarkCollisions(el("#td-monitor-body"));
   renderMissedPanel(detail, el("#td-monitor-body"), "td-missed-panel");
 }
 
-async function loadEpisodes(task) {
+async function loadEpisodes(task, autoEpisode) {
   state.task = task;
   episodeList.innerHTML = "<div class='loading'>loading episodes…</div>";
   const data = await fetchJSON(`/api/episodes?task=${encodeURIComponent(task)}`);
@@ -306,6 +313,9 @@ async function loadEpisodes(task) {
       ${violBadge}`;
     row.addEventListener("click", () => selectEpisode(task, ep.episode, row));
     episodeList.appendChild(row);
+    if (autoEpisode != null && String(ep.episode) === String(autoEpisode)) {
+      selectEpisode(task, ep.episode, row);
+    }
   }
 }
 
@@ -658,10 +668,114 @@ function markTimeline(timeline, marks, window_start, window_end, span, tierBotto
   }
 }
 
+// margin-top for a decomposed atom/sub-predicate row -- these only ever show
+// a single small tier (frame number + a rise/fall glyph, no stacking, no
+// object-name line), unlike the whole-LTL summary row's occurrence-level
+// marks, so this stays a constant instead of running through
+// computeMarkTierLayout().
+const OWN_TRANSITION_MARGIN_TOP = 40;
+
+// Every bar below the whole-LTL summary shows *its own* true/false
+// transitions -- where this specific atom/sub-predicate's own value flips --
+// rather than the shared occurrence-level start/violated/end marks (that's
+// what the top summary bar is for). Derived straight from this predicate's
+// own `runs` (already computed server-side), so it's always exactly this
+// bar's own transitions, never another bar's. The first run's boundary is
+// the edge of the display window, not a real transition, so it's skipped.
+function markOwnTransitions(timeline, p, span, window_start) {
+  if (!p.runs || p.runs.length < 2) return;
+  for (let i = 1; i < p.runs.length; i++) {
+    const run = p.runs[i];
+    const frame = run.start_frame;
+    const left = ((frame - window_start) / span) * 100;
+    const cls = run.value === true ? "bar-mark-rise" : run.value === false ? "bar-mark-fall" : "bar-mark-unknown";
+    const tick = document.createElement("button");
+    tick.className = "bar-mark " + cls;
+    tick.style.left = `${left}%`;
+    tick.style.bottom = `${BAR_HEIGHT}px`;
+    tick.style.setProperty("--dash-height", `${BAR_HEIGHT}px`);
+    const verb = run.value === true ? "became true" : run.value === false ? "became false" : "became n/a";
+    tick.title = `${p.label} ${verb} @ f${frame}`;
+    tick.addEventListener("click", (e) => { e.stopPropagation(); seekTo(run.start); });
+
+    const frameLabel = document.createElement("span");
+    frameLabel.className = "bar-mark-frame";
+    frameLabel.textContent = `f${frame}`;
+    tick.appendChild(frameLabel);
+
+    const glyph = document.createElement("span");
+    glyph.className = "bar-mark-glyph";
+    glyph.textContent = run.value === true ? "▲" : run.value === false ? "▼" : "•";
+    tick.appendChild(glyph);
+
+    timeline.appendChild(tick);
+  }
+}
+
+// Vertical step used to bump a mark up by one collision-avoidance lane,
+// measured (not guessed) from the same line-height constants the marks'
+// own CSS uses.
+const MARK_COLLISION_STEP = MARK_LINE.frame + MARK_LINE.glyph + MARK_TIER_GAP;
+
+// Own-transition marks (and, less often, several same-kind LTL-summary
+// marks) can land close enough together that their frame-number labels
+// visually run into each other -- how close depends on the actual rendered
+// pixel width of the bar and of each label, which varies with the window's
+// physical width and isn't something CSS/position-math alone can predict.
+// So instead of guessing a minimum frame gap, this is a real post-layout
+// pass: once every card is in the live document (so getBoundingClientRect
+// reflects actual on-screen geometry), group each bar's marks by which tier
+// they're already sitting at, and for any two that actually overlap
+// horizontally, push the later one up by a lane until it doesn't.
+function resolveMarkCollisions(container) {
+  container.querySelectorAll(".predicate-timeline").forEach((timeline) => {
+    const marks = Array.from(timeline.querySelectorAll(".bar-mark"));
+    if (marks.length < 2) return;
+    const byBase = new Map();
+    for (const m of marks) {
+      const base = parseFloat(m.style.bottom) || 0;
+      if (!byBase.has(base)) byBase.set(base, []);
+      byBase.get(base).push(m);
+    }
+    for (const group of byBase.values()) {
+      if (group.length < 2) continue;
+      group.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+      const laneRightEdge = [];
+      for (const m of group) {
+        const rect = m.getBoundingClientRect();
+        let lane = 0;
+        while (laneRightEdge[lane] != null && rect.left < laneRightEdge[lane]) lane++;
+        laneRightEdge[lane] = rect.right;
+        if (lane > 0) {
+          const base = parseFloat(m.style.bottom) || 0;
+          const bumped = base + lane * MARK_COLLISION_STEP;
+          m.style.bottom = `${bumped}px`;
+          m.style.setProperty("--dash-height", `${bumped}px`);
+        }
+      }
+    }
+
+    // 3+ marks crowding together can need more lanes than the row's default
+    // margin-top budgeted for (that default only assumes each mark's normal,
+    // uncollided tier) -- grow the row to fit however tall this bar's marks
+    // actually ended up, using each mark's own real rendered height rather
+    // than a guessed constant.
+    let neededMarginTop = 0;
+    for (const m of marks) {
+      const bottom = parseFloat(m.style.bottom) || 0;
+      neededMarginTop = Math.max(neededMarginTop, bottom + m.getBoundingClientRect().height + 8);
+    }
+    const row = timeline.closest(".predicate-row");
+    if (row && neededMarginTop > (parseFloat(row.style.marginTop) || 0)) {
+      row.style.marginTop = `${neededMarginTop}px`;
+    }
+  });
+}
+
 // The whole-LTL bar (green/red) comes first, its decomposition follows
-// indented underneath, and the same set of start/violated/end marks (dashed
-// tick + arrow, collapsed to just the transition frames) is stamped on every
-// bar so they all read off one shared time axis.
+// indented underneath. The LTL bar carries the shared occurrence-level
+// start/violated/end marks; every bar below it instead highlights its own
+// true/false transitions (see markOwnTransitions).
 function predicateBreakdown(pb) {
   if (!pb || !pb.predicates.length) return null;
   const wrap = document.createElement("div");
@@ -674,16 +788,21 @@ function predicateBreakdown(pb) {
 
   for (const p of pb.predicates) {
     const { row, timeline } = predicateRow(p, false);
-    if (p.is_ltl_summary && pb.pattern_blurb) row.title = pb.pattern_blurb;
-    row.style.marginTop = `${marginTop}px`;
     fillTimeline(timeline, p, span);
-    markTimeline(timeline, marks, start_frame, end_frame, span, bottoms);
+    if (p.is_ltl_summary) {
+      if (pb.pattern_blurb) row.title = pb.pattern_blurb;
+      row.style.marginTop = `${marginTop}px`;
+      markTimeline(timeline, marks, start_frame, end_frame, span, bottoms);
+    } else {
+      row.style.marginTop = `${OWN_TRANSITION_MARGIN_TOP}px`;
+      markOwnTransitions(timeline, p, span, start_frame);
+    }
     wrap.appendChild(row);
     for (const sub of p.subs || []) {
       const { row: subRow, timeline: subTimeline } = predicateRow(sub, true);
-      subRow.style.marginTop = `${marginTop}px`;
+      subRow.style.marginTop = `${OWN_TRANSITION_MARGIN_TOP}px`;
       fillTimeline(subTimeline, sub, span);
-      markTimeline(subTimeline, marks, start_frame, end_frame, span, bottoms);
+      markOwnTransitions(subTimeline, sub, span, start_frame);
       wrap.appendChild(subRow);
     }
   }
@@ -899,6 +1018,7 @@ function render(detail) {
   slist.innerHTML = "";
   for (const s of detail.satisfied) slist.appendChild(renderSatisfied(s, detail.annotations));
 
+  resolveMarkCollisions(episodeView);
   renderMissedPanel(detail, episodeView, "missed-panel");
 }
 
