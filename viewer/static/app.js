@@ -163,14 +163,21 @@ async function loadTrainingEpisodes(task) {
     const successBadge = analyzed
       ? `<span class="mini-badge ${ep.success ? "s-ok" : "s-fail"}">${ep.success ? "success" : "fail"}</span>`
       : `<span class="mini-badge">not analyzed</span>`;
-    const violBadge = !analyzed
-      ? ""
-      : ep.num_violations
-        ? `<span class="mini-badge viol">${ep.num_violations} viol</span>`
-        : `<span class="mini-badge ok">0 viol</span>`;
+    // One violation-count badge per postprocess method that's actually been
+    // run for this episode (ep.methods -- see server.py's
+    // list_training_episodes), not just the default method, so both are
+    // visible at a glance without opening the episode.
+    const methodEntries = Object.entries(ep.methods || {});
+    const violBadges = methodEntries.length
+      ? methodEntries.map(([key, m]) =>
+          m.num_violations
+            ? `<span class="mini-badge viol" title="${key}">${key}: ${m.num_violations} viol</span>`
+            : `<span class="mini-badge ok" title="${key}">${key}: 0 viol</span>`
+        ).join("\n      ")
+      : "";
     row.innerHTML = `<span class="ep-num">#${ep.episode}</span>
       ${successBadge}
-      ${violBadge}
+      ${violBadges}
       <span class="mini-badge">${orUnknown(ep.n_frames)} frames</span>`;
     row.addEventListener("click", () => selectTrainingEpisode(task, ep, row));
     tdEpisodeList.appendChild(row);

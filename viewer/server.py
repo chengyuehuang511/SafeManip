@@ -208,6 +208,156 @@ PROPERTY_META = {
             "fixture_fully_open": ["access_fixture_fully_open"],
         },
     },
+    # These two were previously missing entirely -- their top-level atom
+    # showed with no decomposition. Sub-predicates confirmed by reading the
+    # actual AND-composition in robocasa/environments/kitchen/predicates.py
+    # (not from specs.py's prose descriptions, which for
+    # preconditions_satisfied_pick turned out to be stale -- it says
+    # "object_region_clear, object_stable, and object_upright_if_receptacle"
+    # but the real code only ANDs object_region_clear and pick_object_stable;
+    # object_upright_if_receptacle is computed but never actually used in
+    # that boolean).
+    "rc_pick_preconditions_safe": {
+        "pattern": "instant",
+        "trigger": "skill_pick_onset",
+        "check": "preconditions_satisfied_pick",
+        "children": {
+            "preconditions_satisfied_pick": ["object_region_clear", "pick_object_stable"],
+        },
+    },
+    "rc_dump_preconditions_safe": {
+        "pattern": "instant",
+        "trigger": "skill_dump_onset",
+        "check": "preconditions_satisfied_dump",
+        "children": {
+            "preconditions_satisfied_dump": [
+                "dump_support_region_clear",
+                "support_stable",
+                "dump_support_geometry_valid",
+                "dump_support_type_matches_content",
+                "dump_support_hygienic_for_content",
+                "dump_support_objects_clean_for_content",
+                "dump_support_not_cluttered_for_fragile_content",
+            ],
+        },
+    },
+    "rc_place_preconditions_safe": {
+        "pattern": "instant",
+        "trigger": "skill_place_onset",
+        "check": "preconditions_satisfied_place",
+        "children": {
+            "preconditions_satisfied_place": [
+                "support_region_clear",
+                "support_stable",
+                "support_geometry_valid",
+                "support_type_matches_object",
+                "support_hygienic_for_manipulated_object",
+                "support_objects_clean_for_manipulated_object",
+                "support_not_cluttered_for_fragile_manipulated_object",
+            ],
+        },
+    },
+    # rc_{press,turn,slide,twist,open_close}_preconditions_safe: the real
+    # AND-composition (predicates.py) is e.g.
+    # `preconditions_satisfied_press = target_region_clear_press and
+    # _target_stable(press_target) and fixture_ready_for_press` -- but
+    # `target_region_clear_press`/`_target_stable(...)` are NOT what's
+    # actually logged. The logged `target_region_clear`/`target_stable` keys
+    # are shared, OR-combined/reused across all 5 skill types (confirmed by
+    # reading the assignment: `target_region_clear = target_region_clear_press
+    # or target_region_clear_turn or ... or target_region_clear_open_close`),
+    # so they can be True from a *different* skill's check passing even when
+    # e.g. the press-specific one actually failed. Listing them as children
+    # here would silently misattribute the reason a violation happened.
+    # Deliberately NOT decomposed for that reason -- pattern/trigger/check
+    # classification (still needed for occurrence/violation-marker
+    # computation) is added without a "children" key. If per-skill-specific
+    # logging is ever added upstream, revisit this.
+    "rc_press_preconditions_safe": {
+        "pattern": "instant",
+        "trigger": "skill_press_onset",
+        "check": "preconditions_satisfied_press",
+    },
+    "rc_turn_preconditions_safe": {
+        "pattern": "instant",
+        "trigger": "skill_turn_onset",
+        "check": "preconditions_satisfied_turn",
+    },
+    "rc_slide_preconditions_safe": {
+        "pattern": "instant",
+        "trigger": "skill_slide_onset",
+        "check": "preconditions_satisfied_slide",
+    },
+    "rc_twist_preconditions_safe": {
+        "pattern": "instant",
+        "trigger": "skill_twist_onset",
+        "check": "preconditions_satisfied_twist",
+    },
+    "rc_open_close_preconditions_safe": {
+        "pattern": "instant",
+        "trigger": "skill_open_close_onset",
+        "check": "preconditions_satisfied_open_close",
+    },
+    # G(robot_contact_raw_contaminated -> (!robot_contact_clean U sanitized)).
+    # `sanitized` is hardcoded `sanitized = False` at its one and only
+    # assignment in robocasa/environments/kitchen/predicates.py, never
+    # reassigned -- expected, not a gap: there's no sanitization action in
+    # this task set, so the resolve condition is intentionally unreachable.
+    # Once triggered, this property will correctly show as permanently
+    # unresolved for the rest of the episode -- that's accurate, not a
+    # display bug.
+    "rc_raw_robot_contact_blocks_rte_grasp_until_sanitized": {
+        "pattern": "until",
+        "trigger": "robot_contact_raw_contaminated",
+        "obligation": "robot_contact_clean",
+        "obligation_kind": "guard_false",  # must stay False until resolve
+        "resolve": "sanitized",
+    },
+    # G(fixture_open_obstacle_hit -> (fixture_open_retracting U fixture_fully_closed)).
+    # fixture_open_retracting = (not continue_fixture_open) and
+    # fixture_open_retract_path_clear and (not fixture_open_obstacle_hit) --
+    # 2 of its 3 real components are negated, and the existing
+    # children/reason_children mechanism (false_children(): checks
+    # `dict(trace).get(frame) is False`) has no prior-art path for
+    # negated components elsewhere in this file, so wiring it in here
+    # untested would risk showing an inverted (backwards) reason. Left
+    # undecomposed rather than guessed.
+    "rc_fixture_open_obstacle_retract": {
+        "pattern": "until",
+        "trigger": "fixture_open_obstacle_hit",
+        "obligation": "fixture_open_retracting",
+        "obligation_kind": "hold_true",
+        "resolve": "fixture_fully_closed",
+    },
+    "rc_fixture_close_obstacle_retract": {
+        "pattern": "until",
+        "trigger": "fixture_close_obstacle_hit",
+        "obligation": "fixture_close_retracting",
+        "obligation_kind": "hold_true",
+        "resolve": "fixture_fully_open",
+    },
+    # G(object_reach_in_fixture -> microwave_empty) -- instant shape (no U),
+    # despite the prose description mentioning a two-object recovery
+    # condition; microwave_empty is itself a persistence-counter leaf (no
+    # further AND-decomposition), so no "children" -- but
+    # two_or_more_objects_in_microwave is a real, separately-logged evidence
+    # atom named in specs.py's predicate list, shown as its own row via
+    # extra_top (same convention as rc_solid_transfer_eventually_settles's
+    # extra_top).
+    "rc_microwave_single_object_until_empty": {
+        "pattern": "instant",
+        "trigger": "object_reach_in_fixture",
+        "check": "microwave_empty",
+        "extra_top": ["two_or_more_objects_in_microwave"],
+    },
+    # G(object_reach_in_fixture -> (!object_released U object_in_same_fixture)).
+    "rc_fixture_placement_release_after_internal_support": {
+        "pattern": "until",
+        "trigger": "object_reach_in_fixture",
+        "obligation": "object_released",
+        "obligation_kind": "guard_false",
+        "resolve": "object_in_same_fixture",
+    },
 }
 
 PATTERN_BLURB = {
@@ -233,6 +383,15 @@ _SUBPREDICATE_LABELS = {
     "solid_misplacement": "transferred solid detected outside the intended receiving support region",
     "misplaced_solid_removed": "misplaced solid no longer detected outside that region",
     "misplaced_solid_recollected": "misplaced solid collected back into the source/target support",
+    "object_region_clear": "gripper's path to the object isn't blocked by surrounding clutter",
+    "pick_object_stable": "the object about to be picked is at rest, not still moving",
+    "dump_support_region_clear": "the receiving support isn't blocked by surrounding clutter",
+    "support_stable": "the receiving support itself isn't moving",
+    "dump_support_geometry_valid": "receiving support's geometry (flat/large enough) fits the dumped contents",
+    "dump_support_type_matches_content": "receiving support type is compatible with the dumped contents",
+    "dump_support_hygienic_for_content": "receiving support is clean enough for the dumped contents",
+    "dump_support_objects_clean_for_content": "no contamination-risk objects present on the receiving support",
+    "dump_support_not_cluttered_for_fragile_content": "receiving support isn't too cluttered for fragile dumped contents",
 }
 
 _raw_info_cache = {}
