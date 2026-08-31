@@ -1,0 +1,120 @@
+==============================================================================
+1. WHAT attributes.py GOT WRONG (vs. robocasa's own native data)
+==============================================================================
+
+-- category-set drift vs. the native `types` tag it's meant to mirror --
+RECEPTACLE_CATEGORIES (should mirror native tag `receptacle`, 27 native vs 15 hand-written):
+  MISSING (native has it, attributes.py doesn't): baking_sheet, basket, blender_jug, colander, cutting_board, ice_cube_tray, jar, kettle_non_electric, oven_tray, placemat, plate, saucepan, saucepan_with_lid, strainer, teapot, wine_glass
+  EXTRA (attributes.py claims it, native disagrees): bottle, can, coffee_cup, container
+TOOL_CATEGORIES (should mirror native tag `tool`, 14 native vs 19 hand-written):
+  MISSING (native has it, attributes.py doesn't): aluminum_foil, dish_brush
+  EXTRA (attributes.py claims it, native disagrees): cutting_board, fork, knife, ladle, spatula, spoon, whisk
+
+-- tool/utensil conflation --
+native `tool` tag (14): aluminum_foil, bottle_opener, can_opener, cheese_grater, digital_scale, dish_brush, measuring_cup, peeler, pizza_cutter, reamer, rolling_pin, scissors, strainer, tongs
+native `utensil` tag (7): fork, knife, ladle, spatula, spoon, whisk, wooden_spoon
+TOOL_CATEGORIES entries that are actually native `utensil`, not `tool` (6): fork, knife, ladle, spatula, spoon, whisk
+
+-- object-axis members declared but never assigned to any category (dead code) --
+declared (43): alcohol, bread_food, cleaner, closeable, cold, condiment, cookable, cooked_food, cookware, cuttable, dairy, dishwashable, drink, food, fragile, freezable, fridgable, fruit, graspable, hot, lid, liquid, meat, microwavable, openable, packaged_food, pastry, pourable, pressable, raw, ready_to_eat, receptacle, slideable, spice, stackable, sweet, toastable, tool, turnable, twistable, utensil, vegetable, washable
+DEAD (12): cleaner, cold, cookware, cuttable, hot, lid, liquid, packaged_food, pressable, slideable, stackable, turnable
+
+-- fixture/support/button/tool role axes: declared vs. actually assigned --
+fixture role -- declared (23): cabinet, closeable, cooktop, cooling, dirty, dispensing, drawer, fridge, heated, microwave, mixing, openable, oven, powered, pressable, sink, slideable, storage, stove, toasting, turnable, twistable, washing
+  DEAD (1): dirty
+support role -- declared (7): cold_storage, containment, heated, prep_zone, serving_zone, storage_zone, wash_zone
+  DEAD (0): (none)
+button role -- declared (5): lever, mode_select, power, pressable, toggle
+  DEAD (5): lever, mode_select, power, pressable, toggle
+tool role -- declared (5): cleaning_tool, cutting_tool, measuring_tool, mixing_tool, serving_tool
+  DEAD (5): cleaning_tool, cutting_tool, measuring_tool, mixing_tool, serving_tool
+
+-- dead `"literal" in types` checks in attributes.py's own source (literal never in robocasa's vocabulary) --
+  line 526: "cookware" in types  (never true -- "cookware" is not a native types tag)
+  line 528: "raw" in types  (never true -- "raw" is not a native types tag)
+  line 530: "ready_to_eat" in types  (never true -- "ready_to_eat" is not a native types tag)
+  line 532: "in_container" in types  (never true -- "in_container" is not a native types tag)
+  line 476: "cookware" in types  (never true -- "cookware" is not a native types tag)
+  line 522: "liquid" in types  (never true -- "liquid" is not a native types tag)
+  line 442: "liquid" in types  (never true -- "liquid" is not a native types tag)
+  line 491: "raw" in types  (never true -- "raw" is not a native types tag)
+  line 493: "ready_to_eat" in types  (never true -- "ready_to_eat" is not a native types tag)
+
+-- fixture class coverage --
+native classes missing from attributes.py (4): Cabinet, Fridge, ProcGenFixture, Stool
+attributes.py classes not in native hierarchy (4): Box, Floor, Wall, WindowProc
+
+-- named fixture instances that get zero attributes (class-only lookup can't distinguish them) --
+blank classes: Accessory, BlenderLid, Box, Floor, Hood, Wall, WallAccessory
+affected named instances (29): accessory, blender_lid, box, candle, cinnamon, digital_scale, floor, flower_vase, fruit_bowl, glass_cup, hood, jar, jar_lid, knife_block, oil_bottle, paper_towel, paprika, pepper_shaker, plant, salt_shaker, soap_dispenser, tiered_basket, turmeric, utensil_holder, utensil_rack, utensil_set, vinegar_bottle, wall, wall_accessory
+
+-- robocasa's FixtureType enum, entirely unused by attributes.py (27) --
+  BLENDER, CABINET, CABINET_DOUBLE_DOOR, CABINET_SINGLE_DOOR, CABINET_WITH_DOOR, COFFEE_MACHINE, COUNTER, COUNTER_NON_CORNER, COUNTER_NON_DINING, DINING_COUNTER, DISHWASHER, DISH_RACK, DRAWER, ELECTRIC_KETTLE, FRIDGE, ISLAND, MICROWAVE, OVEN, SHELF, SINK, STAND_MIXER, STOOL, STOVE, TOASTER, TOASTER_OVEN, TOP_DRAWER, WINDOW
+
+==============================================================================
+2. WHAT attributes.py ADDS that robocasa has no native equivalent for
+==============================================================================
+
+-- invented attribute names (49) --
+  cabinet: used (in fixture)
+  cleaning_tool: declared but never assigned
+  closeable: used (in object+fixture)
+  cold: declared but never assigned
+  cold_storage: used (in support)
+  containment: used (in support)
+  cooktop: used (in fixture)
+  cookware: declared but never assigned
+  cooling: used (in fixture)
+  cuttable: declared but never assigned
+  cutting_tool: declared but never assigned
+  dirty: declared but never assigned
+  dispensing: used (in fixture)
+  drawer: used (in fixture)
+  food: used (in object)
+  fragile: used (in object)
+  fridge: used (in fixture)
+  heated: used (in fixture+support)
+  hot: declared but never assigned
+  lever: used (in fixture)
+  liquid: declared but never assigned
+  measuring_tool: declared but never assigned
+  microwave: used (in fixture)
+  mixing: used (in fixture)
+  mixing_tool: declared but never assigned
+  mode_select: declared but never assigned
+  openable: used (in object+fixture)
+  oven: used (in fixture)
+  pourable: used (in object)
+  power: declared but never assigned
+  powered: used (in fixture)
+  prep_zone: used (in support)
+  pressable: used (in fixture)
+  raw: used (in object)
+  ready_to_eat: used (in object)
+  serving_tool: declared but never assigned
+  serving_zone: used (in support)
+  sink: used (in fixture)
+  slideable: used (in fixture)
+  storage: used (in fixture)
+  storage_zone: used (in support)
+  stove: used (in fixture)
+  toastable: used (in object)
+  toasting: used (in fixture)
+  toggle: declared but never assigned
+  turnable: used (in fixture)
+  twistable: used (in object+fixture)
+  wash_zone: used (in support)
+  washing: used (in fixture)
+
+-- invented, fully hand-written category sets (no native tag/flag backs them) --
+  FRAGILE_CATEGORIES (8): bowl, coffee_cup, cup, egg, glass_cup, mug, plate, wine_glass
+  LIQUID_CATEGORIES (5): brewed_coffee, coffee, sauce, soup, water
+  POURABLE_CATEGORIES (15): brewed_coffee, coffee, coffee_cup, cup, glass_cup, jug, jug_wide_opening, mug, pitcher, sauce, soup, teapot, thermos, water, wine_glass
+  TWISTABLE_CATEGORIES (4): bottle, can, jar, thermos
+  OPENABLE_OBJECT_CATEGORIES (4): bottle, can, jar, thermos
+  READY_TO_EAT_TYPE_NAMES (9): bread_food, condiment, cooked_food, dairy, drink, fruit, pastry, sweets, vegetable
+
+-- invented role axes (whole concepts robocasa has no equivalent for) --
+  support (support-zone semantics -- containment/heated/wash_zone/...) (7): containment, heated, cold_storage, wash_zone, prep_zone, serving_zone, storage_zone
+  button (lever/toggle/power/mode_select/...) (5): lever, toggle, power, mode_select, pressable
+  tool (cleaning_tool/cutting_tool/mixing_tool/.../measuring_tool) (5): cleaning_tool, cutting_tool, mixing_tool, serving_tool, measuring_tool
