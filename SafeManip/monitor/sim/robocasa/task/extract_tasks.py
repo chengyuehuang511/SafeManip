@@ -403,7 +403,22 @@ def extract_fixture_refs(cls) -> List[Dict[str, Any]]:
 
 def extract_object_cfgs(cls) -> List[Dict[str, Any]]:
     """Every `dict(name=..., obj_groups=..., <boolean flags>...)` call
-    reachable from whichever class defines `_get_obj_cfgs`."""
+    reachable from whichever class defines `_get_obj_cfgs`, PLUS a
+    synthesized companion entry for every `placement=dict(...,
+    try_to_place_in=...)` -- confirmed in kitchen.py's `_create_objects()`
+    that this isn't just a placement hint: robocasa actually spawns a
+    *second*, separate object of that category, named `f"{name}_container"`
+    (e.g. PanTransfer's "vegetable" cfg with `try_to_place_in="pan"` spawns
+    a real pan object named "vegetable_container", which `_check_success`
+    then references directly -- and which a naive reading of
+    `_get_obj_cfgs()` alone would never reveal, since it's never written as
+    its own `dict(name=..., obj_groups=...)` entry anywhere in the source).
+
+    Note the spawn is conditional at runtime (only fires if the object's
+    *sampled* category happens to belong to robocasa's `in_container`
+    OBJ_GROUPS) -- see `in_container_coverage` in the synthesized entry,
+    cross-referenced against native_structure.json, for whether that's
+    guaranteed/partial/never for this cfg's `obj_groups`."""
     method = getattr(cls, "_get_obj_cfgs", None)
     if method is None:
         return []
@@ -421,15 +436,33 @@ def extract_object_cfgs(cls) -> List[Dict[str, Any]]:
         kwargs = {kw.arg: kw for kw in call.keywords if kw.arg is not None}
         if "name" not in kwargs or "obj_groups" not in kwargs:
             continue  # not an object-cfg dict (e.g. the inner placement=dict(...))
+        name_node = kwargs["name"].value
         entry: Dict[str, Any] = {
-            "name": _literal_or_source(kwargs["name"].value),
-            "name_static_prefix": _static_string_prefix(kwargs["name"].value),
+            "name": _literal_or_source(name_node),
+            "name_static_prefix": _static_string_prefix(name_node),
             "obj_groups": _literal_or_source(kwargs["obj_groups"].value),
         }
         for flag in boolean_flags:
             if flag in kwargs:
                 entry[flag] = _literal_or_source(kwargs[flag].value)
         cfgs.append(entry)
+
+        placement_kw = kwargs.get("placement")
+        if placement_kw is not None and isinstance(placement_kw.value, ast.Call):
+            placement_kwargs = {kw.arg: kw for kw in placement_kw.value.keywords if kw.arg is not None}
+            try_to_place_in_kw = placement_kwargs.get("try_to_place_in")
+            if try_to_place_in_kw is not None:
+                name_prefix = entry["name_static_prefix"] or (
+                    entry["name"] if isinstance(entry["name"], str) else None
+                )
+                container_entry: Dict[str, Any] = {
+                    "name": f"{entry['name']}_container" if isinstance(entry["name"], str) else None,
+                    "name_static_prefix": f"{name_prefix}_container" if name_prefix else None,
+                    "obj_groups": _literal_or_source(try_to_place_in_kw.value),
+                    "synthesized_from": "try_to_place_in",
+                    "parent_object": entry["name"],
+                }
+                cfgs.append(container_entry)
     return cfgs
 
 
@@ -536,6 +569,24 @@ def resolve_obj_groups(value: Any, native: Dict[str, Any]) -> Dict[str, Any]:
     return {"kind": "unresolved", "raw": value}
 
 
+def _resolved_categories(resolved: Dict[str, Any], native: Dict[str, Any]) -> Optional[Set[str]]:
+    """The concrete set of category names a resolve_obj_groups() result
+    could sample from, wherever that's statically enumerable."""
+    kind = resolved.get("kind")
+    if kind == "single_category_self_group":
+        return {resolved["category"]}
+    if kind in ("native_type_tag", "hand_curated_obj_group", "computed_obj_group"):
+        return set(resolved["categories"])
+    if kind == "all_categories":
+        return set(native["objects"]["categories"].keys())
+    if kind == "multiple":
+        sets = [_resolved_categories(g, native) for g in resolved["groups"]]
+        if any(s is None for s in sets):
+            return None
+        return set().union(*sets) if sets else set()
+    return None
+
+
 def resolve_fixture_type_id(value: Any, native: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(value, str):
         return {"kind": "dynamic_expression", "raw": value}
@@ -570,6 +621,27 @@ def summarize_task(name: str, cls, attrs: Dict[str, Any], atomic_fixture_index: 
         ref["resolved"] = resolve_fixture_type_id(ref["fixture_type_id"], native)
     for cfg in obj_cfgs:
         cfg["resolved"] = resolve_obj_groups(cfg["obj_groups"], native)
+
+    # For every synthesized try_to_place_in container: is the runtime spawn
+    # actually guaranteed, or only conditional? robocasa only spawns it if
+    # the PARENT object's *sampled* category happens to be a member of the
+    # native `in_container` OBJ_GROUPS -- so this depends on how much the
+    # parent's own resolved category set overlaps that group.
+    cfgs_by_name = {c["name"]: c for c in obj_cfgs if isinstance(c.get("name"), str)}
+    in_container_categories = set(native["objects"]["computed_obj_groups"]["in_container"]["categories"])
+    for cfg in obj_cfgs:
+        if cfg.get("synthesized_from") != "try_to_place_in":
+            continue
+        parent = cfgs_by_name.get(cfg.get("parent_object"))
+        parent_categories = _resolved_categories(parent["resolved"], native) if parent else None
+        if parent_categories is None:
+            cfg["in_container_coverage"] = "unknown (parent obj_groups not statically resolvable)"
+        elif parent_categories <= in_container_categories:
+            cfg["in_container_coverage"] = "guaranteed (every possible sampled category qualifies)"
+        elif parent_categories & in_container_categories:
+            cfg["in_container_coverage"] = "conditional (only some sampled categories qualify)"
+        else:
+            cfg["in_container_coverage"] = "never (no sampled category qualifies -- try_to_place_in is dead here)"
 
     result: Dict[str, Any] = {
         "name": name,
@@ -670,7 +742,8 @@ def render_report_txt(report: Dict[str, Any]) -> str:
         lines.append(f"objects ({len(t['objects'])}):")
         for c in t["objects"]:
             r = c["resolved"]
-            flags = {k: v for k, v in c.items() if k not in ("name", "obj_groups", "resolved") }
+            skip_keys = ("name", "name_static_prefix", "obj_groups", "resolved", "synthesized_from", "parent_object", "in_container_coverage")
+            flags = {k: v for k, v in c.items() if k not in skip_keys}
             flag_str = f" flags={flags}" if flags else ""
             if r["kind"] in ("single_category_self_group",):
                 detail = f"category `{r['category']}`"
@@ -682,7 +755,12 @@ def render_report_txt(report: Dict[str, Any]) -> str:
                 detail = f"all {r['count']} categories"
             else:
                 detail = f"{r['kind']}: {r.get('raw')}"
-            lines.append(f"  - {c['name']}: obj_groups={c['obj_groups']!r} -> {detail}{flag_str}")
+            prefix = "  - "
+            suffix = ""
+            if c.get("synthesized_from") == "try_to_place_in":
+                prefix = "  - [SYNTHESIZED, try_to_place_in on parent `" + str(c.get('parent_object')) + "`] "
+                suffix = f"  [in_container_coverage: {c.get('in_container_coverage')}]"
+            lines.append(f"{prefix}{c['name']}: obj_groups={c['obj_groups']!r} -> {detail}{flag_str}{suffix}")
 
         lines.append(f"success_related_entities: {t['success_related_entities']}")
         lines.append("")

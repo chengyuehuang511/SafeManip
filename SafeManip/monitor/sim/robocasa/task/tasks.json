@@ -254,6 +254,18 @@
             "category": "fish",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "fish_container",
+          "name_static_prefix": "fish_container",
+          "obj_groups": "plate",
+          "parent_object": "fish",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -278,6 +290,7 @@
       "success_related_entities": [
         "dining_counter",
         "fish",
+        "fish_container",
         "lemon_wedge"
       ],
       "task_kind": "composite"
@@ -335,6 +348,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "f'marshmallow'_container",
+          "name_static_prefix": "marshmallow_container",
+          "obj_groups": "plate",
+          "parent_object": "f'marshmallow'",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "mug",
           "name_static_prefix": "mug",
           "obj_groups": "mug",
@@ -365,6 +390,7 @@
       "source_file": "robocasa/environments/kitchen/composite/preparing_hot_chocolate/add_marshmallow.py",
       "success_related_entities": [
         "f'marshmallow'",
+        "f'marshmallow'_container",
         "mug"
       ],
       "task_kind": "composite"
@@ -411,6 +437,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "cake_container",
+          "name_static_prefix": "cake_container",
+          "obj_groups": "plate",
+          "parent_object": "cake",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "sugar_cube_1",
           "name_static_prefix": "sugar_cube_1",
           "obj_groups": "sugar_cube",
@@ -450,6 +488,7 @@
       "source_file": "robocasa/environments/kitchen/composite/garnishing_dishes/add_sugar_cubes.py",
       "success_related_entities": [
         "cake",
+        "cake_container",
         "dining_counter",
         "sugar_cube_1",
         "sugar_cube_2"
@@ -1733,6 +1772,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "distractor_cooked_food_container",
+          "name_static_prefix": "distractor_cooked_food_container",
+          "obj_groups": "tray",
+          "parent_object": "distractor_cooked_food",
+          "resolved": {
+            "category": "tray",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "distractor_bread_food",
           "name_static_prefix": "distractor_bread_food",
           "obj_groups": "bread_food",
@@ -1749,6 +1800,18 @@
             "kind": "native_type_tag",
             "tag": "bread_food"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "distractor_bread_food_container",
+          "name_static_prefix": "distractor_bread_food_container",
+          "obj_groups": "tray",
+          "parent_object": "distractor_bread_food",
+          "resolved": {
+            "category": "tray",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         },
         {
           "name": "distractor_glass_cup",
@@ -2613,6 +2676,20 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "container",
+          "parent_object": "meat",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "condiment",
           "name_static_prefix": "condiment",
@@ -2686,6 +2763,7 @@
         "condiment",
         "counter",
         "meat",
+        "meat_container",
         "pan",
         "vegetable"
       ],
@@ -2754,6 +2832,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "pan",
+          "parent_object": "meat",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "plate",
           "name_static_prefix": "plate",
           "obj_groups": "plate",
@@ -2805,6 +2895,18 @@
             "kind": "native_type_tag",
             "tag": "vegetable"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "vegetable_container",
+          "name_static_prefix": "vegetable_container",
+          "obj_groups": "bowl",
+          "parent_object": "vegetable",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -2814,8 +2916,10 @@
       "source_file": "robocasa/environments/kitchen/composite/plating_food/balanced_meal_prep.py",
       "success_related_entities": [
         "meat",
+        "meat_container",
         "plate",
-        "vegetable"
+        "vegetable",
+        "vegetable_container"
       ],
       "task_kind": "composite"
     },
@@ -3955,6 +4059,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "distr_pastry_container",
+          "name_static_prefix": "distr_pastry_container",
+          "obj_groups": "plate",
+          "parent_object": "distr_pastry",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "croissant",
           "name_static_prefix": "croissant",
           "obj_groups": "croissant",
@@ -3962,6 +4078,18 @@
             "category": "croissant",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "croissant_container",
+          "name_static_prefix": "croissant_container",
+          "obj_groups": "plate",
+          "parent_object": "croissant",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         },
         {
           "name": "jam",
@@ -3993,6 +4121,7 @@
       "source_file": "robocasa/environments/kitchen/composite/making_toast/bread_selection.py",
       "success_related_entities": [
         "croissant",
+        "croissant_container",
         "cutting_board",
         "jam"
       ],
@@ -4038,6 +4167,20 @@
             "category": "bread",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "f'obj_{i}'_container",
+          "name_static_prefix": "obj__container",
+          "obj_groups": "container",
+          "parent_object": "f'obj_{i}'",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -4047,6 +4190,7 @@
       "source_file": "robocasa/environments/kitchen/composite/chopping_food/bread_setup_slicing.py",
       "success_related_entities": [
         "f'obj_{i}'",
+        "f'obj_{i}'_container",
         "receptacle"
       ],
       "task_kind": "composite"
@@ -4265,6 +4409,18 @@
             "category": "butter_stick",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "butter_container",
+          "name_static_prefix": "butter_container",
+          "obj_groups": "plate",
+          "parent_object": "butter",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -4274,6 +4430,7 @@
       "source_file": "robocasa/environments/kitchen/composite/sauteing_vegetables/butter_on_pan.py",
       "success_related_entities": [
         "butter",
+        "butter_container",
         "pan",
         "stove"
       ],
@@ -4725,6 +4882,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "bread_container",
+          "name_static_prefix": "bread_container",
+          "obj_groups": "cutting_board",
+          "parent_object": "bread",
+          "resolved": {
+            "category": "cutting_board",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "cheese",
           "name_static_prefix": "cheese",
           "obj_groups": "cheese",
@@ -4754,6 +4923,7 @@
       "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
       "success_related_entities": [
         "bread",
+        "bread_container",
         "cheese"
       ],
       "task_kind": "atomic"
@@ -5388,6 +5558,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "non_vegetable_container",
+          "name_static_prefix": "non_vegetable_container",
+          "obj_groups": "cutting_board",
+          "parent_object": "non_vegetable",
+          "resolved": {
+            "category": "cutting_board",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "vegetable1",
           "name_static_prefix": "vegetable1",
@@ -5483,6 +5665,7 @@
       "source_file": "robocasa/environments/kitchen/composite/chopping_food/clear_cutting_board.py",
       "success_related_entities": [
         "non_vegetable",
+        "non_vegetable_container",
         "vegetable1",
         "vegetable2"
       ],
@@ -8011,6 +8194,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "cake_container",
+          "name_static_prefix": "cake_container",
+          "obj_groups": "oven_tray",
+          "parent_object": "cake",
+          "resolved": {
+            "category": "oven_tray",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "container",
           "name_static_prefix": "container",
           "obj_groups": "plate",
@@ -8073,6 +8268,7 @@
       "source_file": "robocasa/environments/kitchen/composite/baking/cool_baked_cake.py",
       "success_related_entities": [
         "cake",
+        "cake_container",
         "container",
         "counter",
         "oven"
@@ -8795,6 +8991,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "cupcake_container",
+          "name_static_prefix": "cupcake_container",
+          "obj_groups": "tray",
+          "parent_object": "cupcake",
+          "resolved": {
+            "category": "tray",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "bowl",
           "name_static_prefix": "bowl",
           "obj_groups": "bowl",
@@ -8816,6 +9024,7 @@
         "bowl",
         "counter",
         "cupcake",
+        "cupcake_container",
         "sink"
       ],
       "task_kind": "composite"
@@ -8931,6 +9140,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "distractor_bread_food_container",
+          "name_static_prefix": "distractor_bread_food_container",
+          "obj_groups": "tray",
+          "parent_object": "distractor_bread_food",
+          "resolved": {
+            "category": "tray",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "distractor_mug",
           "name_static_prefix": "distractor_mug",
           "obj_groups": "mug",
@@ -9022,6 +9243,18 @@
             "kind": "unresolved",
             "raw": "self.food"
           }
+        },
+        {
+          "in_container_coverage": "unknown (parent obj_groups not statically resolvable)",
+          "name": "food_container",
+          "name_static_prefix": "food_container",
+          "obj_groups": "cutting_board",
+          "parent_object": "food",
+          "resolved": {
+            "category": "cutting_board",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -9031,6 +9264,7 @@
       "source_file": "robocasa/environments/kitchen/composite/chopping_vegetables/cutting_tool_selection.py",
       "success_related_entities": [
         "food",
+        "food_container",
         "knife",
         "peeler"
       ],
@@ -9493,6 +9727,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "dessert1_container",
+          "name_static_prefix": "dessert1_container",
+          "obj_groups": "bowl",
+          "parent_object": "dessert1",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "dessert2",
           "name_static_prefix": "dessert2",
@@ -9510,6 +9756,7 @@
       "source_file": "robocasa/environments/kitchen/composite/clearing_table/dessert_assembly.py",
       "success_related_entities": [
         "dessert1",
+        "dessert1_container",
         "dessert2",
         "receptacle"
       ],
@@ -9571,6 +9818,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "dessert1_container",
+          "name_static_prefix": "dessert1_container",
+          "obj_groups": "plate",
+          "parent_object": "dessert1",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "dessert2",
           "name_static_prefix": "dessert2",
@@ -9593,6 +9852,18 @@
             "kind": "native_type_tag",
             "tag": "sweets"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "dessert2_container",
+          "name_static_prefix": "dessert2_container",
+          "obj_groups": "plate",
+          "parent_object": "dessert2",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -9602,7 +9873,9 @@
       "source_file": "robocasa/environments/kitchen/composite/serving_food/dessert_upgrade.py",
       "success_related_entities": [
         "dessert1",
+        "dessert1_container",
         "dessert2",
+        "dessert2_container",
         "receptacle"
       ],
       "task_kind": "composite"
@@ -10199,6 +10472,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "tray1_container",
+          "name_static_prefix": "tray1_container",
+          "obj_groups": "tray",
+          "parent_object": "tray1",
+          "resolved": {
+            "category": "tray",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "tray2",
           "name_static_prefix": "tray2",
           "obj_groups": "tongs",
@@ -10206,6 +10491,18 @@
             "category": "tongs",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "tray2_container",
+          "name_static_prefix": "tray2_container",
+          "obj_groups": "tray",
+          "parent_object": "tray2",
+          "resolved": {
+            "category": "tray",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         },
         {
           "name": "distractor_cup",
@@ -10249,7 +10546,9 @@
         "meat1",
         "meat2",
         "tray1",
+        "tray1_container",
         "tray2",
+        "tray2_container",
         "vegetable1",
         "vegetable2"
       ],
@@ -10329,6 +10628,18 @@
             "kind": "native_type_tag",
             "tag": "vegetable"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "f'obj'_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "pot",
+          "parent_object": "f'obj'",
+          "resolved": {
+            "category": "pot",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -10338,6 +10649,7 @@
       "source_file": "robocasa/environments/kitchen/composite/washing_fruits_and_vegetables/drain_veggies.py",
       "success_related_entities": [
         "f'obj'",
+        "f'obj'_container",
         "sink"
       ],
       "task_kind": "composite"
@@ -12170,6 +12482,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "cupcake_container",
+          "name_static_prefix": "cupcake_container",
+          "obj_groups": "plate",
+          "parent_object": "cupcake",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "chocolate",
           "name_static_prefix": "chocolate",
           "obj_groups": "chocolate",
@@ -12202,6 +12526,7 @@
         "chocolate",
         "cinnamon",
         "cupcake",
+        "cupcake_container",
         "dining_counter"
       ],
       "task_kind": "composite"
@@ -12388,6 +12713,18 @@
             "category": "pancake",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "pancake_container",
+          "name_static_prefix": "pancake_container",
+          "obj_groups": "plate",
+          "parent_object": "pancake",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -12412,6 +12749,7 @@
       "success_related_entities": [
         "dining_counter",
         "pancake",
+        "pancake_container",
         "strawberry"
       ],
       "task_kind": "composite"
@@ -13558,6 +13896,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "hotdog_bun_container",
+          "name_static_prefix": "hotdog_bun_container",
+          "obj_groups": "plate",
+          "parent_object": "hotdog_bun",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "sausage",
           "name_static_prefix": "sausage",
           "obj_groups": "sausage",
@@ -13625,6 +13975,7 @@
         "condiment",
         "dining_table",
         "hotdog_bun",
+        "hotdog_bun_container",
         "plate",
         "sausage"
       ],
@@ -13805,6 +14156,18 @@
             "category": "fish",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "fish_container",
+          "name_static_prefix": "fish_container",
+          "obj_groups": "cutting_board",
+          "parent_object": "fish",
+          "resolved": {
+            "category": "cutting_board",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -13814,6 +14177,7 @@
       "source_file": "robocasa/environments/kitchen/composite/seasoning_food/lemon_seasoning_fish.py",
       "success_related_entities": [
         "fish",
+        "fish_container",
         "lemon"
       ],
       "task_kind": "composite"
@@ -14390,6 +14754,18 @@
             "kind": "unresolved",
             "raw": "self.meat_type"
           }
+        },
+        {
+          "in_container_coverage": "unknown (parent obj_groups not statically resolvable)",
+          "name": "meat_new_container",
+          "name_static_prefix": "meat_new_container",
+          "obj_groups": "plate",
+          "parent_object": "meat_new",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -14400,6 +14776,7 @@
       "success_related_entities": [
         "fridge",
         "meat_new",
+        "meat_new_container",
         "meat_old"
       ],
       "task_kind": "composite"
@@ -15183,6 +15560,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "potato_container",
+          "name_static_prefix": "potato_container",
+          "obj_groups": "plate",
+          "parent_object": "potato",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "cutting_board",
           "name_static_prefix": "cutting_board",
           "obj_groups": "cutting_board",
@@ -15229,7 +15618,8 @@
         "cheese",
         "condiment",
         "cutting_board",
-        "potato"
+        "potato",
+        "potato_container"
       ],
       "task_kind": "composite"
     },
@@ -16573,6 +16963,20 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "container",
+          "parent_object": "obj",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "container",
           "name_static_prefix": "container",
           "obj_groups": "plate",
@@ -16600,7 +17004,8 @@
       "source_file": "robocasa/environments/kitchen/composite/defrosting_food/microwave_thawing.py",
       "success_related_entities": [
         "microwave",
-        "obj"
+        "obj",
+        "obj_container"
       ],
       "task_kind": "composite"
     },
@@ -16667,6 +17072,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "plate",
+          "parent_object": "meat",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "vegetable",
           "name_static_prefix": "vegetable",
@@ -16727,6 +17144,7 @@
       "source_file": "robocasa/environments/kitchen/composite/defrosting_food/microwave_thawing_fridge.py",
       "success_related_entities": [
         "meat",
+        "meat_container",
         "microwave"
       ],
       "task_kind": "composite"
@@ -16774,6 +17192,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "butter_container",
+          "name_static_prefix": "butter_container",
+          "obj_groups": "plate",
+          "parent_object": "butter",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "f'sugar_{i}'",
           "name_static_prefix": "sugar_",
@@ -16791,6 +17221,7 @@
       "source_file": "robocasa/environments/kitchen/composite/baking/mix_cake_frosting.py",
       "success_related_entities": [
         "butter",
+        "butter_container",
         "f'sugar_{i}'",
         "stand_mixer"
       ],
@@ -17034,6 +17465,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "plate1_container",
+          "name_static_prefix": "plate1_container",
+          "obj_groups": "plate",
+          "parent_object": "plate1",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "plate2",
           "name_static_prefix": "plate2",
@@ -17053,6 +17496,18 @@
             "kind": "native_type_tag",
             "tag": "cooked_food"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "plate2_container",
+          "name_static_prefix": "plate2_container",
+          "obj_groups": "plate",
+          "parent_object": "plate2",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -17079,7 +17534,9 @@
         "fruit1",
         "fruit2",
         "plate1",
-        "plate2"
+        "plate1_container",
+        "plate2",
+        "plate2_container"
       ],
       "task_kind": "composite"
     },
@@ -19412,6 +19869,18 @@
             "category": "fish",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "plate",
+          "parent_object": "obj",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -19467,6 +19936,7 @@
       "source_file": "robocasa/environments/kitchen/composite/broiling_fish/oven_broil_fish.py",
       "success_related_entities": [
         "obj",
+        "obj_container",
         "oven"
       ],
       "task_kind": "composite"
@@ -19642,6 +20112,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "cooked_food_container",
+          "name_static_prefix": "cooked_food_container",
+          "obj_groups": "tupperware",
+          "parent_object": "cooked_food",
+          "resolved": {
+            "category": "tupperware",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "dessert",
           "name_static_prefix": "dessert",
@@ -19677,6 +20159,7 @@
       "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
       "success_related_entities": [
         "cooked_food",
+        "cooked_food_container",
         "dessert"
       ],
       "task_kind": "atomic"
@@ -19756,6 +20239,18 @@
           }
         },
         {
+          "in_container_coverage": "unknown (parent obj_groups not statically resolvable)",
+          "name": "hot0_container",
+          "name_static_prefix": "hot0_container",
+          "obj_groups": "pan",
+          "parent_object": "hot0",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "hot1",
           "name_static_prefix": "hot1",
           "obj_groups": "selected_hot[1]",
@@ -19763,6 +20258,18 @@
             "kind": "unresolved",
             "raw": "selected_hot[1]"
           }
+        },
+        {
+          "in_container_coverage": "unknown (parent obj_groups not statically resolvable)",
+          "name": "hot1_container",
+          "name_static_prefix": "hot1_container",
+          "obj_groups": "plate",
+          "parent_object": "hot1",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         },
         {
           "name": "cold0",
@@ -19824,7 +20331,9 @@
         "cold0",
         "cold1",
         "hot0",
+        "hot0_container",
         "hot1",
+        "hot1_container",
         "tupperware0",
         "tupperware1"
       ],
@@ -20375,6 +20884,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "vegetable_container",
+          "name_static_prefix": "vegetable_container",
+          "obj_groups": "pan",
+          "parent_object": "vegetable",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": false,
           "name": "plate",
           "name_static_prefix": "plate",
@@ -20401,7 +20922,8 @@
       "source_file": "robocasa/environments/kitchen/composite/serving_food/pan_transfer.py",
       "success_related_entities": [
         "plate",
-        "vegetable"
+        "vegetable",
+        "vegetable_container"
       ],
       "task_kind": "composite"
     },
@@ -20887,6 +21409,20 @@
           }
         },
         {
+          "in_container_coverage": "unknown (parent obj_groups not statically resolvable)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "container",
+          "parent_object": "obj",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "container",
           "name_static_prefix": "container",
           "obj_groups": "plate",
@@ -20919,7 +21455,8 @@
       "success_related_entities": [
         "container",
         "microwave",
-        "obj"
+        "obj",
+        "obj_container"
       ],
       "task_kind": "atomic"
     },
@@ -20973,6 +21510,18 @@
             ],
             "kind": "hand_curated_obj_group"
           }
+        },
+        {
+          "in_container_coverage": "conditional (only some sampled categories qualify)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "plate",
+          "parent_object": "obj",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         },
         {
           "name": "oven_tray",
@@ -21041,6 +21590,7 @@
       "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
       "success_related_entities": [
         "obj",
+        "obj_container",
         "oven",
         "oven_tray"
       ],
@@ -21245,6 +21795,20 @@
             "kind": "unresolved",
             "raw": "self.obj_groups"
           }
+        },
+        {
+          "in_container_coverage": "unknown (parent obj_groups not statically resolvable)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "container",
+          "parent_object": "obj",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -21258,7 +21822,8 @@
       "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
       "success_related_entities": [
         "container",
-        "obj"
+        "obj",
+        "obj_container"
       ],
       "task_kind": "atomic"
     },
@@ -21311,6 +21876,18 @@
             "kind": "native_type_tag",
             "tag": "bread_food"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "plate",
+          "parent_object": "obj",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -21324,6 +21901,7 @@
       "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
       "success_related_entities": [
         "obj",
+        "obj_container",
         "toaster_oven"
       ],
       "task_kind": "atomic"
@@ -21731,6 +22309,20 @@
           }
         },
         {
+          "in_container_coverage": "unknown (parent obj_groups not statically resolvable)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "container",
+          "parent_object": "obj",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "container",
           "name_static_prefix": "container",
           "obj_groups": "container",
@@ -21764,7 +22356,8 @@
       "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
       "success_related_entities": [
         "container",
-        "obj"
+        "obj",
+        "obj_container"
       ],
       "task_kind": "atomic"
     },
@@ -21890,6 +22483,18 @@
           }
         },
         {
+          "in_container_coverage": "unknown (parent obj_groups not statically resolvable)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "pan",
+          "parent_object": "obj",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "container",
           "name_static_prefix": "container",
           "obj_groups": [
@@ -21922,7 +22527,8 @@
       "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
       "success_related_entities": [
         "container",
-        "obj"
+        "obj",
+        "obj_container"
       ],
       "task_kind": "atomic"
     },
@@ -22160,6 +22766,18 @@
             "category": "tongs",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "distractor_tong_container",
+          "name_static_prefix": "distractor_tong_container",
+          "obj_groups": "tray",
+          "parent_object": "distractor_tong",
+          "resolved": {
+            "category": "tray",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         },
         {
           "name": "distractor_cup",
@@ -23031,6 +23649,18 @@
             "kind": "native_type_tag",
             "tag": "meat"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "plate",
+          "parent_object": "meat",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -23040,6 +23670,7 @@
       "source_file": "robocasa/environments/kitchen/composite/preparing_marinade/place_meat_in_marinade.py",
       "success_related_entities": [
         "meat",
+        "meat_container",
         "pan",
         "stove"
       ],
@@ -23823,6 +24454,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat1_container",
+          "name_static_prefix": "meat1_container",
+          "obj_groups": "pan",
+          "parent_object": "meat1",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "meat2",
           "name_static_prefix": "meat2",
@@ -23831,6 +24474,18 @@
             "category": "steak",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat2_container",
+          "name_static_prefix": "meat2_container",
+          "obj_groups": "pan",
+          "parent_object": "meat2",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         },
         {
           "name": "plate",
@@ -23860,7 +24515,9 @@
         "bowl",
         "fridge",
         "meat1",
+        "meat1_container",
         "meat2",
+        "meat2_container",
         "plate"
       ],
       "task_kind": "composite"
@@ -25222,6 +25879,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "cutting_board",
+          "parent_object": "meat",
+          "resolved": {
+            "category": "cutting_board",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "rolling_pin",
           "name_static_prefix": "rolling_pin",
@@ -25243,6 +25912,7 @@
       "source_file": "robocasa/environments/kitchen/composite/meat_preparation/prep_for_tenderizing.py",
       "success_related_entities": [
         "meat",
+        "meat_container",
         "rolling_pin"
       ],
       "task_kind": "composite"
@@ -25457,6 +26127,20 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "container",
+          "parent_object": "meat",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "condiment",
           "name_static_prefix": "condiment",
@@ -25489,7 +26173,8 @@
         "condiment",
         "counter",
         "cutting_board",
-        "meat"
+        "meat",
+        "meat_container"
       ],
       "task_kind": "composite"
     },
@@ -25650,6 +26335,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "food_item_container",
+          "name_static_prefix": "food_item_container",
+          "obj_groups": "bowl",
+          "parent_object": "food_item",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "cup",
           "name_static_prefix": "cup",
@@ -25703,6 +26400,7 @@
         "cabinet",
         "cup",
         "food_item",
+        "food_item_container",
         "fridge"
       ],
       "task_kind": "composite"
@@ -25889,6 +26587,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "lettuce_container",
+          "name_static_prefix": "lettuce_container",
+          "obj_groups": "bowl",
+          "parent_object": "lettuce",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "grater",
           "name_static_prefix": "grater",
           "obj_groups": "cheese_grater",
@@ -25907,7 +26617,8 @@
         "cheese",
         "counter",
         "grater",
-        "lettuce"
+        "lettuce",
+        "lettuce_container"
       ],
       "task_kind": "composite"
     },
@@ -26397,6 +27108,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "baguette_container",
+          "name_static_prefix": "baguette_container",
+          "obj_groups": "cutting_board",
+          "parent_object": "baguette",
+          "resolved": {
+            "category": "cutting_board",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "knife",
           "name_static_prefix": "knife",
           "obj_groups": "knife",
@@ -26413,6 +27136,7 @@
       "source_file": "robocasa/environments/kitchen/composite/preparing_sandwiches/prepare_sausage_cheese.py",
       "success_related_entities": [
         "baguette",
+        "baguette_container",
         "cheese",
         "sausage"
       ],
@@ -27412,6 +28136,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "chicken_container",
+          "name_static_prefix": "chicken_container",
+          "obj_groups": "pan",
+          "parent_object": "chicken",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "spatula",
           "name_static_prefix": "spatula",
           "obj_groups": "spatula",
@@ -27419,6 +28155,18 @@
             "category": "spatula",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "never (no sampled category qualifies -- try_to_place_in is dead here)",
+          "name": "spatula_container",
+          "name_static_prefix": "spatula_container",
+          "obj_groups": "plate",
+          "parent_object": "spatula",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -27427,7 +28175,8 @@
       },
       "source_file": "robocasa/environments/kitchen/composite/frying/press_chicken.py",
       "success_related_entities": [
-        "chicken"
+        "chicken",
+        "chicken_container"
       ],
       "task_kind": "composite"
     },
@@ -27765,6 +28514,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "plate",
+          "parent_object": "meat",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "container",
           "name_static_prefix": "container",
           "obj_groups": "pot",
@@ -27782,6 +28543,7 @@
       "success_related_entities": [
         "container",
         "meat",
+        "meat_container",
         "stove"
       ],
       "task_kind": "composite"
@@ -29829,6 +30591,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "plate",
+          "parent_object": "meat",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "dist_obj",
           "name_static_prefix": "dist_obj",
@@ -29899,6 +30673,7 @@
       "source_file": "robocasa/environments/kitchen/composite/slicing_meat/retrieve_meat.py",
       "success_related_entities": [
         "meat",
+        "meat_container",
         "receptacle"
       ],
       "task_kind": "composite"
@@ -30403,6 +31178,18 @@
             "kind": "native_type_tag",
             "tag": "meat"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "pan",
+          "parent_object": "meat",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -30412,6 +31199,7 @@
       "source_file": "robocasa/environments/kitchen/composite/frying/rotate_pan.py",
       "success_related_entities": [
         "meat",
+        "meat_container",
         "stove"
       ],
       "task_kind": "composite"
@@ -30897,6 +31685,20 @@
             "kind": "native_type_tag",
             "tag": "meat"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "container",
+          "parent_object": "meat",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -30910,6 +31712,7 @@
       "source_file": "robocasa/environments/kitchen/composite/frying/searing_meat.py",
       "success_related_entities": [
         "meat",
+        "meat_container",
         "pan",
         "stove"
       ],
@@ -31104,6 +31907,18 @@
             "category": "steak",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "steak_container",
+          "name_static_prefix": "steak_container",
+          "obj_groups": "plate",
+          "parent_object": "steak",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -31129,6 +31944,7 @@
         "dining_counter",
         "shaker",
         "steak",
+        "steak_container",
         "stool"
       ],
       "task_kind": "composite"
@@ -31737,6 +32553,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "pan",
+          "parent_object": "obj",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": false,
           "name": "plate",
           "name_static_prefix": "plate",
@@ -31790,6 +32618,7 @@
       "success_related_entities": [
         "dining_table",
         "obj",
+        "obj_container",
         "plate"
       ],
       "task_kind": "composite"
@@ -32127,6 +32956,18 @@
             "kind": "native_type_tag",
             "tag": "meat"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "plate",
+          "parent_object": "meat",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -32137,6 +32978,7 @@
       "success_related_entities": [
         "knife",
         "meat",
+        "meat_container",
         "receptacle"
       ],
       "task_kind": "composite"
@@ -32946,6 +33788,18 @@
             "kind": "native_type_tag",
             "tag": "vegetable"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "pan",
+          "parent_object": "obj",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -32955,6 +33809,7 @@
       "source_file": "robocasa/environments/kitchen/composite/sauteing_vegetables/shake_pan.py",
       "success_related_entities": [
         "obj",
+        "obj_container",
         "stove"
       ],
       "task_kind": "composite"
@@ -34119,6 +34974,18 @@
             "category": "fish",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "fish_container",
+          "name_static_prefix": "fish_container",
+          "obj_groups": "plate",
+          "parent_object": "fish",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -34128,6 +34995,7 @@
       "source_file": "robocasa/environments/kitchen/composite/steaming_food/steam_fish.py",
       "success_related_entities": [
         "fish",
+        "fish_container",
         "pan",
         "stove"
       ],
@@ -34856,6 +35724,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_counter_container",
+          "name_static_prefix": "meat_counter_container",
+          "obj_groups": "plate",
+          "parent_object": "meat_counter",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "vegetable_counter",
           "name_static_prefix": "vegetable_counter",
@@ -34898,6 +35778,18 @@
             "kind": "native_type_tag",
             "tag": "vegetable"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "vegetable_counter_container",
+          "name_static_prefix": "vegetable_counter_container",
+          "obj_groups": "plate",
+          "parent_object": "vegetable_counter",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         },
         {
           "fridgable": true,
@@ -34996,8 +35888,10 @@
       "success_related_entities": [
         "fridge",
         "meat_counter",
+        "meat_counter_container",
         "meat_fridge",
         "vegetable_counter",
+        "vegetable_counter_container",
         "vegetable_fridge"
       ],
       "task_kind": "composite"
@@ -35044,6 +35938,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "chicken_drumstick_container",
+          "name_static_prefix": "chicken_drumstick_container",
+          "obj_groups": "plate",
+          "parent_object": "chicken_drumstick",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "vegetable",
           "name_static_prefix": "vegetable",
@@ -35088,6 +35994,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "vegetable_container",
+          "name_static_prefix": "vegetable_container",
+          "obj_groups": "plate",
+          "parent_object": "vegetable",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "graspable": true,
           "name": "bowl",
           "name_static_prefix": "bowl",
@@ -35120,8 +36038,10 @@
       "success_related_entities": [
         "bowl",
         "chicken_drumstick",
+        "chicken_drumstick_container",
         "fridge",
-        "vegetable"
+        "vegetable",
+        "vegetable_container"
       ],
       "task_kind": "composite"
     },
@@ -35486,6 +36406,20 @@
           "washable": true
         },
         {
+          "in_container_coverage": "unknown (parent obj_groups not statically resolvable)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "container",
+          "parent_object": "obj",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "distr_counter",
           "name_static_prefix": "distr_counter",
           "obj_groups": "all",
@@ -35502,6 +36436,7 @@
       "source_file": "robocasa/environments/kitchen/composite/defrosting_food/thaw_in_sink.py",
       "success_related_entities": [
         "obj",
+        "obj_container",
         "sink"
       ],
       "task_kind": "composite"
@@ -35580,6 +36515,18 @@
             "kind": "native_type_tag",
             "tag": "vegetable"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "pan",
+          "parent_object": "obj",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -35589,6 +36536,7 @@
       "source_file": "robocasa/environments/kitchen/composite/sauteing_vegetables/tilt_pan.py",
       "success_related_entities": [
         "obj",
+        "obj_container",
         "stove"
       ],
       "task_kind": "composite"
@@ -35633,6 +36581,18 @@
             "category": "bagel",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "bagel_container",
+          "name_static_prefix": "bagel_container",
+          "obj_groups": "plate",
+          "parent_object": "bagel",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -35645,6 +36605,7 @@
       "source_file": "robocasa/environments/kitchen/composite/toasting_bread/toast_bagel.py",
       "success_related_entities": [
         "bagel",
+        "bagel_container",
         "toaster_oven"
       ],
       "task_kind": "composite"
@@ -35689,6 +36650,18 @@
             "category": "baguette",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "baguette_container",
+          "name_static_prefix": "baguette_container",
+          "obj_groups": "plate",
+          "parent_object": "baguette",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -35698,6 +36671,7 @@
       "source_file": "robocasa/environments/kitchen/composite/toasting_bread/toast_baguette.py",
       "success_related_entities": [
         "baguette",
+        "baguette_container",
         "toaster_oven"
       ],
       "task_kind": "composite"
@@ -35847,6 +36821,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "bread_container",
+          "name_static_prefix": "bread_container",
+          "obj_groups": "plate",
+          "parent_object": "bread",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "meat",
           "name_static_prefix": "meat",
           "obj_groups": "meat",
@@ -35874,6 +36860,18 @@
             "kind": "native_type_tag",
             "tag": "meat"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "meat_container",
+          "name_static_prefix": "meat_container",
+          "obj_groups": "plate",
+          "parent_object": "meat",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -35931,7 +36929,9 @@
       "source_file": "robocasa/environments/kitchen/composite/toasting_bread/toast_on_correct_rack.py",
       "success_related_entities": [
         "bread",
+        "bread_container",
         "meat",
+        "meat_container",
         "toaster_oven"
       ],
       "task_kind": "composite"
@@ -36075,6 +37075,18 @@
             "category": "fish",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "plate",
+          "parent_object": "obj",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -36084,6 +37096,7 @@
       "source_file": "robocasa/environments/kitchen/composite/broiling_fish/toaster_oven_broil_fish.py",
       "success_related_entities": [
         "obj",
+        "obj_container",
         "toaster_oven"
       ],
       "task_kind": "composite"
@@ -36162,6 +37175,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "food_container",
+          "name_static_prefix": "food_container",
+          "obj_groups": "tray",
+          "parent_object": "food",
+          "resolved": {
+            "category": "tray",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "distractor_spoon",
           "name_static_prefix": "distractor_spoon",
           "obj_groups": "spoon",
@@ -36220,6 +37245,7 @@
       "success_related_entities": [
         "dining_counter",
         "food",
+        "food_container",
         "tongs"
       ],
       "task_kind": "composite"
@@ -36314,6 +37340,20 @@
             "count": 198,
             "kind": "all_categories"
           }
+        },
+        {
+          "in_container_coverage": "conditional (only some sampled categories qualify)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "container",
+          "parent_object": "obj",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -36601,6 +37641,20 @@
             "count": 198,
             "kind": "all_categories"
           }
+        },
+        {
+          "in_container_coverage": "conditional (only some sampled categories qualify)",
+          "name": "obj_container",
+          "name_static_prefix": "obj_container",
+          "obj_groups": "container",
+          "parent_object": "obj",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -37054,6 +38108,18 @@
             "category": "waffle",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "waffle_container",
+          "name_static_prefix": "waffle_container",
+          "obj_groups": "bowl",
+          "parent_object": "waffle",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
@@ -37065,7 +38131,8 @@
       "source_file": "robocasa/environments/kitchen/composite/reheating_food/waffle_reheat.py",
       "success_related_entities": [
         "microwave",
-        "waffle"
+        "waffle",
+        "waffle_container"
       ],
       "task_kind": "composite"
     },
@@ -37111,6 +38178,18 @@
           }
         },
         {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "croissant_container",
+          "name_static_prefix": "croissant_container",
+          "obj_groups": "plate",
+          "parent_object": "croissant",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
+        },
+        {
           "name": "pan",
           "name_static_prefix": "pan",
           "obj_groups": "pan",
@@ -37127,6 +38206,7 @@
       "source_file": "robocasa/environments/kitchen/composite/reheating_food/warm_croissant.py",
       "success_related_entities": [
         "croissant",
+        "croissant_container",
         "pan",
         "stove"
       ],
@@ -37487,6 +38567,18 @@
             "category": "lettuce",
             "kind": "single_category_self_group"
           }
+        },
+        {
+          "in_container_coverage": "guaranteed (every possible sampled category qualifies)",
+          "name": "lettuce_container",
+          "name_static_prefix": "lettuce_container",
+          "obj_groups": "colander",
+          "parent_object": "lettuce",
+          "resolved": {
+            "category": "colander",
+            "kind": "single_category_self_group"
+          },
+          "synthesized_from": "try_to_place_in"
         }
       ],
       "scene": {
