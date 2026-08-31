@@ -1,0 +1,144 @@
+==============================================================================
+FIXTURE TREE -- a real is-a hierarchy (robocasa's own Python class
+inheritance, read from each class's __bases__); depth = inheritance
+distance from the Fixture base class.
+==============================================================================
+depth 0 (root -- robocasa's abstract Fixture base class): 1 classes
+  Fixture
+depth 1 (direct subclasses of Fixture): 18 classes
+  Accessory, Blender, BlenderLid, CoffeeMachine, DishRack, Dishwasher, ElectricKettle, Fridge, Hood, Microwave, Oven, ProcGenFixture, Sink, StandMixer, Stove, Toaster, ToasterOven, WallAccessory
+depth 2 (subclasses of a depth-1 class (Cabinet/ProcGenFixture, Fridge, Stove, or WallAccessory)): 8 classes
+  Cabinet, Counter, FridgeBottomFreezer, FridgeFrenchDoor, FridgeSideBySide, Stool, Stovetop, Window
+depth 3 (subclasses of Cabinet (the only depth-2 class with further subclasses)): 6 classes
+  Drawer, HingeCabinet, HousingCabinet, OpenCabinet, PanelCabinet, SingleCabinet
+TOTAL fixture classes across depths 0-3: 33
+
+==============================================================================
+OBJECT TREE -- categories have no native parent/child relation among
+themselves; depth = membership in robocasa's own OBJ_CATEGORIES `types`
+tag vocabulary. A category attaches under every tag it carries, so it
+can (and 17 of them do) appear at depth 2 under more than one depth-1
+parent -- these are listed once per parent tag below, not deduplicated.
+==============================================================================
+depth 0 (root -- there is no real object superclass, just a label): 1
+  object
+depth 1 (native `types` tag, from OBJ_CATEGORIES): 21
+  alcohol, bread_food, cleaner, condiment, cooked_food, dairy, decoration, drink, fruit, iced_item, lid, meat, packaged_food, pastry, receptacle, spice, stackable, sweets, tool, utensil, vegetable
+depth 2 (object category, nested under every depth-1 tag it carries): 198 unique categories, 211 tag-attachments
+  under alcohol (3): beer, liquor, wine
+  under bread_food (7): bagel, baguette, bread, bread_flat, hotdog_bun, sandwich_bread, scone
+  under cleaner (5): bar_soap, dish_brush, soap_dispenser, sponge, spray
+  under condiment (8): condiment_bottle, ketchup, mayonnaise, mustard, oil_and_vinegar_bottle, shaker, syrup_bottle, vinegar
+  under cooked_food (9): burrito, dumpling, hamburger, hot_dog, kebab_skewer, kebabs, pizza, skewers, tacos
+  under dairy (6): butter_stick, cheese, cream_cheese_stick, egg, milk, yogurt
+  under decoration (2): candle, jar
+  under drink (13): beer, bottled_drink, bottled_water, boxed_drink, can, coffee_cup, juice, lemonade, liquor, milk, thermos, water_bottle, wine
+  under fruit (19): apple, apricot, banana, cantaloupe, cherry, coconut, dates, grapes, kiwi, mango, orange, peach, pear, pineapple, pomegranate, raspberry, strawberry, tangerine, watermelon
+  under iced_item (1): ice_cube
+  under lid (1): saucepan_lid
+  under meat (18): bacon, chicken_breast, chicken_drumstick, dumpling, fish, ham, lamb_chop, lobster, pork_chop, pork_loin, salami, sausage, scallops, shrimp, skewers, steak, sushi, turkey_slice
+  under packaged_food (16): bagged_food, bar, boxed_food, canned_food, canola_oil, cereal, chips, honey_bottle, jam, jello_cup, olive_oil_bottle, peanut_butter, salsa, spaghetti_box, vinegar, yogurt
+  under pastry (3): croissant, donut, scone
+  under receptacle (27): baking_sheet, basket, blender_jug, bowl, colander, cup, cutting_board, glass_cup, ice_cube_tray, jar, jug, jug_wide_opening, kettle_non_electric, mug, oven_tray, pan, pitcher, placemat, plate, pot, saucepan, saucepan_with_lid, strainer, teapot, tray, tupperware, wine_glass
+  under spice (4): cinnamon, paprika, salt_and_pepper_shaker, turmeric
+  under stackable (4): bowl, cup, glass_cup, mug
+  under sweets (12): cake, candy, chocolate, cookie_dough_ball, cupcake, donut, ice_cream, lollipop, marshmallow, pancake, sugar_cube, waffle
+  under tool (14): aluminum_foil, bottle_opener, can_opener, cheese_grater, digital_scale, dish_brush, measuring_cup, peeler, pizza_cutter, reamer, rolling_pin, scissors, strainer, tongs
+  under utensil (7): fork, knife, ladle, spatula, spoon, whisk, wooden_spoon
+  under vegetable (32): artichoke, asparagus, avocado, beet, bell_pepper, broccoli, brussel_sprout, cabbage, carrot, cauliflower, celery, chili_pepper, corn, cucumber, eggplant, garlic, ginger, lemon, lemon_wedge, lettuce, lime, mushroom, onion, pickle, pickle_slice, potato, radish, squash, sweet_potato, tomato, tomato_slice, zucchini
+categories with >1 tag (appear at depth 2 under multiple parents): 17
+  beer [alcohol+drink], bowl [receptacle+stackable], cup [receptacle+stackable], dish_brush [cleaner+tool], donut [pastry+sweets], dumpling [cooked_food+meat], glass_cup [receptacle+stackable], jar [decoration+receptacle], liquor [alcohol+drink], milk [dairy+drink], mug [receptacle+stackable], scone [bread_food+pastry], skewers [cooked_food+meat], strainer [receptacle+tool], vinegar [condiment+packaged_food], wine [alcohol+drink], yogurt [dairy+packaged_food]
+categories with 0 tags (no depth-1 parent to attach under at all): 4
+  flour_bag, straw, tofu, walnut
+
+OBJECT_CATEGORIES also carries 7 boolean capability flags per category (cookable/washable/microwavable/fridgable/freezable/dishwashable/graspable) -- an axis independent of `types`, so it's a second, separate depth-1 branch below,
+not folded into the tag branch above:
+depth 1 (boolean capability flag, from OBJ_CATEGORIES booleans): 7
+  cookable, dishwashable, freezable, fridgable, graspable, microwavable, washable
+depth 2 (object category where that flag is True, nested under every flag it satisfies): 665 flag-attachments
+  under cookable (62): aluminum_foil, apple, artichoke, asparagus, bacon, beet, bell_pepper, broccoli, brussel_sprout, butter_stick, cabbage, carrot, cauliflower, celery, cheese, chicken_breast, chicken_drumstick, chili_pepper, corn, cream_cheese_stick, dumpling, egg, eggplant, fish, fork, garlic, ginger, ham, hot_dog, hotdog_bun, kebab_skewer, kebabs, knife, ladle, lamb_chop, lemon, lemon_wedge, lime, lobster, mango, marshmallow, mushroom, onion, pancake, pizza, pork_chop, pork_loin, potato, salami, sausage, scallops, shrimp, skewers, spatula, spoon, squash, steak, sweet_potato, tofu, tomato, wooden_spoon, zucchini
+  under dishwashable (18): bowl, colander, glass_cup, knife, ladle, measuring_cup, mug, pan, peeler, plate, pot, reamer, saucepan, saucepan_lid, saucepan_with_lid, spoon, strainer, tupperware
+  under freezable (89): asparagus, bagged_food, baguette, bar, bell_pepper, bottled_drink, bottled_water, boxed_drink, boxed_food, bread, bread_flat, broccoli, brussel_sprout, burrito, butter_stick, cake, can, canned_food, cantaloupe, carrot, cauliflower, celery, cheese, cherry, chicken_breast, chicken_drumstick, chili_pepper, chocolate, cookie_dough_ball, corn, cream_cheese_stick, croissant, cucumber, cupcake, dates, donut, dumpling, eggplant, fish, garlic, ginger, grapes, ham, hotdog_bun, ice_cream, ice_cube, ice_cube_tray, jello_cup, kebab_skewer, kebabs, kiwi, lamb_chop, lemon, lemon_wedge, lime, lobster, mango, marshmallow, mushroom, orange, pancake, peach, peanut_butter, pear, pickle_slice, pineapple, pizza, pork_chop, pork_loin, potato, raspberry, salami, sausage, scallops, shrimp, squash, steak, strawberry, sushi, sweet_potato, tangerine, tofu, tomato_slice, tupperware, turkey_slice, waffle, water_bottle, yogurt, zucchini
+  under fridgable (139): apple, apricot, artichoke, asparagus, avocado, bacon, bagel, bagged_food, baguette, banana, bar, beer, beet, bell_pepper, blender_jug, bottled_drink, bottled_water, bowl, boxed_drink, boxed_food, bread, bread_flat, broccoli, brussel_sprout, burrito, butter_stick, cabbage, cake, can, candy, canned_food, cantaloupe, carrot, cauliflower, celery, cheese, cherry, chicken_breast, chicken_drumstick, chili_pepper, chocolate, coconut, colander, condiment_bottle, cookie_dough_ball, corn, cream_cheese_stick, croissant, cucumber, cup, cupcake, dates, donut, dumpling, egg, eggplant, fish, garlic, ginger, glass_cup, grapes, ham, hamburger, hot_dog, hotdog_bun, ice_cube_tray, jam, jello_cup, jug, jug_wide_opening, juice, kebab_skewer, kebabs, ketchup, kiwi, lamb_chop, lemon, lemon_wedge, lemonade, lettuce, lime, liquor, lobster, mango, marshmallow, mayonnaise, milk, mug, mushroom, mustard, onion, orange, pan, pancake, peach, pear, pickle, pickle_slice, pineapple, pitcher, pizza, plate, pomegranate, pork_chop, pork_loin, pot, potato, radish, raspberry, salami, salsa, sandwich_bread, saucepan, saucepan_with_lid, sausage, scallops, scone, shrimp, skewers, squash, steak, strawberry, sushi, sweet_potato, tacos, tangerine, thermos, tofu, tomato, tomato_slice, tray, tupperware, turkey_slice, waffle, walnut, water_bottle, watermelon, yogurt, zucchini
+  under graspable (157): aluminum_foil, apple, apricot, artichoke, asparagus, avocado, baguette, banana, bar, bar_soap, beer, beet, bell_pepper, blender_jug, bottled_drink, bottled_water, bowl, boxed_drink, boxed_food, bread, bread_flat, broccoli, brussel_sprout, burrito, butter_stick, cake, can, candle, candy, canned_food, canola_oil, carrot, celery, cereal, cheese, cheese_grater, cherry, chicken_breast, chicken_drumstick, chili_pepper, cinnamon, coffee_cup, colander, condiment_bottle, cookie_dough_ball, corn, cream_cheese_stick, croissant, cucumber, cup, cupcake, dish_brush, donut, dumpling, egg, eggplant, fish, garlic, ginger, glass_cup, grapes, hamburger, honey_bottle, hot_dog, hotdog_bun, ice_cream, ice_cube, jam, jar, jello_cup, jug, jug_wide_opening, juice, kebab_skewer, kebabs, ketchup, kettle_non_electric, kiwi, ladle, lamb_chop, lemon, lemon_wedge, lemonade, lime, liquor, lobster, mango, marshmallow, mayonnaise, measuring_cup, milk, mug, mushroom, mustard, oil_and_vinegar_bottle, olive_oil_bottle, onion, orange, pan, paprika, peach, peanut_butter, pear, peeler, pickle, pitcher, pizza_cutter, pomegranate, pork_chop, pork_loin, pot, potato, radish, reamer, rolling_pin, salami, salsa, salt_and_pepper_shaker, saucepan, saucepan_lid, saucepan_with_lid, sausage, scallops, scone, shaker, shrimp, skewers, soap_dispenser, sponge, spray, squash, steak, strainer, straw, strawberry, sugar_cube, sushi, sweet_potato, syrup_bottle, tacos, tangerine, teapot, thermos, tofu, tomato, tongs, tupperware, turmeric, vinegar, walnut, water_bottle, whisk, wine, wine_glass, wooden_spoon, yogurt, zucchini
+  under microwavable (63): asparagus, bacon, bell_pepper, bowl, boxed_food, broccoli, brussel_sprout, burrito, butter_stick, canned_food, carrot, cauliflower, celery, cheese, chicken_breast, chicken_drumstick, chili_pepper, coffee_cup, corn, cup, dumpling, egg, eggplant, fish, fork, garlic, glass_cup, ham, hamburger, hot_dog, hotdog_bun, kebab_skewer, kebabs, knife, lamb_chop, lobster, marshmallow, mug, mushroom, onion, pancake, pitcher, pizza, plate, pork_chop, pork_loin, potato, salami, sausage, scallops, shrimp, skewers, spoon, squash, steak, sweet_potato, tacos, thermos, tomato, tupperware, waffle, wine_glass, zucchini
+  under washable (137): apple, apricot, artichoke, asparagus, avocado, baking_sheet, banana, bar_soap, basket, beer, beet, bell_pepper, blender_jug, bottle_opener, bottled_drink, bottled_water, bowl, boxed_drink, broccoli, brussel_sprout, cabbage, can, can_opener, canned_food, cantaloupe, carrot, cauliflower, celery, cheese, cheese_grater, cherry, chicken_breast, chicken_drumstick, chili_pepper, coconut, colander, condiment_bottle, corn, cream_cheese_stick, cucumber, cup, cutting_board, dates, dish_brush, dumpling, egg, eggplant, fish, fork, garlic, ginger, glass_cup, grapes, ham, ice_cube, ice_cube_tray, jam, jar, jug, jug_wide_opening, juice, ketchup, kettle_non_electric, kiwi, knife, ladle, lamb_chop, lemon, lemon_wedge, lettuce, lime, lobster, mango, measuring_cup, milk, mug, mushroom, onion, orange, oven_tray, pan, peach, pear, peeler, pickle, pineapple, pitcher, pizza_cutter, placemat, plate, pomegranate, pork_chop, pork_loin, pot, potato, radish, raspberry, reamer, rolling_pin, salami, salt_and_pepper_shaker, saucepan, saucepan_lid, saucepan_with_lid, sausage, scallops, scissors, shrimp, skewers, soap_dispenser, spatula, sponge, spoon, spray, squash, steak, strainer, straw, strawberry, sweet_potato, tangerine, teapot, thermos, tofu, tomato, tongs, tray, tupperware, walnut, water_bottle, watermelon, whisk, wine, wine_glass, wooden_spoon, yogurt, zucchini
+
+==============================================================================
+SCENE TREE -- layout/style IDs are bare numbers with no native semantic
+name; depth = membership in robocasa's own *_GROUPS_TO_IDS partitions
+(scene_registry.py). Groups overlap (e.g. layout ISLAND and DINING share
+4 of their 5-6 IDs), so an ID can appear at depth 2 under multiple groups.
+==============================================================================
+-- layout axis --
+depth 0 (root -- the axis itself, e.g. `layout_id`/`style_id` on an episode): 1
+  layout
+depth 1 (named ID-group, from LAYOUT_GROUPS_TO_IDS): 6
+  DINING (id -6, 6 members), ISLAND (id -5, 5 members), NO_ISLAND (id -4, 5 members), ALL (id -3, 60 members), TRAIN (id -2, 50 members), TEST (id -1, 10 members)
+depth 2 (individual numeric ID, nested under every group it belongs to): 60 unique IDs
+  under DINING (6): LAYOUT002, LAYOUT004, LAYOUT007, LAYOUT008, LAYOUT009, LAYOUT010
+  under ISLAND (5): LAYOUT002, LAYOUT004, LAYOUT007, LAYOUT009, LAYOUT010
+  under NO_ISLAND (5): LAYOUT001, LAYOUT003, LAYOUT005, LAYOUT006, LAYOUT008
+  under ALL (60): LAYOUT001, LAYOUT002, LAYOUT003, LAYOUT004, LAYOUT005, LAYOUT006, LAYOUT007, LAYOUT008, LAYOUT009, LAYOUT010, LAYOUT011, LAYOUT012, LAYOUT013, LAYOUT014, LAYOUT015, LAYOUT016, LAYOUT017, LAYOUT018, LAYOUT019, LAYOUT020, LAYOUT021, LAYOUT022, LAYOUT023, LAYOUT024, LAYOUT025, LAYOUT026, LAYOUT027, LAYOUT028, LAYOUT029, LAYOUT030, LAYOUT031, LAYOUT032, LAYOUT033, LAYOUT034, LAYOUT035, LAYOUT036, LAYOUT037, LAYOUT038, LAYOUT039, LAYOUT040, LAYOUT041, LAYOUT042, LAYOUT043, LAYOUT044, LAYOUT045, LAYOUT046, LAYOUT047, LAYOUT048, LAYOUT049, LAYOUT050, LAYOUT051, LAYOUT052, LAYOUT053, LAYOUT054, LAYOUT055, LAYOUT056, LAYOUT057, LAYOUT058, LAYOUT059, LAYOUT060
+  under TRAIN (50): LAYOUT011, LAYOUT012, LAYOUT013, LAYOUT014, LAYOUT015, LAYOUT016, LAYOUT017, LAYOUT018, LAYOUT019, LAYOUT020, LAYOUT021, LAYOUT022, LAYOUT023, LAYOUT024, LAYOUT025, LAYOUT026, LAYOUT027, LAYOUT028, LAYOUT029, LAYOUT030, LAYOUT031, LAYOUT032, LAYOUT033, LAYOUT034, LAYOUT035, LAYOUT036, LAYOUT037, LAYOUT038, LAYOUT039, LAYOUT040, LAYOUT041, LAYOUT042, LAYOUT043, LAYOUT044, LAYOUT045, LAYOUT046, LAYOUT047, LAYOUT048, LAYOUT049, LAYOUT050, LAYOUT051, LAYOUT052, LAYOUT053, LAYOUT054, LAYOUT055, LAYOUT056, LAYOUT057, LAYOUT058, LAYOUT059, LAYOUT060
+  under TEST (10): LAYOUT001, LAYOUT002, LAYOUT003, LAYOUT004, LAYOUT005, LAYOUT006, LAYOUT007, LAYOUT008, LAYOUT009, LAYOUT010
+
+-- style axis --
+depth 0 (root -- the axis itself, e.g. `layout_id`/`style_id` on an episode): 1
+  style
+depth 1 (named ID-group, from STYLE_GROUPS_TO_IDS): 3
+  ALL (id -3, 60 members), -2 (id -2, 50 members), -1 (id -1, 10 members)
+depth 2 (individual numeric ID, nested under every group it belongs to): 60 unique IDs
+  under ALL (60): STYLE001, STYLE002, STYLE003, STYLE004, STYLE005, STYLE006, STYLE007, STYLE008, STYLE009, STYLE010, STYLE011, STYLE012, STYLE013, STYLE014, STYLE015, STYLE016, STYLE017, STYLE018, STYLE019, STYLE020, STYLE021, STYLE022, STYLE023, STYLE024, STYLE025, STYLE026, STYLE027, STYLE028, STYLE029, STYLE030, STYLE031, STYLE032, STYLE033, STYLE034, STYLE035, STYLE036, STYLE037, STYLE038, STYLE039, STYLE040, STYLE041, STYLE042, STYLE043, STYLE044, STYLE045, STYLE046, STYLE047, STYLE048, STYLE049, STYLE050, STYLE051, STYLE052, STYLE053, STYLE054, STYLE055, STYLE056, STYLE057, STYLE058, STYLE059, STYLE060
+  under -2 (50): STYLE011, STYLE012, STYLE013, STYLE014, STYLE015, STYLE016, STYLE017, STYLE018, STYLE019, STYLE020, STYLE021, STYLE022, STYLE023, STYLE024, STYLE025, STYLE026, STYLE027, STYLE028, STYLE029, STYLE030, STYLE031, STYLE032, STYLE033, STYLE034, STYLE035, STYLE036, STYLE037, STYLE038, STYLE039, STYLE040, STYLE041, STYLE042, STYLE043, STYLE044, STYLE045, STYLE046, STYLE047, STYLE048, STYLE049, STYLE050, STYLE051, STYLE052, STYLE053, STYLE054, STYLE055, STYLE056, STYLE057, STYLE058, STYLE059, STYLE060
+  under -1 (10): STYLE001, STYLE002, STYLE003, STYLE004, STYLE005, STYLE006, STYLE007, STYLE008, STYLE009, STYLE010
+
+==============================================================================
+EXTRAS -- non-tree-shaped native data (ad hoc lists / a flat enum / a
+name->class mapping), not part of any depth count above.
+==============================================================================
+- hand_curated_obj_groups (robocasa/kitchen_objects.py OBJ_GROUPS literals): 8 groups
+  - container (1): plate
+  - container_set2 (2): plate, bowl
+  - cookware (4): pan, pot, saucepan, kettle_non_electric
+  - food_set1 (10): apple, baguette, banana, carrot, cheese, cucumber, egg, lemon, orange, potato
+  - group1 (5): apple, carrot, banana, bowl, can
+  - kettle (1): kettle_non_electric
+  - oven_ready (9): corn, fish, steak, tray, potato, sweet_potato, chicken_drumstick, eggplant, broccoli
+  - pots_and_pans (2): pan, pot
+- fixture_type_enum (robocasa FixtureType, placement-role queries): 27 members
+  MICROWAVE, STOVE, OVEN, SINK, COFFEE_MACHINE, TOASTER, TOASTER_OVEN, FRIDGE, DISHWASHER, BLENDER, STAND_MIXER, ELECTRIC_KETTLE, STOOL, COUNTER, ISLAND, COUNTER_NON_CORNER, DINING_COUNTER, CABINET, CABINET_WITH_DOOR, CABINET_SINGLE_DOOR, CABINET_DOUBLE_DOOR, SHELF, DRAWER, TOP_DRAWER, WINDOW, DISH_RACK, COUNTER_NON_DINING
+- fixtures_name_to_class (scene_builder.FIXTURES): 56 names -> 33 classes
+  - Accessory (22): accessory, candle, cinnamon, digital_scale, flower_vase, fruit_bowl, glass_cup, jar, jar_lid, knife_block, oil_bottle, paper_towel, paprika, pepper_shaker, plant, salt_shaker, soap_dispenser, tiered_basket, turmeric, utensil_holder, utensil_set, vinegar_bottle
+  - Blender (1): blender
+  - BlenderLid (1): blender_lid
+  - Box (1): box
+  - CoffeeMachine (1): coffee_machine
+  - Counter (1): counter
+  - DishRack (1): dish_rack
+  - Dishwasher (1): dishwasher
+  - Drawer (1): drawer
+  - ElectricKettle (1): electric_kettle
+  - Floor (1): floor
+  - FridgeBottomFreezer (1): fridge_bottom_freezer
+  - FridgeFrenchDoor (1): fridge_french_door
+  - FridgeSideBySide (1): fridge_side_by_side
+  - HingeCabinet (1): hinge_cabinet
+  - Hood (1): hood
+  - HousingCabinet (1): housing_cabinet
+  - Microwave (1): microwave
+  - OpenCabinet (1): open_cabinet
+  - Oven (1): oven
+  - PanelCabinet (1): panel_cabinet
+  - SingleCabinet (1): single_cabinet
+  - Sink (1): sink
+  - StandMixer (1): stand_mixer
+  - Stool (1): stool
+  - Stove (2): stove, stove_wide
+  - Stovetop (1): stovetop
+  - Toaster (1): toaster
+  - ToasterOven (1): toaster_oven
+  - Wall (1): wall
+  - WallAccessory (2): utensil_rack, wall_accessory
+  - Window (1): window
+  - WindowProc (1): window_proc
