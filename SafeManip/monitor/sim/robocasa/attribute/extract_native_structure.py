@@ -50,7 +50,8 @@ def get_object_structure() -> Dict[str, Any]:
     tree = ast.parse(path.read_text())
 
     obj_categories: Dict[str, Any] = {}
-    obj_groups_source: Dict[str, Any] = {}
+    obj_groups_literal: Dict[str, Any] = {}
+    computed_group_calls: List[Dict[str, Any]] = []  # get_cats_by_type([...]) call sites, args only
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
@@ -64,9 +65,18 @@ def get_object_structure() -> Dict[str, Any]:
                             "types": tuple(types),
                             "booleans": {k: v for k, v in info.items() if isinstance(v, bool)},
                         }
-        # Hand-curated OBJ_GROUPS[...] = [...] assignments (skip the
-        # programmatically-populated ones, e.g. `for t in all_types: ...`,
-        # which just mirror `types` and add no new information).
+        # OBJ_GROUPS[...] = [...] assignments come in two shapes: literal
+        # lists (hand-curated, e.g. "cookware") and get_cats_by_type([...])
+        # calls (e.g. "food", "in_container") -- the latter previously got
+        # silently dropped entirely (ast.literal_eval can't evaluate a call)
+        # even though "food" is 100% original robocasa, not a SafeManip
+        # addition, and its specific tag selection (8 tags, deliberately
+        # excluding condiment/spice/drink/alcohol) is real information, not
+        # reconstructable from type_tag_vocabulary alone. Rather than
+        # import kitchen_objects.py to execute the call, replicate
+        # get_cats_by_type()'s own logic (a category matches if its `types`
+        # intersects the requested tags) against the OBJ_CATEGORIES data
+        # already parsed above -- same result, zero robocasa imports.
         if isinstance(node, ast.Assign) and len(node.targets) == 1:
             target = node.targets[0]
             if (
@@ -76,17 +86,46 @@ def get_object_structure() -> Dict[str, Any]:
             ):
                 key = ast.literal_eval(target.slice)
                 try:
-                    obj_groups_source[key] = ast.literal_eval(node.value)
+                    obj_groups_literal[key] = ast.literal_eval(node.value)
+                    continue
                 except ValueError:
-                    pass  # e.g. get_cats_by_type(...) calls -- not a literal
+                    pass  # not a literal -- fall through to the call case below
+                if (
+                    isinstance(node.value, ast.Call)
+                    and isinstance(node.value.func, ast.Name)
+                    and node.value.func.id == "get_cats_by_type"
+                    and node.value.args
+                ):
+                    try:
+                        wanted_tags = ast.literal_eval(node.value.args[0])
+                    except ValueError:
+                        continue
+                    if isinstance(wanted_tags, str):
+                        wanted_tags = [wanted_tags]
+                    computed_group_calls.append({"name": key, "types_argument": list(wanted_tags)})
 
     all_type_tags = sorted({t for info in obj_categories.values() for t in info["types"]})
     all_boolean_keys = sorted({k for info in obj_categories.values() for k in info["booleans"]})
+
+    # Resolve the get_cats_by_type([...]) calls now that obj_categories is
+    # fully built -- replicates kitchen_objects.py's own get_cats_by_type()
+    # exactly: category included if its `types` intersects the wanted tags.
+    obj_groups_computed: Dict[str, Any] = {}
+    for call in computed_group_calls:
+        wanted = set(call["types_argument"])
+        obj_groups_computed[call["name"]] = {
+            "types_argument": call["types_argument"],
+            "categories": sorted(
+                cat for cat, info in obj_categories.items() if set(info["types"]) & wanted
+            ),
+        }
+
     return {
         "num_categories": len(obj_categories),
         "type_tag_vocabulary": all_type_tags,
         "boolean_capability_flags": all_boolean_keys,
-        "hand_curated_obj_groups": obj_groups_source,
+        "hand_curated_obj_groups": obj_groups_literal,
+        "computed_obj_groups": obj_groups_computed,
         "categories": obj_categories,
     }
 
@@ -276,6 +315,14 @@ def render_extras(structure: Dict[str, Any]) -> str:
         scene-XML fixture-type string (what actually shows up as a fixture's
         instance-name prefix at runtime, e.g. "oil_bottle") to its Python
         class -- many-to-one (many names share one class, esp. Accessory).
+      - computed_obj_groups: OBJ_GROUPS entries robocasa defines via a
+        get_cats_by_type([...]) *call* rather than a literal list (e.g.
+        "food", "in_container") -- resolved here by replicating that
+        function's own logic against the already-parsed OBJ_CATEGORIES data,
+        not by importing kitchen_objects.py. 100% original robocasa (not a
+        SafeManip addition); a category's presence in one of these depends
+        on the specific tags each one bundles, so it's real information, not
+        reconstructable from type_tag_vocabulary alone.
     """
     lines = []
     obj_groups = structure["objects"]["hand_curated_obj_groups"]
@@ -283,6 +330,18 @@ def render_extras(structure: Dict[str, Any]) -> str:
     for name in sorted(obj_groups):
         members = obj_groups[name]
         lines.append(f"  - {name} ({len(members)}): {', '.join(members)}")
+
+    computed_groups = structure["objects"]["computed_obj_groups"]
+    lines.append(
+        f"- computed_obj_groups (OBJ_GROUPS entries defined via get_cats_by_type([...]), "
+        f"resolved here rather than skipped): {len(computed_groups)} groups"
+    )
+    for name in sorted(computed_groups):
+        info = computed_groups[name]
+        lines.append(
+            f"  - {name} (from tags {info['types_argument']}, {len(info['categories'])} categories): "
+            f"{', '.join(info['categories'])}"
+        )
 
     fixture_type_enum = structure["fixtures"]["fixture_type_enum"]
     lines.append(f"- fixture_type_enum (robocasa FixtureType, placement-role queries): {len(fixture_type_enum)} members")
