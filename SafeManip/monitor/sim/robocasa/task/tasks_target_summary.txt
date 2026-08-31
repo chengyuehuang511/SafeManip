@@ -1,0 +1,773 @@
+target tasks: 50, found: 50, missing: 0
+
+-- atomic_seen (18) --
+  CloseBlenderLid, CloseFridge, CloseToasterOvenDoor, CoffeeSetupMug, NavigateKitchen, OpenCabinet, OpenDrawer, OpenStandMixerHead, PickPlaceCounterToCabinet, PickPlaceCounterToStove, PickPlaceDrawerToCounter, PickPlaceSinkToCounter, PickPlaceToasterToCounter, SlideDishwasherRack, TurnOffStove, TurnOnElectricKettle, TurnOnMicrowave, TurnOnSinkFaucet
+-- composite_seen (16) --
+  DeliverStraw, GetToastedBread, KettleBoiling, LoadDishwasher, PackIdenticalLunches, PreSoakPan, PrepareCoffee, RinseSinkBasin, ScrubCuttingBoard, SearingMeat, SetUpCuttingStation, StackBowlsCabinet, SteamInMicrowave, StirVegetables, StoreLeftoversInBowl, WashLettuce
+-- composite_unseen (16) --
+  ArrangeBreadBasket, ArrangeTea, BreadSelection, CategorizeCondiments, CuttingToolSelection, GarnishPancake, GatherTableware, HeatKebabSandwich, MakeIceLemonade, PanTransfer, PortionHotDogs, RecycleBottlesByType, SeparateFreezerRack, WaffleReheat, WashFruitColander, WeighIngredients
+
+==============================================================================
+ArrangeBreadBasket  [composite]
+==============================================================================
+description: Open the cabinet, pick up the [*bread*] from the cabinet and place it in the basket. Then move the basket to the dining counter.
+num_subtasks: 5  moma_required: Yes  source: robocasa/environments/kitchen/composite/setting_the_table/arrange_bread_basket.py
+activity: Setting the Table   category: Serving
+scene: exclude_layouts=[1, 3, 5, 6, 18, 20, 36, 39, 40, 43, 47, 50, 52]  exclude_styles=[]
+fixtures (3):
+  - cab: FixtureType.CABINET
+  - counter: FixtureType.COUNTER
+  - dining_table: FixtureType.COUNTER
+objects (4):
+  - bread: obj_groups='bread' -> category `bread` flags={'name_static_prefix': 'bread', 'graspable': True}
+  - basket: obj_groups='basket' -> category `basket` flags={'name_static_prefix': 'basket'}
+  - dstr_dining: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'dstr_dining'}
+  - dstr_dining2: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'dstr_dining2'}
+success_related_entities: ['basket', 'bread', 'dining_table']
+
+==============================================================================
+ArrangeTea  [composite]
+==============================================================================
+description: Pick the kettle from the counter and place it on the tray. Then pick the mug from the cabinet and place it on the tray. Then close the cabinet doors.
+num_subtasks: 3  moma_required: No  source: robocasa/environments/kitchen/composite/brewing/arrange_tea.py
+activity: Brewing   category: Beverage Preparation
+scene: exclude_layouts=[32, 41, 59]  exclude_styles=[]
+fixtures (2):
+  - cab: FixtureType.CABINET_DOUBLE_DOOR
+  - counter: FixtureType.COUNTER
+objects (3):
+  - obj: obj_groups='mug' -> category `mug` flags={'name_static_prefix': 'obj', 'graspable': True}
+  - obj2: obj_groups='kettle' -> hand_curated_obj_group (1 categories) flags={'name_static_prefix': 'obj2', 'graspable': True}
+  - container: obj_groups='tray' -> category `tray` flags={'name_static_prefix': 'container'}
+success_related_entities: ['cab', 'container', 'obj', 'obj2']
+
+==============================================================================
+BreadSelection  [composite]
+==============================================================================
+description: From the different types of pastries on the counter, select a croissant and place it on the cutting board. Then retrieve a jar of jam from the cabinet and place it alongside the croissant on the cutting board.
+num_subtasks: 2  moma_required: Yes  source: robocasa/environments/kitchen/composite/making_toast/bread_selection.py
+activity: Making Toast   category: Cooking
+scene: exclude_layouts=[32, 41, 59]  exclude_styles=[]
+fixtures (2):
+  - cab: FixtureType.CABINET_DOUBLE_DOOR
+  - counter: FixtureType.COUNTER
+objects (5):
+  - cutting_board: obj_groups='cutting_board' -> category `cutting_board` flags={'name_static_prefix': 'cutting_board'}
+  - distr_pastry: obj_groups=('baguette', 'cupcake') -> multiple: None flags={'name_static_prefix': 'distr_pastry'}
+  - croissant: obj_groups='croissant' -> category `croissant` flags={'name_static_prefix': 'croissant'}
+  - jam: obj_groups='jam' -> category `jam` flags={'name_static_prefix': 'jam'}
+  - distr_counter: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_counter'}
+success_related_entities: ['croissant', 'cutting_board', 'jam']
+
+==============================================================================
+CategorizeCondiments  [composite]
+==============================================================================
+description: Put the shaker and condiment bottle from the counter next to their counterparts in the cabinet.
+num_subtasks: 2  moma_required: Yes  source: robocasa/environments/kitchen/composite/arranging_condiments/categorize_condiments.py
+activity: Arranging Condiments   category: Serving
+scene: no layout/style exclusions
+fixtures (2):
+  - cab: FixtureType.CABINET
+  - counter: FixtureType.COUNTER
+objects (5):
+  - obj1: obj_groups=['condiment_bottle', 'ketchup', 'syrup_bottle'] -> multiple: None flags={'name_static_prefix': 'obj1', 'graspable': True}
+  - obj2: obj_groups='shaker' -> category `shaker` flags={'name_static_prefix': 'obj2', 'graspable': True}
+  - cab_obj1: obj_groups=['condiment_bottle', 'ketchup', 'syrup_bottle'] -> multiple: None flags={'name_static_prefix': 'cab_obj1', 'graspable': True}
+  - cab_obj2: obj_groups='shaker' -> category `shaker` flags={'name_static_prefix': 'cab_obj2', 'graspable': True}
+  - distr_counter1: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_counter1'}
+success_related_entities: ['cab', 'cab_obj1', 'cab_obj2', 'obj1', 'obj2']
+
+==============================================================================
+CloseBlenderLid  [atomic]
+==============================================================================
+description: Close the lid blender by securely placing the lid on top.
+num_subtasks: 1  moma_required: Yes  source: robocasa/environments/kitchen/atomic/kitchen_blender.py
+skill: lids (Close & Open Lid)   fixture_label: Blender
+scene: no layout/style exclusions
+fixtures (1):
+  - blender: FixtureType.BLENDER
+objects (0):
+success_related_entities: ['blender']
+
+==============================================================================
+CloseFridge  [atomic]
+==============================================================================
+description: Close the fridge door(s).
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_doors.py
+skill: closing_doors (Close Door)   fixture_label: Doors
+scene: no layout/style exclusions
+fixtures (1):
+  - fxtr: FixtureType.FRIDGE
+objects (2):
+  - door_obj: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'door_obj', 'graspable': True}
+  - f'distr_counter_{i + 1}': obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_counter_'}
+success_related_entities: ['fxtr']
+
+==============================================================================
+CloseToasterOvenDoor  [atomic]
+==============================================================================
+description: Close the toaster oven door.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_doors.py
+skill: closing_doors (Close Door)   fixture_label: Doors
+scene: no layout/style exclusions
+fixtures (1):
+  - toaster_oven: FixtureType.TOASTER_OVEN
+objects (0):
+success_related_entities: ['toaster_oven']
+
+==============================================================================
+CoffeeSetupMug  [atomic]
+==============================================================================
+description: Pick the mug from the counter and place it under the coffee machine dispenser.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_coffee.py
+skill: insertion (Insertion)   fixture_label: Coffee Machine
+scene: no layout/style exclusions
+fixtures (2):
+  - coffee_machine: FixtureType.COFFEE_MACHINE
+  - counter: FixtureType.COUNTER
+objects (2):
+  - obj: obj_groups='mug' -> category `mug` flags={'name_static_prefix': 'obj'}
+  - obj: obj_groups='mug' -> category `mug` flags={'name_static_prefix': 'obj'}
+success_related_entities: ['coffee_machine', 'counter', 'obj']
+
+==============================================================================
+CuttingToolSelection  [composite]
+==============================================================================
+description: Place the appropriate cutting tool for cutting the [*fruit/vegetable*] skin on the cutting board.
+num_subtasks: 1  moma_required: Yes  source: robocasa/environments/kitchen/composite/chopping_vegetables/cutting_tool_selection.py
+activity: Chopping Vegetables   category: Food Preparation
+scene: no layout/style exclusions
+fixtures (1):
+  - counter: FixtureType.COUNTER
+objects (3):
+  - peeler: obj_groups='peeler' -> category `peeler` flags={'name_static_prefix': 'peeler'}
+  - knife: obj_groups='knife' -> category `knife` flags={'name_static_prefix': 'knife'}
+  - food: obj_groups='self.food' -> unresolved: self.food flags={'name_static_prefix': 'food'}
+success_related_entities: ['food', 'knife', 'peeler']
+
+==============================================================================
+DeliverStraw  [composite]
+==============================================================================
+description: Take a straw from the drawer in front and place it inside the glass cup on the dining counter.
+num_subtasks: 4  moma_required: Yes  source: robocasa/environments/kitchen/composite/serving_beverages/deliver_straw.py
+activity: Serving Beverages   category: Serving
+scene: exclude_layouts=[1, 3, 5, 6, 18, 20, 36, 39, 40, 43, 47, 50, 52]  exclude_styles=[]
+fixtures (3):
+  - stool: FixtureType.STOOL
+  - dining_counter: FixtureType.DINING_COUNTER
+  - drawer: FixtureType.TOP_DRAWER
+objects (2):
+  - straw: obj_groups='straw' -> category `straw` flags={'name_static_prefix': 'straw'}
+  - glass_cup: obj_groups='glass_cup' -> category `glass_cup` flags={'name_static_prefix': 'glass_cup'}
+success_related_entities: ['glass_cup', 'straw']
+
+==============================================================================
+GarnishPancake  [composite]
+==============================================================================
+description: Take the strawberry from the fridge and place it on top of the pancake, located on the dining counter.
+num_subtasks: 4  moma_required: Yes  source: robocasa/environments/kitchen/composite/garnishing_dishes/garnish_pancake.py
+activity: Garnishing Dishes   category: Serving
+scene: exclude_layouts=[1, 3, 5, 6, 18, 20, 36, 39, 40, 43, 47, 50, 52]  exclude_styles=[]
+fixtures (3):
+  - fridge: FixtureType.FRIDGE
+  - stool: FixtureType.STOOL
+  - dining_counter: FixtureType.DINING_COUNTER
+objects (3):
+  - strawberry: obj_groups='strawberry' -> category `strawberry` flags={'name_static_prefix': 'strawberry'}
+  - distr_fridge: obj_groups='food' -> computed_obj_group (102 categories) flags={'name_static_prefix': 'distr_fridge'}
+  - pancake: obj_groups='pancake' -> category `pancake` flags={'name_static_prefix': 'pancake'}
+success_related_entities: ['dining_counter', 'pancake', 'strawberry']
+
+==============================================================================
+GatherTableware  [composite]
+==============================================================================
+description: Gather all objects into one cabinet and sort the glasses and bowls to opposite sides.
+num_subtasks: 4  moma_required: Yes  source: robocasa/environments/kitchen/composite/arranging_cabinets/gather_tableware.py
+activity: Arranging Cabinets   category: Organizing and Storage
+scene: no layout/style exclusions
+fixtures (3):
+  - counter: FixtureType.COUNTER
+  - cab: FixtureType.CABINET
+  - cab2: FixtureType.CABINET
+objects (4):
+  - glass1: obj_groups=['mug'] -> multiple: None flags={'name_static_prefix': 'glass1', 'graspable': True}
+  - glass2: obj_groups=['mug'] -> multiple: None flags={'name_static_prefix': 'glass2', 'graspable': True}
+  - glass3: obj_groups=['mug'] -> multiple: None flags={'name_static_prefix': 'glass3', 'graspable': True}
+  - bowl: obj_groups='bowl' -> category `bowl` flags={'name_static_prefix': 'bowl', 'graspable': True}
+success_related_entities: ['bowl', 'glass1', 'glass2', 'glass3']
+
+==============================================================================
+GetToastedBread  [composite]
+==============================================================================
+description: Start the toaster. Once the lever pops up, take the bread to the plate on the dining counter.
+num_subtasks: 4  moma_required: Yes  source: robocasa/environments/kitchen/composite/toasting_bread/get_toasted_bread.py
+activity: Toasting Bread   category: Cooking
+scene: exclude_layouts=[1, 3, 5, 6, 18, 20, 36, 39, 40, 43, 47, 50, 52]  exclude_styles=[]
+fixtures (3):
+  - stool: FixtureType.STOOL
+  - dining_counter: FixtureType.DINING_COUNTER
+  - toaster: FixtureType.TOASTER
+objects (2):
+  - obj: obj_groups='sandwich_bread' -> category `sandwich_bread` flags={'name_static_prefix': 'obj'}
+  - plate: obj_groups='plate' -> category `plate` flags={'name_static_prefix': 'plate'}
+success_related_entities: ['obj', 'plate', 'toaster']
+
+==============================================================================
+HeatKebabSandwich  [composite]
+==============================================================================
+description: Pick up the kebab skewer and baguette bread, and place them inside the toaster oven. Close the toaster oven door and start by setting the timer.
+num_subtasks: 6  moma_required: Yes  source: robocasa/environments/kitchen/composite/preparing_sandwiches/heat_kebab_sandwich.py
+activity: Preparing Sandwiches   category: Food Preparation
+scene: no layout/style exclusions
+fixtures (2):
+  - toaster_oven: FixtureType.TOASTER_OVEN
+  - counter: FixtureType.COUNTER
+objects (3):
+  - plate: obj_groups='plate' -> category `plate` flags={'name_static_prefix': 'plate'}
+  - kebab: obj_groups='kebab_skewer' -> category `kebab_skewer` flags={'name_static_prefix': 'kebab'}
+  - baguette: obj_groups='baguette' -> category `baguette` flags={'name_static_prefix': 'baguette'}
+success_related_entities: ['baguette', 'kebab', 'toaster_oven']
+
+==============================================================================
+KettleBoiling  [composite]
+==============================================================================
+description: Pick the kettle from the counter and place it on a stove burner. Then turn the burner on.
+num_subtasks: 2  moma_required: Yes  source: robocasa/environments/kitchen/composite/brewing/kettle_boiling.py
+activity: Brewing   category: Beverage Preparation
+scene: no layout/style exclusions
+fixtures (2):
+  - stove: FixtureType.STOVE
+  - counter: FixtureType.COUNTER
+objects (2):
+  - obj: obj_groups='kettle_non_electric' -> category `kettle_non_electric` flags={'name_static_prefix': 'obj', 'graspable': True}
+  - stove_distr: obj_groups=('pan', 'pot') -> multiple: None flags={'name_static_prefix': 'stove_distr'}
+success_related_entities: ['obj', 'stove']
+
+==============================================================================
+LoadDishwasher  [composite]
+==============================================================================
+description: Pick up the [*dishes*] from the counter, place them in the dishwasher, and close the dishwasher door.
+num_subtasks: 3  moma_required: No  source: robocasa/environments/kitchen/composite/loading_dishwasher/load_dishwasher.py
+activity: Loading Dishwasher   category: Cleaning and Sanitizing
+scene: no layout/style exclusions
+fixtures (2):
+  - dishwasher: FixtureType.DISHWASHER
+  - counter: FixtureType.COUNTER
+objects (2):
+  - dish0: obj_groups='cup' -> category `cup` flags={'name_static_prefix': 'dish0'}
+  - dish1: obj_groups='bowl' -> category `bowl` flags={'name_static_prefix': 'dish1'}
+success_related_entities: ['dish0', 'dish1', 'dishwasher']
+
+==============================================================================
+MakeIceLemonade  [composite]
+==============================================================================
+description: Grab a lemon wedge from the fridge and one ice cube from the ice bowl, and put them in the glass of lemonade.
+num_subtasks: 5  moma_required: Yes  source: robocasa/environments/kitchen/composite/adding_ice_to_beverages/make_ice_lemonade.py
+activity: Adding Ice to Beverages   category: Beverage Preparation
+scene: no layout/style exclusions
+fixtures (2):
+  - fridge: FixtureType.FRIDGE
+  - counter: FixtureType.COUNTER
+objects (5):
+  - lemon_wedge: obj_groups='lemon_wedge' -> category `lemon_wedge` flags={'name_static_prefix': 'lemon_wedge'}
+  - ice_bowl: obj_groups='bowl' -> category `bowl` flags={'name_static_prefix': 'ice_bowl'}
+  - ice_cube1: obj_groups='ice_cube' -> category `ice_cube` flags={'name_static_prefix': 'ice_cube1'}
+  - ice_cube2: obj_groups='ice_cube' -> category `ice_cube` flags={'name_static_prefix': 'ice_cube2'}
+  - glass_cup: obj_groups='glass_cup' -> category `glass_cup` flags={'name_static_prefix': 'glass_cup'}
+success_related_entities: ['glass_cup', 'ice_cube1', 'ice_cube2', 'lemon_wedge']
+
+==============================================================================
+NavigateKitchen  [atomic]
+==============================================================================
+description: Navigate to the {kitchen location}.
+num_subtasks: 1  moma_required: Yes  source: robocasa/environments/kitchen/atomic/kitchen_navigate.py
+skill: navigation (Navigation)   fixture_label: Navigation
+scene: no layout/style exclusions
+fixtures (0):
+objects (0):
+success_related_entities: []
+
+==============================================================================
+OpenCabinet  [atomic]
+==============================================================================
+description: Open the cabinet door(s).
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_doors.py
+skill: opening_doors (Open Door)   fixture_label: Doors
+scene: no layout/style exclusions
+fixtures (1):
+  - fxtr: FixtureType.CABINET_WITH_DOOR
+objects (2):
+  - door_obj: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'door_obj', 'graspable': True}
+  - f'distr_counter_{i + 1}': obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_counter_'}
+success_related_entities: ['fxtr']
+
+==============================================================================
+OpenDrawer  [atomic]
+==============================================================================
+description: Open the {left/right} drawer.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_drawer.py
+skill: opening_doors (Open Door)   fixture_label: Drawer
+scene: no layout/style exclusions
+fixtures (1):
+  - drawer: not_a_fixture_type_literal: self.drawer
+objects (2):
+  - drawer_obj: obj_groups=('tool', 'utensil') -> multiple: None flags={'name_static_prefix': 'drawer_obj', 'graspable': True}
+  - f'distr_counter_{i + 1}': obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_counter_'}
+success_related_entities: ['drawer']
+
+==============================================================================
+OpenStandMixerHead  [atomic]
+==============================================================================
+description: Open the stand mixer head.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_stand_mixer.py
+skill: lids (Close & Open Lid)   fixture_label: Stand Mixer
+scene: no layout/style exclusions
+fixtures (1):
+  - stand_mixer: FixtureType.STAND_MIXER
+objects (0):
+success_related_entities: ['stand_mixer']
+
+==============================================================================
+PackIdenticalLunches  [composite]
+==============================================================================
+description: Place one [*vegetable*] and one [*meat*] in each tupperware on the nearby counter, to pack two identical lunches.
+num_subtasks: 15  moma_required: Yes  source: robocasa/environments/kitchen/composite/packing_lunches/pack_identical_lunches.py
+activity: Packing Lunches   category: Serving
+scene: no layout/style exclusions
+fixtures (2):
+  - fridge: FixtureType.FRIDGE
+  - counter: FixtureType.COUNTER
+objects (6):
+  - vegetable0: obj_groups='selected_veg' -> unresolved: selected_veg flags={'name_static_prefix': 'vegetable0', 'graspable': True}
+  - vegetable1: obj_groups='selected_veg' -> unresolved: selected_veg flags={'name_static_prefix': 'vegetable1', 'graspable': True}
+  - meat0: obj_groups='selected_meat' -> unresolved: selected_meat flags={'name_static_prefix': 'meat0'}
+  - meat1: obj_groups='selected_meat' -> unresolved: selected_meat flags={'name_static_prefix': 'meat1'}
+  - tupperware0: obj_groups='tupperware' -> category `tupperware` flags={'name_static_prefix': 'tupperware0'}
+  - tupperware1: obj_groups='tupperware' -> category `tupperware` flags={'name_static_prefix': 'tupperware1'}
+success_related_entities: ['meat0', 'meat1', 'tupperware0', 'tupperware1', 'vegetable0', 'vegetable1']
+
+==============================================================================
+PanTransfer  [composite]
+==============================================================================
+description: Pick up the pan and dump the vegetables in it onto the plate. Then return the pan to the stove.
+num_subtasks: 3  moma_required: No  source: robocasa/environments/kitchen/composite/serving_food/pan_transfer.py
+activity: Serving Food   category: Food Preparation
+scene: no layout/style exclusions
+fixtures (2):
+  - stove: FixtureType.STOVE
+  - counter: FixtureType.COUNTER
+objects (3):
+  - vegetable: obj_groups='vegetable' -> native tag `vegetable` (32 categories) flags={'name_static_prefix': 'vegetable'}
+  - plate: obj_groups='plate' -> category `plate` flags={'name_static_prefix': 'plate', 'graspable': False}
+  - dstr_dining: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'dstr_dining'}
+success_related_entities: ['plate', 'vegetable']
+
+==============================================================================
+PickPlaceCounterToCabinet  [atomic]
+==============================================================================
+description: Pick the item from the counter and place it in the cabinet.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_pick_place.py
+skill: pick_and_place (Pick & Place)   fixture_label: Pick and Place
+scene: no layout/style exclusions
+fixtures (2):
+  - cab: FixtureType.CABINET
+  - counter: FixtureType.COUNTER
+objects (3):
+  - obj: obj_groups='self.obj_groups' -> unresolved: self.obj_groups flags={'name_static_prefix': 'obj', 'graspable': True}
+  - distr_counter: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_counter'}
+  - distr_cab: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_cab'}
+success_related_entities: ['cab', 'obj']
+
+==============================================================================
+PickPlaceCounterToStove  [atomic]
+==============================================================================
+description: Pick the item from the plate and place it in the pan.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_pick_place.py
+skill: pick_and_place (Pick & Place)   fixture_label: Pick and Place
+scene: no layout/style exclusions
+fixtures (2):
+  - stove: FixtureType.STOVE
+  - counter: FixtureType.COUNTER
+objects (2):
+  - container: obj_groups='pan' -> category `pan` flags={'name_static_prefix': 'container'}
+  - obj: obj_groups='self.obj_groups' -> unresolved: self.obj_groups flags={'name_static_prefix': 'obj', 'graspable': True, 'cookable': True}
+success_related_entities: ['container', 'obj']
+
+==============================================================================
+PickPlaceDrawerToCounter  [atomic]
+==============================================================================
+description: Pick the item from the drawer and place it on the counter.
+num_subtasks: 1  moma_required: Yes  source: robocasa/environments/kitchen/atomic/kitchen_pick_place.py
+skill: pick_and_place (Pick & Place)   fixture_label: Pick and Place
+scene: no layout/style exclusions
+fixtures (2):
+  - drawer: FixtureType.TOP_DRAWER
+  - counter: FixtureType.COUNTER
+objects (1):
+  - obj: obj_groups=('tool', 'utensil') -> multiple: None flags={'name_static_prefix': 'obj', 'graspable': True}
+success_related_entities: ['obj']
+
+==============================================================================
+PickPlaceSinkToCounter  [atomic]
+==============================================================================
+description: Pick the item from the sink and place it on the container located on the counter.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_pick_place.py
+skill: pick_and_place (Pick & Place)   fixture_label: Pick and Place
+scene: no layout/style exclusions
+fixtures (2):
+  - sink: FixtureType.SINK
+  - counter: FixtureType.COUNTER
+objects (3):
+  - obj: obj_groups='self.obj_groups' -> unresolved: self.obj_groups flags={'name_static_prefix': 'obj', 'graspable': True, 'washable': True}
+  - container: obj_groups='container' -> hand_curated_obj_group (1 categories) flags={'name_static_prefix': 'container'}
+  - distr_counter: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_counter'}
+success_related_entities: ['container', 'counter', 'obj']
+
+==============================================================================
+PickPlaceToasterToCounter  [atomic]
+==============================================================================
+description: Place the toasted item on a plate.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_pick_place.py
+skill: pick_and_place (Pick & Place)   fixture_label: Pick and Place
+scene: no layout/style exclusions
+fixtures (2):
+  - counter: FixtureType.COUNTER
+  - toaster: FixtureType.TOASTER
+objects (2):
+  - obj: obj_groups=('sandwich_bread',) -> multiple: None flags={'name_static_prefix': 'obj'}
+  - plate: obj_groups='plate' -> category `plate` flags={'name_static_prefix': 'plate', 'graspable': False}
+success_related_entities: ['obj', 'plate']
+
+==============================================================================
+PortionHotDogs  [composite]
+==============================================================================
+description: Place one bun and one sausage from the bowl on each plate.
+num_subtasks: 4  moma_required: Yes  source: robocasa/environments/kitchen/composite/portioning_meals/portion_hot_dogs.py
+activity: Portioning Meals   category: Serving
+scene: exclude_layouts=[1, 3, 5, 6, 18, 20, 36, 39, 40, 43, 47, 50, 52, 22, 58]  exclude_styles=[]
+fixtures (1):
+  - dining_counter: FixtureType.DINING_COUNTER
+objects (7):
+  - plate1: obj_groups='plate' -> category `plate` flags={'name_static_prefix': 'plate1'}
+  - plate2: obj_groups='plate' -> category `plate` flags={'name_static_prefix': 'plate2'}
+  - bowl: obj_groups='bowl' -> category `bowl` flags={'name_static_prefix': 'bowl'}
+  - hotdog_bun1: obj_groups='hotdog_bun' -> category `hotdog_bun` flags={'name_static_prefix': 'hotdog_bun1', 'graspable': True}
+  - hotdog_bun2: obj_groups='hotdog_bun' -> category `hotdog_bun` flags={'name_static_prefix': 'hotdog_bun2', 'graspable': True}
+  - sausage1: obj_groups='sausage' -> category `sausage` flags={'name_static_prefix': 'sausage1', 'graspable': True}
+  - sausage2: obj_groups='sausage' -> category `sausage` flags={'name_static_prefix': 'sausage2', 'graspable': True}
+success_related_entities: ['hotdog_bun1', 'hotdog_bun2', 'plate1', 'plate2', 'sausage1', 'sausage2']
+
+==============================================================================
+PreSoakPan  [composite]
+==============================================================================
+description: Pick the pan and sponge and place them into the sink. Then turn on the water.
+num_subtasks: 3  moma_required: No  source: robocasa/environments/kitchen/composite/washing_dishes/pre_soak_pan.py
+activity: Washing Dishes   category: Cleaning and Sanitizing
+scene: no layout/style exclusions
+fixtures (2):
+  - sink: FixtureType.SINK
+  - counter: FixtureType.COUNTER
+objects (2):
+  - obj1: obj_groups='pan' -> category `pan` flags={'name_static_prefix': 'obj1', 'graspable': True, 'washable': True}
+  - obj2: obj_groups='sponge' -> category `sponge` flags={'name_static_prefix': 'obj2'}
+success_related_entities: ['obj1', 'obj2', 'sink']
+
+==============================================================================
+PrepareCoffee  [composite]
+==============================================================================
+description: Pick the mug from the cabinet, place it under the coffee machine dispenser, and press the start button.
+num_subtasks: 2  moma_required: No  source: robocasa/environments/kitchen/composite/brewing/prepare_coffee.py
+activity: Brewing   category: Beverage Preparation
+scene: no layout/style exclusions
+fixtures (2):
+  - coffee_machine: FixtureType.COFFEE_MACHINE
+  - cab: FixtureType.CABINET
+objects (2):
+  - obj: obj_groups='mug' -> category `mug` flags={'name_static_prefix': 'obj'}
+  - distr_cab: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_cab'}
+success_related_entities: ['coffee_machine', 'obj']
+
+==============================================================================
+RecycleBottlesByType  [composite]
+==============================================================================
+description: Move the plastic bottles in the middle to the plastics group, and the glass bottles in the middle to the glass group.
+num_subtasks: 3  moma_required: Yes  source: robocasa/environments/kitchen/composite/organizing_recycling/recycle_bottles_by_type.py
+activity: Organizing Recycling   category: Cleaning and Sanitizing
+scene: exclude_layouts=[1, 3, 5, 6, 18, 20, 36, 39, 40, 43, 47, 50, 52, 8, 11, 12, 13, 19, 21, 22, 23, 25, 28, 29, 30, 33, 34, 38, 41, 42, 46, 49, 54, 57, 58, 60]  exclude_styles=[]
+fixtures (3):
+  - sink: FixtureType.SINK
+  - dining_counter: FixtureType.DINING_COUNTER
+  - counter: FixtureType.COUNTER
+objects (5):
+  - bottle_plastic_middle: obj_groups='bottled_water' -> category `bottled_water` flags={'name_static_prefix': 'bottle_plastic_middle'}
+  - bottle_glass_middle: obj_groups='alcohol' -> native tag `alcohol` (3 categories) flags={'name_static_prefix': 'bottle_glass_middle'}
+  - mystery_middle: obj_groups='self.choice' -> unresolved: self.choice flags={'name_static_prefix': 'mystery_middle'}
+  - f'bottle_plastic{i + 1}': obj_groups='bottled_water' -> category `bottled_water` flags={'name_static_prefix': 'bottle_plastic'}
+  - f'bottle_glass{i + 1}': obj_groups='alcohol' -> native tag `alcohol` (3 categories) flags={'name_static_prefix': 'bottle_glass'}
+success_related_entities: ['bottle_glass_middle', 'bottle_plastic_middle', 'dining_counter', "f'bottle_glass{i + 1}'", "f'bottle_plastic{i + 1}'", 'mystery_middle']
+
+==============================================================================
+RinseSinkBasin  [composite]
+==============================================================================
+description: Turn on the sink and manuever the spout to wash all locations of the sink basin.
+num_subtasks: 2  moma_required: No  source: robocasa/environments/kitchen/composite/cleaning_sink/rinse_sink_basin.py
+activity: Cleaning Sink   category: Cleaning and Sanitizing
+scene: no layout/style exclusions
+fixtures (1):
+  - sink: FixtureType.SINK
+objects (1):
+  - plate: obj_groups='plate' -> category `plate` flags={'name_static_prefix': 'plate'}
+success_related_entities: ['sink']
+
+==============================================================================
+ScrubCuttingBoard  [composite]
+==============================================================================
+description: Pick up the sponge from the counter and clean the cutting board by briefly scrubbing or pressing down on the cutting board. Once finished, release the sponge.
+num_subtasks: 2  moma_required: Yes  source: robocasa/environments/kitchen/composite/sanitizing_cutting_board/scrub_cutting_board.py
+activity: Sanitizing Cutting Board   category: Cleaning and Sanitizing
+scene: no layout/style exclusions
+fixtures (2):
+  - sink: FixtureType.SINK
+  - counter: FixtureType.COUNTER
+objects (2):
+  - cutting_board: obj_groups='cutting_board' -> category `cutting_board` flags={'name_static_prefix': 'cutting_board'}
+  - sponge: obj_groups='sponge' -> category `sponge` flags={'name_static_prefix': 'sponge'}
+success_related_entities: ['sponge']
+
+==============================================================================
+SearingMeat  [composite]
+==============================================================================
+description: Grab the pan from the cabinet and place it on the [*burner location*] burner on the stove. Then place the [*meat*] on the stove and turn the burner on.
+num_subtasks: 3  moma_required: Yes  source: robocasa/environments/kitchen/composite/frying/searing_meat.py
+activity: Frying   category: Cooking
+scene: exclude_layouts=[32, 41, 59]  exclude_styles=[]
+fixtures (3):
+  - stove: FixtureType.STOVE
+  - counter: FixtureType.COUNTER
+  - cab: FixtureType.CABINET_DOUBLE_DOOR
+objects (2):
+  - pan: obj_groups='pan' -> category `pan` flags={'name_static_prefix': 'pan'}
+  - meat: obj_groups='meat' -> native tag `meat` (18 categories) flags={'name_static_prefix': 'meat', 'graspable': True}
+success_related_entities: ['meat', 'pan', 'stove']
+
+==============================================================================
+SeparateFreezerRack  [composite]
+==============================================================================
+description: Take the meat container that has the [*meat*] and place it on the second highest rack of the freezer. Then take the vegetable container that has the [*vegetables*] and place it on the highest rack of the freezer.
+num_subtasks: 7  moma_required: Yes  source: robocasa/environments/kitchen/composite/managing_freezer_space/separate_freezer_rack.py
+activity: Managing Freezer Space   category: Organizing and Storage
+scene: exclude_layouts=[1, 3, 4, 5, 6, 8, 10, 11, 12, 13, 14, 15, 16, 17, 19, 20, 22, 23, 25, 26, 27, 28, 30, 31, 33, 34, 35, 36, 37, 39, 40, 42, 46, 48, 49, 50, 51, 52, 53, 54, 55, 56, 58, 59, 60]  exclude_styles=[]
+fixtures (2):
+  - fridge: FixtureType.FRIDGE
+  - counter: FixtureType.COUNTER
+objects (5):
+  - meat_tupperware: obj_groups='tupperware' -> category `tupperware` flags={'name_static_prefix': 'meat_tupperware'}
+  - meat: obj_groups='meat' -> native tag `meat` (18 categories) flags={'name_static_prefix': 'meat', 'graspable': True}
+  - veg_tupperware: obj_groups='tupperware' -> category `tupperware` flags={'name_static_prefix': 'veg_tupperware'}
+  - vegetable1: obj_groups='vegetable' -> native tag `vegetable` (32 categories) flags={'name_static_prefix': 'vegetable1', 'graspable': True}
+  - vegetable2: obj_groups='vegetable' -> native tag `vegetable` (32 categories) flags={'name_static_prefix': 'vegetable2', 'graspable': True}
+success_related_entities: ['fridge', 'meat', 'meat_tupperware', 'veg_tupperware', 'vegetable1', 'vegetable2']
+
+==============================================================================
+SetUpCuttingStation  [composite]
+==============================================================================
+description: Pick up the knife from the drawer and place it on the cutting board. Then place the meat from the plate to the cutting board.
+num_subtasks: 2  moma_required: Yes  source: robocasa/environments/kitchen/composite/slicing_meat/set_up_cutting_station.py
+activity: Slicing Meat   category: Food Preparation
+scene: no layout/style exclusions
+fixtures (2):
+  - counter: FixtureType.COUNTER
+  - drawer: FixtureType.TOP_DRAWER
+objects (3):
+  - receptacle: obj_groups='cutting_board' -> category `cutting_board` flags={'name_static_prefix': 'receptacle', 'graspable': False}
+  - knife: obj_groups='knife' -> category `knife` flags={'name_static_prefix': 'knife'}
+  - meat: obj_groups='meat' -> native tag `meat` (18 categories) flags={'name_static_prefix': 'meat', 'graspable': True}
+success_related_entities: ['knife', 'meat', 'receptacle']
+
+==============================================================================
+SlideDishwasherRack  [atomic]
+==============================================================================
+description: Fully slide the top dishwasher rack {in/out}.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_drawer.py
+skill: sliding_racks (Slide Rack)   fixture_label: Drawer
+scene: no layout/style exclusions
+fixtures (1):
+  - dishwasher: FixtureType.DISHWASHER
+objects (0):
+success_related_entities: ['dishwasher']
+
+==============================================================================
+StackBowlsCabinet  [composite]
+==============================================================================
+description: Pick up the bowls on the counter and stack them on top of one another in the open cabinet. Place the smaller bowl on top of the larger bowl.
+num_subtasks: 2  moma_required: Yes  source: robocasa/environments/kitchen/composite/organizing_dishes_and_containers/stack_bowls_cabinet.py
+activity: Organizing Dishes and Containers   category: Organizing and Storage
+scene: no layout/style exclusions
+fixtures (2):
+  - cabinet: FixtureType.CABINET
+  - counter: FixtureType.COUNTER
+objects (2):
+  - bowl1: obj_groups='bowl' -> category `bowl` flags={'name_static_prefix': 'bowl1'}
+  - bowl2: obj_groups='bowl' -> category `bowl` flags={'name_static_prefix': 'bowl2'}
+success_related_entities: ['bowl1', 'bowl2', 'cabinet']
+
+==============================================================================
+SteamInMicrowave  [composite]
+==============================================================================
+description: Pick the [*vegetable*] from the sink and place it in the bowl. Then pick the bowl and place it in the microwave. Then close the microwave door and press the start button.
+num_subtasks: 6  moma_required: Yes  source: robocasa/environments/kitchen/composite/steaming_food/steam_in_microwave.py
+activity: Steaming Food   category: Food Preparation
+scene: no layout/style exclusions
+fixtures (3):
+  - sink: FixtureType.SINK
+  - microwave: FixtureType.MICROWAVE
+  - counter: FixtureType.COUNTER
+objects (4):
+  - bowl: obj_groups='bowl' -> category `bowl` flags={'name_static_prefix': 'bowl'}
+  - vegetable: obj_groups='vegetable' -> native tag `vegetable` (32 categories) flags={'name_static_prefix': 'vegetable', 'graspable': True, 'washable': True}
+  - distr_counter_0: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_counter_0'}
+  - distr_counter_1: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_counter_1'}
+success_related_entities: ['bowl', 'microwave', 'vegetable']
+
+==============================================================================
+StirVegetables  [composite]
+==============================================================================
+description: Put the [*vegetables*] in the pot. Retrieve the spatula and lightly stir the vegetables in the pot.
+num_subtasks: 4  moma_required: Yes  source: robocasa/environments/kitchen/composite/sauteing_vegetables/stir_vegetables.py
+activity: Sauteing Vegetables   category: Cooking
+scene: no layout/style exclusions
+fixtures (2):
+  - stove: FixtureType.STOVE
+  - counter: FixtureType.COUNTER
+objects (3):
+  - spatula: obj_groups='spatula' -> category `spatula` flags={'name_static_prefix': 'spatula'}
+  - pot: obj_groups='pot' -> category `pot` flags={'name_static_prefix': 'pot'}
+  - name: obj_groups='vegetable' -> native tag `vegetable` (32 categories) flags={'name_static_prefix': None, 'graspable': True}
+success_related_entities: []
+
+==============================================================================
+StoreLeftoversInBowl  [composite]
+==============================================================================
+description: Pick the chicken drumstick and [*vegetable*] from their plates and place them in the bowl. Then put the bowl in the fridge.
+num_subtasks: 5  moma_required: Yes  source: robocasa/environments/kitchen/composite/storing_leftovers/store_leftovers_in_bowl.py
+activity: Storing Leftovers   category: Organizing and Storage
+scene: exclude_layouts=[1, 3, 5, 6, 18, 20, 36, 39, 40, 43, 47, 50, 52]  exclude_styles=[]
+fixtures (2):
+  - dining_counter: FixtureType.DINING_COUNTER
+  - fridge: FixtureType.FRIDGE
+objects (3):
+  - chicken_drumstick: obj_groups='chicken_drumstick' -> category `chicken_drumstick` flags={'name_static_prefix': 'chicken_drumstick'}
+  - vegetable: obj_groups='vegetable' -> native tag `vegetable` (32 categories) flags={'name_static_prefix': 'vegetable', 'graspable': True}
+  - bowl: obj_groups='bowl' -> category `bowl` flags={'name_static_prefix': 'bowl', 'graspable': True}
+success_related_entities: ['bowl', 'chicken_drumstick', 'fridge', 'vegetable']
+
+==============================================================================
+TurnOffStove  [atomic]
+==============================================================================
+description: Turn off the [burner location] burner of the stove.
+num_subtasks: 1  moma_required: Yes  source: robocasa/environments/kitchen/atomic/kitchen_stove.py
+skill: twisting_knobs (Twist Knob)   fixture_label: Stove
+scene: no layout/style exclusions
+fixtures (1):
+  - stove: FixtureType.STOVE
+objects (1):
+  - cookware: obj_groups='cookware' -> hand_curated_obj_group (4 categories) flags={'name_static_prefix': 'cookware'}
+success_related_entities: ['stove']
+
+==============================================================================
+TurnOnElectricKettle  [atomic]
+==============================================================================
+description: Press down the lever to turn on the electric kettle.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_electric_kettle.py
+skill: pressing_buttons (Press Button)   fixture_label: Electric Kettle
+scene: exclude_layouts=[]  exclude_styles=[21, 37, 49]
+fixtures (1):
+  - electric_kettle: FixtureType.ELECTRIC_KETTLE
+objects (0):
+success_related_entities: ['electric_kettle']
+
+==============================================================================
+TurnOnMicrowave  [atomic]
+==============================================================================
+description: Press the start button on the microwave.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_microwave.py
+skill: pressing_buttons (Press Button)   fixture_label: Microwave
+scene: no layout/style exclusions
+fixtures (1):
+  - microwave: FixtureType.MICROWAVE
+objects (1):
+  - obj: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'obj'}
+success_related_entities: ['microwave']
+
+==============================================================================
+TurnOnSinkFaucet  [atomic]
+==============================================================================
+description: Turn on the sink faucet.
+num_subtasks: 1  moma_required: No  source: robocasa/environments/kitchen/atomic/kitchen_sink.py
+skill: turning_levers (Turn Lever)   fixture_label: Sink
+scene: no layout/style exclusions
+fixtures (1):
+  - sink: FixtureType.SINK
+objects (2):
+  - distr_sink: obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_sink', 'washable': True}
+  - f'distr_counter_{i}': obj_groups='all' -> all 198 categories flags={'name_static_prefix': 'distr_counter_'}
+success_related_entities: ['sink']
+
+==============================================================================
+WaffleReheat  [composite]
+==============================================================================
+description: Open the microwave, place the bowl with waffle inside the microwave, then close the microwave door and turn it on.
+num_subtasks: 4  moma_required: Yes  source: robocasa/environments/kitchen/composite/reheating_food/waffle_reheat.py
+activity: Reheating Food   category: Food Preparation
+scene: exclude_layouts=[9]  exclude_styles=[]
+fixtures (2):
+  - microwave: FixtureType.MICROWAVE
+  - counter: FixtureType.COUNTER
+objects (1):
+  - waffle: obj_groups='waffle' -> category `waffle` flags={'name_static_prefix': 'waffle'}
+success_related_entities: ['microwave', 'waffle']
+
+==============================================================================
+WashFruitColander  [composite]
+==============================================================================
+description: Put the colander in the sink, put the [*fruit*] in the colander, and turn on the sink faucet and pour water over the colander.
+num_subtasks: 4  moma_required: No  source: robocasa/environments/kitchen/composite/washing_fruits_and_vegetables/wash_fruit_colander.py
+activity: Washing Fruits and Vegetables   category: Food Preparation
+scene: no layout/style exclusions
+fixtures (2):
+  - sink: FixtureType.SINK
+  - counter: FixtureType.COUNTER
+objects (2):
+  - colander: obj_groups='colander' -> category `colander` flags={'name_static_prefix': 'colander', 'graspable': True}
+  - f'fruit{i}': obj_groups='fruit' -> native tag `fruit` (19 categories) flags={'name_static_prefix': 'fruit', 'graspable': True, 'washable': True}
+success_related_entities: ['colander', "f'fruit{i}'", 'sink']
+
+==============================================================================
+WashLettuce  [composite]
+==============================================================================
+description: Wash the lettuce in the sink by running water over it.
+num_subtasks: 2  moma_required: No  source: robocasa/environments/kitchen/composite/making_salads/wash_lettuce.py
+activity: Making Salads   category: Food Preparation
+scene: no layout/style exclusions
+fixtures (2):
+  - sink: FixtureType.SINK
+  - counter: FixtureType.COUNTER
+objects (1):
+  - lettuce: obj_groups='lettuce' -> category `lettuce` flags={'name_static_prefix': 'lettuce'}
+success_related_entities: []
+
+==============================================================================
+WeighIngredients  [composite]
+==============================================================================
+description: Pick the [*packaged food*] and place it on the digital scale for weighing, and close the cabinet.
+num_subtasks: 2  moma_required: No  source: robocasa/environments/kitchen/composite/measuring_ingredients/weigh_ingredients.py
+activity: Measuring Ingredients   category: Food Preparation
+scene: no layout/style exclusions
+fixtures (2):
+  - cab: FixtureType.CABINET_WITH_DOOR
+  - counter: FixtureType.COUNTER
+objects (3):
+  - obj: obj_groups='packaged_food' -> native tag `packaged_food` (16 categories) flags={'name_static_prefix': 'obj', 'graspable': True}
+  - obj_distractor: obj_groups='packaged_food' -> native tag `packaged_food` (16 categories) flags={'name_static_prefix': 'obj_distractor', 'graspable': True}
+  - digital_scale: obj_groups='digital_scale' -> category `digital_scale` flags={'name_static_prefix': 'digital_scale'}
+success_related_entities: ['cab', 'digital_scale', 'obj', 'obj_distractor']

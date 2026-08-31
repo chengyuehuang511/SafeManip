@@ -1,0 +1,4239 @@
+{
+  "missing": [],
+  "num_found": 50,
+  "num_missing": 0,
+  "num_target_tasks": 50,
+  "splits": {
+    "atomic_seen": [
+      "CloseBlenderLid",
+      "CloseFridge",
+      "CloseToasterOvenDoor",
+      "CoffeeSetupMug",
+      "NavigateKitchen",
+      "OpenCabinet",
+      "OpenDrawer",
+      "OpenStandMixerHead",
+      "PickPlaceCounterToCabinet",
+      "PickPlaceCounterToStove",
+      "PickPlaceDrawerToCounter",
+      "PickPlaceSinkToCounter",
+      "PickPlaceToasterToCounter",
+      "SlideDishwasherRack",
+      "TurnOffStove",
+      "TurnOnElectricKettle",
+      "TurnOnMicrowave",
+      "TurnOnSinkFaucet"
+    ],
+    "composite_seen": [
+      "DeliverStraw",
+      "GetToastedBread",
+      "KettleBoiling",
+      "LoadDishwasher",
+      "PackIdenticalLunches",
+      "PreSoakPan",
+      "PrepareCoffee",
+      "RinseSinkBasin",
+      "ScrubCuttingBoard",
+      "SearingMeat",
+      "SetUpCuttingStation",
+      "StackBowlsCabinet",
+      "SteamInMicrowave",
+      "StirVegetables",
+      "StoreLeftoversInBowl",
+      "WashLettuce"
+    ],
+    "composite_unseen": [
+      "ArrangeBreadBasket",
+      "ArrangeTea",
+      "BreadSelection",
+      "CategorizeCondiments",
+      "CuttingToolSelection",
+      "GarnishPancake",
+      "GatherTableware",
+      "HeatKebabSandwich",
+      "MakeIceLemonade",
+      "PanTransfer",
+      "PortionHotDogs",
+      "RecycleBottlesByType",
+      "SeparateFreezerRack",
+      "WaffleReheat",
+      "WashFruitColander",
+      "WeighIngredients"
+    ]
+  },
+  "tasks": {
+    "ArrangeBreadBasket": {
+      "activity": "Setting the Table",
+      "category": "Serving",
+      "description": "Open the cabinet, pick up the [*bread*] from the cabinet and place it in the basket. Then move the basket to the dining counter.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.CABINET",
+          "ref_name": "cab",
+          "ref_name_static_prefix": "cab",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "dining_table",
+          "ref_name_static_prefix": "dining_table",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "ArrangeBreadBasket",
+      "num_subtasks": 5,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "bread",
+          "name_static_prefix": "bread",
+          "obj_groups": "bread",
+          "resolved": {
+            "category": "bread",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "basket",
+          "name_static_prefix": "basket",
+          "obj_groups": "basket",
+          "resolved": {
+            "category": "basket",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "dstr_dining",
+          "name_static_prefix": "dstr_dining",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        },
+        {
+          "name": "dstr_dining2",
+          "name_static_prefix": "dstr_dining2",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          1,
+          3,
+          5,
+          6,
+          18,
+          20,
+          36,
+          39,
+          40,
+          43,
+          47,
+          50,
+          52
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/setting_the_table/arrange_bread_basket.py",
+      "success_related_entities": [
+        "basket",
+        "bread",
+        "dining_table"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "ArrangeTea": {
+      "activity": "Brewing",
+      "category": "Beverage Preparation",
+      "description": "Pick the kettle from the counter and place it on the tray. Then pick the mug from the cabinet and place it on the tray. Then close the cabinet doors.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.CABINET_DOUBLE_DOOR",
+          "ref_name": "cab",
+          "ref_name_static_prefix": "cab",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET_DOUBLE_DOOR"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "ArrangeTea",
+      "num_subtasks": 3,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": "mug",
+          "resolved": {
+            "category": "mug",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "obj2",
+          "name_static_prefix": "obj2",
+          "obj_groups": "kettle",
+          "resolved": {
+            "categories": [
+              "kettle_non_electric"
+            ],
+            "kind": "hand_curated_obj_group"
+          }
+        },
+        {
+          "name": "container",
+          "name_static_prefix": "container",
+          "obj_groups": "tray",
+          "resolved": {
+            "category": "tray",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          32,
+          41,
+          59
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/brewing/arrange_tea.py",
+      "success_related_entities": [
+        "cab",
+        "container",
+        "obj",
+        "obj2"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "BreadSelection": {
+      "activity": "Making Toast",
+      "category": "Cooking",
+      "description": "From the different types of pastries on the counter, select a croissant and place it on the cutting board. Then retrieve a jar of jam from the cabinet and place it alongside the croissant on the cutting board.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.CABINET_DOUBLE_DOOR",
+          "ref_name": "cab",
+          "ref_name_static_prefix": "cab",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET_DOUBLE_DOOR"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "BreadSelection",
+      "num_subtasks": 2,
+      "objects": [
+        {
+          "name": "cutting_board",
+          "name_static_prefix": "cutting_board",
+          "obj_groups": "cutting_board",
+          "resolved": {
+            "category": "cutting_board",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "distr_pastry",
+          "name_static_prefix": "distr_pastry",
+          "obj_groups": [
+            "baguette",
+            "cupcake"
+          ],
+          "resolved": {
+            "groups": [
+              {
+                "category": "baguette",
+                "kind": "single_category_self_group"
+              },
+              {
+                "category": "cupcake",
+                "kind": "single_category_self_group"
+              }
+            ],
+            "kind": "multiple"
+          }
+        },
+        {
+          "name": "croissant",
+          "name_static_prefix": "croissant",
+          "obj_groups": "croissant",
+          "resolved": {
+            "category": "croissant",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "jam",
+          "name_static_prefix": "jam",
+          "obj_groups": "jam",
+          "resolved": {
+            "category": "jam",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "distr_counter",
+          "name_static_prefix": "distr_counter",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          32,
+          41,
+          59
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/making_toast/bread_selection.py",
+      "success_related_entities": [
+        "croissant",
+        "cutting_board",
+        "jam"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "CategorizeCondiments": {
+      "activity": "Arranging Condiments",
+      "category": "Serving",
+      "description": "Put the shaker and condiment bottle from the counter next to their counterparts in the cabinet.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.CABINET",
+          "ref_name": "cab",
+          "ref_name_static_prefix": "cab",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "CategorizeCondiments",
+      "num_subtasks": 2,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "obj1",
+          "name_static_prefix": "obj1",
+          "obj_groups": [
+            "condiment_bottle",
+            "ketchup",
+            "syrup_bottle"
+          ],
+          "resolved": {
+            "groups": [
+              {
+                "category": "condiment_bottle",
+                "kind": "single_category_self_group"
+              },
+              {
+                "category": "ketchup",
+                "kind": "single_category_self_group"
+              },
+              {
+                "category": "syrup_bottle",
+                "kind": "single_category_self_group"
+              }
+            ],
+            "kind": "multiple"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "obj2",
+          "name_static_prefix": "obj2",
+          "obj_groups": "shaker",
+          "resolved": {
+            "category": "shaker",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "cab_obj1",
+          "name_static_prefix": "cab_obj1",
+          "obj_groups": [
+            "condiment_bottle",
+            "ketchup",
+            "syrup_bottle"
+          ],
+          "resolved": {
+            "groups": [
+              {
+                "category": "condiment_bottle",
+                "kind": "single_category_self_group"
+              },
+              {
+                "category": "ketchup",
+                "kind": "single_category_self_group"
+              },
+              {
+                "category": "syrup_bottle",
+                "kind": "single_category_self_group"
+              }
+            ],
+            "kind": "multiple"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "cab_obj2",
+          "name_static_prefix": "cab_obj2",
+          "obj_groups": "shaker",
+          "resolved": {
+            "category": "shaker",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "distr_counter1",
+          "name_static_prefix": "distr_counter1",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/arranging_condiments/categorize_condiments.py",
+      "success_related_entities": [
+        "cab",
+        "cab_obj1",
+        "cab_obj2",
+        "obj1",
+        "obj2"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "CloseBlenderLid": {
+      "description": "Close the lid blender by securely placing the lid on top.",
+      "fixture_label": "Blender",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.BLENDER",
+          "ref_name": "blender",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "BLENDER"
+          },
+          "via": "get_fixture"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "CloseBlenderLid",
+      "num_subtasks": 1,
+      "objects": [],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "lids",
+        "label": "Close & Open Lid"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_blender.py",
+      "success_related_entities": [
+        "blender"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "CloseFridge": {
+      "description": "Close the fridge door(s).",
+      "fixture_label": "Doors",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.FRIDGE",
+          "ref_name": "fxtr",
+          "ref_name_static_prefix": "fxtr",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "FRIDGE"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "CloseFridge",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "door_obj",
+          "name_static_prefix": "door_obj",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        },
+        {
+          "name": "f'distr_counter_{i + 1}'",
+          "name_static_prefix": "distr_counter_",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "closing_doors",
+        "label": "Close Door"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_doors.py",
+      "success_related_entities": [
+        "fxtr"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "CloseToasterOvenDoor": {
+      "description": "Close the toaster oven door.",
+      "fixture_label": "Doors",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.TOASTER_OVEN",
+          "ref_name": "toaster_oven",
+          "ref_name_static_prefix": "toaster_oven",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "TOASTER_OVEN"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "CloseToasterOvenDoor",
+      "num_subtasks": 1,
+      "objects": [],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "closing_doors",
+        "label": "Close Door"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_doors.py",
+      "success_related_entities": [
+        "toaster_oven"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "CoffeeSetupMug": {
+      "description": "Pick the mug from the counter and place it under the coffee machine dispenser.",
+      "fixture_label": "Coffee Machine",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.COFFEE_MACHINE",
+          "ref_name": "coffee_machine",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COFFEE_MACHINE"
+          },
+          "via": "get_fixture"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "get_fixture"
+        }
+      ],
+      "moma_required": "No",
+      "name": "CoffeeSetupMug",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": "mug",
+          "resolved": {
+            "category": "mug",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": "mug",
+          "resolved": {
+            "category": "mug",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "insertion",
+        "label": "Insertion"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_coffee.py",
+      "success_related_entities": [
+        "coffee_machine",
+        "counter",
+        "obj"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "CuttingToolSelection": {
+      "activity": "Chopping Vegetables",
+      "category": "Food Preparation",
+      "description": "Place the appropriate cutting tool for cutting the [*fruit/vegetable*] skin on the cutting board.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "CuttingToolSelection",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "name": "peeler",
+          "name_static_prefix": "peeler",
+          "obj_groups": "peeler",
+          "resolved": {
+            "category": "peeler",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "knife",
+          "name_static_prefix": "knife",
+          "obj_groups": "knife",
+          "resolved": {
+            "category": "knife",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "food",
+          "name_static_prefix": "food",
+          "obj_groups": "self.food",
+          "resolved": {
+            "kind": "unresolved",
+            "raw": "self.food"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/chopping_vegetables/cutting_tool_selection.py",
+      "success_related_entities": [
+        "food",
+        "knife",
+        "peeler"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "DeliverStraw": {
+      "activity": "Serving Beverages",
+      "category": "Serving",
+      "description": "Take a straw from the drawer in front and place it inside the glass cup on the dining counter.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.STOOL",
+          "ref_name": "stool",
+          "ref_name_static_prefix": "stool",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "STOOL"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.DINING_COUNTER",
+          "ref_name": "dining_counter",
+          "ref_name_static_prefix": "dining_counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "DINING_COUNTER"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.TOP_DRAWER",
+          "ref_name": "drawer",
+          "ref_name_static_prefix": "drawer",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "TOP_DRAWER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "DeliverStraw",
+      "num_subtasks": 4,
+      "objects": [
+        {
+          "name": "straw",
+          "name_static_prefix": "straw",
+          "obj_groups": "straw",
+          "resolved": {
+            "category": "straw",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "glass_cup",
+          "name_static_prefix": "glass_cup",
+          "obj_groups": "glass_cup",
+          "resolved": {
+            "category": "glass_cup",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          1,
+          3,
+          5,
+          6,
+          18,
+          20,
+          36,
+          39,
+          40,
+          43,
+          47,
+          50,
+          52
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/serving_beverages/deliver_straw.py",
+      "success_related_entities": [
+        "glass_cup",
+        "straw"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "GarnishPancake": {
+      "activity": "Garnishing Dishes",
+      "category": "Serving",
+      "description": "Take the strawberry from the fridge and place it on top of the pancake, located on the dining counter.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.FRIDGE",
+          "ref_name": "fridge",
+          "ref_name_static_prefix": "fridge",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "FRIDGE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.STOOL",
+          "ref_name": "stool",
+          "ref_name_static_prefix": "stool",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "STOOL"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.DINING_COUNTER",
+          "ref_name": "dining_counter",
+          "ref_name_static_prefix": "dining_counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "DINING_COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "GarnishPancake",
+      "num_subtasks": 4,
+      "objects": [
+        {
+          "name": "strawberry",
+          "name_static_prefix": "strawberry",
+          "obj_groups": "strawberry",
+          "resolved": {
+            "category": "strawberry",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "distr_fridge",
+          "name_static_prefix": "distr_fridge",
+          "obj_groups": "food",
+          "resolved": {
+            "categories": [
+              "apple",
+              "apricot",
+              "artichoke",
+              "asparagus",
+              "avocado",
+              "bacon",
+              "bagel",
+              "baguette",
+              "banana",
+              "beet",
+              "bell_pepper",
+              "bread",
+              "bread_flat",
+              "broccoli",
+              "brussel_sprout",
+              "burrito",
+              "butter_stick",
+              "cabbage",
+              "cake",
+              "candy",
+              "cantaloupe",
+              "carrot",
+              "cauliflower",
+              "celery",
+              "cheese",
+              "cherry",
+              "chicken_breast",
+              "chicken_drumstick",
+              "chili_pepper",
+              "chocolate",
+              "coconut",
+              "cookie_dough_ball",
+              "corn",
+              "cream_cheese_stick",
+              "croissant",
+              "cucumber",
+              "cupcake",
+              "dates",
+              "donut",
+              "dumpling",
+              "egg",
+              "eggplant",
+              "fish",
+              "garlic",
+              "ginger",
+              "grapes",
+              "ham",
+              "hamburger",
+              "hot_dog",
+              "hotdog_bun",
+              "ice_cream",
+              "kebab_skewer",
+              "kebabs",
+              "kiwi",
+              "lamb_chop",
+              "lemon",
+              "lemon_wedge",
+              "lettuce",
+              "lime",
+              "lobster",
+              "lollipop",
+              "mango",
+              "marshmallow",
+              "milk",
+              "mushroom",
+              "onion",
+              "orange",
+              "pancake",
+              "peach",
+              "pear",
+              "pickle",
+              "pickle_slice",
+              "pineapple",
+              "pizza",
+              "pomegranate",
+              "pork_chop",
+              "pork_loin",
+              "potato",
+              "radish",
+              "raspberry",
+              "salami",
+              "sandwich_bread",
+              "sausage",
+              "scallops",
+              "scone",
+              "shrimp",
+              "skewers",
+              "squash",
+              "steak",
+              "strawberry",
+              "sugar_cube",
+              "sushi",
+              "sweet_potato",
+              "tacos",
+              "tangerine",
+              "tomato",
+              "tomato_slice",
+              "turkey_slice",
+              "waffle",
+              "watermelon",
+              "yogurt",
+              "zucchini"
+            ],
+            "kind": "computed_obj_group",
+            "types_argument": [
+              "vegetable",
+              "fruit",
+              "sweets",
+              "dairy",
+              "meat",
+              "bread_food",
+              "pastry",
+              "cooked_food"
+            ]
+          }
+        },
+        {
+          "name": "pancake",
+          "name_static_prefix": "pancake",
+          "obj_groups": "pancake",
+          "resolved": {
+            "category": "pancake",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          1,
+          3,
+          5,
+          6,
+          18,
+          20,
+          36,
+          39,
+          40,
+          43,
+          47,
+          50,
+          52
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/garnishing_dishes/garnish_pancake.py",
+      "success_related_entities": [
+        "dining_counter",
+        "pancake",
+        "strawberry"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "GatherTableware": {
+      "activity": "Arranging Cabinets",
+      "category": "Organizing and Storage",
+      "description": "Gather all objects into one cabinet and sort the glasses and bowls to opposite sides.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.CABINET",
+          "ref_name": "cab",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET"
+          },
+          "via": "get_fixture"
+        },
+        {
+          "fixture_type_id": "FixtureType.CABINET",
+          "ref_name": "cab2",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET"
+          },
+          "via": "get_fixture"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "GatherTableware",
+      "num_subtasks": 4,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "glass1",
+          "name_static_prefix": "glass1",
+          "obj_groups": [
+            "mug"
+          ],
+          "resolved": {
+            "groups": [
+              {
+                "category": "mug",
+                "kind": "single_category_self_group"
+              }
+            ],
+            "kind": "multiple"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "glass2",
+          "name_static_prefix": "glass2",
+          "obj_groups": [
+            "mug"
+          ],
+          "resolved": {
+            "groups": [
+              {
+                "category": "mug",
+                "kind": "single_category_self_group"
+              }
+            ],
+            "kind": "multiple"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "glass3",
+          "name_static_prefix": "glass3",
+          "obj_groups": [
+            "mug"
+          ],
+          "resolved": {
+            "groups": [
+              {
+                "category": "mug",
+                "kind": "single_category_self_group"
+              }
+            ],
+            "kind": "multiple"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "bowl",
+          "name_static_prefix": "bowl",
+          "obj_groups": "bowl",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/arranging_cabinets/gather_tableware.py",
+      "success_related_entities": [
+        "bowl",
+        "glass1",
+        "glass2",
+        "glass3"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "GetToastedBread": {
+      "activity": "Toasting Bread",
+      "category": "Cooking",
+      "description": "Start the toaster. Once the lever pops up, take the bread to the plate on the dining counter.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.STOOL",
+          "ref_name": "stool",
+          "ref_name_static_prefix": "stool",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "STOOL"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.DINING_COUNTER",
+          "ref_name": "dining_counter",
+          "ref_name_static_prefix": "dining_counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "DINING_COUNTER"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.TOASTER",
+          "ref_name": "toaster",
+          "ref_name_static_prefix": "toaster",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "TOASTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "GetToastedBread",
+      "num_subtasks": 4,
+      "objects": [
+        {
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": "sandwich_bread",
+          "resolved": {
+            "category": "sandwich_bread",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "plate",
+          "name_static_prefix": "plate",
+          "obj_groups": "plate",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          1,
+          3,
+          5,
+          6,
+          18,
+          20,
+          36,
+          39,
+          40,
+          43,
+          47,
+          50,
+          52
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/toasting_bread/get_toasted_bread.py",
+      "success_related_entities": [
+        "obj",
+        "plate",
+        "toaster"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "HeatKebabSandwich": {
+      "activity": "Preparing Sandwiches",
+      "category": "Food Preparation",
+      "description": "Pick up the kebab skewer and baguette bread, and place them inside the toaster oven. Close the toaster oven door and start by setting the timer.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.TOASTER_OVEN",
+          "ref_name": "toaster_oven",
+          "ref_name_static_prefix": "toaster_oven",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "TOASTER_OVEN"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "HeatKebabSandwich",
+      "num_subtasks": 6,
+      "objects": [
+        {
+          "name": "plate",
+          "name_static_prefix": "plate",
+          "obj_groups": "plate",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "kebab",
+          "name_static_prefix": "kebab",
+          "obj_groups": "kebab_skewer",
+          "resolved": {
+            "category": "kebab_skewer",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "baguette",
+          "name_static_prefix": "baguette",
+          "obj_groups": "baguette",
+          "resolved": {
+            "category": "baguette",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/preparing_sandwiches/heat_kebab_sandwich.py",
+      "success_related_entities": [
+        "baguette",
+        "kebab",
+        "toaster_oven"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "KettleBoiling": {
+      "activity": "Brewing",
+      "category": "Beverage Preparation",
+      "description": "Pick the kettle from the counter and place it on a stove burner. Then turn the burner on.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.STOVE",
+          "ref_name": "stove",
+          "ref_name_static_prefix": "stove",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "STOVE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "KettleBoiling",
+      "num_subtasks": 2,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": "kettle_non_electric",
+          "resolved": {
+            "category": "kettle_non_electric",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "stove_distr",
+          "name_static_prefix": "stove_distr",
+          "obj_groups": [
+            "pan",
+            "pot"
+          ],
+          "resolved": {
+            "groups": [
+              {
+                "category": "pan",
+                "kind": "single_category_self_group"
+              },
+              {
+                "category": "pot",
+                "kind": "single_category_self_group"
+              }
+            ],
+            "kind": "multiple"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/brewing/kettle_boiling.py",
+      "success_related_entities": [
+        "obj",
+        "stove"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "LoadDishwasher": {
+      "activity": "Loading Dishwasher",
+      "category": "Cleaning and Sanitizing",
+      "description": "Pick up the [*dishes*] from the counter, place them in the dishwasher, and close the dishwasher door.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.DISHWASHER",
+          "ref_name": "dishwasher",
+          "ref_name_static_prefix": "dishwasher",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "DISHWASHER"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "LoadDishwasher",
+      "num_subtasks": 3,
+      "objects": [
+        {
+          "name": "dish0",
+          "name_static_prefix": "dish0",
+          "obj_groups": "cup",
+          "resolved": {
+            "category": "cup",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "dish1",
+          "name_static_prefix": "dish1",
+          "obj_groups": "bowl",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/loading_dishwasher/load_dishwasher.py",
+      "success_related_entities": [
+        "dish0",
+        "dish1",
+        "dishwasher"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "MakeIceLemonade": {
+      "activity": "Adding Ice to Beverages",
+      "category": "Beverage Preparation",
+      "description": "Grab a lemon wedge from the fridge and one ice cube from the ice bowl, and put them in the glass of lemonade.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.FRIDGE",
+          "ref_name": "fridge",
+          "ref_name_static_prefix": "fridge",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "FRIDGE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "MakeIceLemonade",
+      "num_subtasks": 5,
+      "objects": [
+        {
+          "name": "lemon_wedge",
+          "name_static_prefix": "lemon_wedge",
+          "obj_groups": "lemon_wedge",
+          "resolved": {
+            "category": "lemon_wedge",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "ice_bowl",
+          "name_static_prefix": "ice_bowl",
+          "obj_groups": "bowl",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "ice_cube1",
+          "name_static_prefix": "ice_cube1",
+          "obj_groups": "ice_cube",
+          "resolved": {
+            "category": "ice_cube",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "ice_cube2",
+          "name_static_prefix": "ice_cube2",
+          "obj_groups": "ice_cube",
+          "resolved": {
+            "category": "ice_cube",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "glass_cup",
+          "name_static_prefix": "glass_cup",
+          "obj_groups": "glass_cup",
+          "resolved": {
+            "category": "glass_cup",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/adding_ice_to_beverages/make_ice_lemonade.py",
+      "success_related_entities": [
+        "glass_cup",
+        "ice_cube1",
+        "ice_cube2",
+        "lemon_wedge"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "NavigateKitchen": {
+      "description": "Navigate to the {kitchen location}.",
+      "fixture_label": "Navigation",
+      "fixtures": [],
+      "moma_required": "Yes",
+      "name": "NavigateKitchen",
+      "num_subtasks": 1,
+      "objects": [],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "navigation",
+        "label": "Navigation"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_navigate.py",
+      "success_related_entities": [],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "OpenCabinet": {
+      "description": "Open the cabinet door(s).",
+      "fixture_label": "Doors",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.CABINET_WITH_DOOR",
+          "ref_name": "fxtr",
+          "ref_name_static_prefix": "fxtr",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET_WITH_DOOR"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "OpenCabinet",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "door_obj",
+          "name_static_prefix": "door_obj",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        },
+        {
+          "name": "f'distr_counter_{i + 1}'",
+          "name_static_prefix": "distr_counter_",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "opening_doors",
+        "label": "Open Door"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_doors.py",
+      "success_related_entities": [
+        "fxtr"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "OpenDrawer": {
+      "description": "Open the {left/right} drawer.",
+      "fixture_label": "Drawer",
+      "fixtures": [
+        {
+          "fixture_type_id": "self.drawer",
+          "ref_name": "drawer",
+          "ref_name_static_prefix": "drawer",
+          "resolved": {
+            "kind": "not_a_fixture_type_literal",
+            "raw": "self.drawer"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "OpenDrawer",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "drawer_obj",
+          "name_static_prefix": "drawer_obj",
+          "obj_groups": [
+            "tool",
+            "utensil"
+          ],
+          "resolved": {
+            "groups": [
+              {
+                "categories": [
+                  "aluminum_foil",
+                  "bottle_opener",
+                  "can_opener",
+                  "cheese_grater",
+                  "digital_scale",
+                  "dish_brush",
+                  "measuring_cup",
+                  "peeler",
+                  "pizza_cutter",
+                  "reamer",
+                  "rolling_pin",
+                  "scissors",
+                  "strainer",
+                  "tongs"
+                ],
+                "kind": "native_type_tag",
+                "tag": "tool"
+              },
+              {
+                "categories": [
+                  "fork",
+                  "knife",
+                  "ladle",
+                  "spatula",
+                  "spoon",
+                  "whisk",
+                  "wooden_spoon"
+                ],
+                "kind": "native_type_tag",
+                "tag": "utensil"
+              }
+            ],
+            "kind": "multiple"
+          }
+        },
+        {
+          "name": "f'distr_counter_{i + 1}'",
+          "name_static_prefix": "distr_counter_",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "opening_doors",
+        "label": "Open Door"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_drawer.py",
+      "success_related_entities": [
+        "drawer"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "OpenStandMixerHead": {
+      "description": "Open the stand mixer head.",
+      "fixture_label": "Stand Mixer",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.STAND_MIXER",
+          "ref_name": "stand_mixer",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "STAND_MIXER"
+          },
+          "via": "get_fixture"
+        }
+      ],
+      "moma_required": "No",
+      "name": "OpenStandMixerHead",
+      "num_subtasks": 1,
+      "objects": [],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "lids",
+        "label": "Close & Open Lid"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_stand_mixer.py",
+      "success_related_entities": [
+        "stand_mixer"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "PackIdenticalLunches": {
+      "activity": "Packing Lunches",
+      "category": "Serving",
+      "description": "Place one [*vegetable*] and one [*meat*] in each tupperware on the nearby counter, to pack two identical lunches.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.FRIDGE",
+          "ref_name": "fridge",
+          "ref_name_static_prefix": "fridge",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "FRIDGE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "PackIdenticalLunches",
+      "num_subtasks": 15,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "vegetable0",
+          "name_static_prefix": "vegetable0",
+          "obj_groups": "selected_veg",
+          "resolved": {
+            "kind": "unresolved",
+            "raw": "selected_veg"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "vegetable1",
+          "name_static_prefix": "vegetable1",
+          "obj_groups": "selected_veg",
+          "resolved": {
+            "kind": "unresolved",
+            "raw": "selected_veg"
+          }
+        },
+        {
+          "name": "meat0",
+          "name_static_prefix": "meat0",
+          "obj_groups": "selected_meat",
+          "resolved": {
+            "kind": "unresolved",
+            "raw": "selected_meat"
+          }
+        },
+        {
+          "name": "meat1",
+          "name_static_prefix": "meat1",
+          "obj_groups": "selected_meat",
+          "resolved": {
+            "kind": "unresolved",
+            "raw": "selected_meat"
+          }
+        },
+        {
+          "name": "tupperware0",
+          "name_static_prefix": "tupperware0",
+          "obj_groups": "tupperware",
+          "resolved": {
+            "category": "tupperware",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "tupperware1",
+          "name_static_prefix": "tupperware1",
+          "obj_groups": "tupperware",
+          "resolved": {
+            "category": "tupperware",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/packing_lunches/pack_identical_lunches.py",
+      "success_related_entities": [
+        "meat0",
+        "meat1",
+        "tupperware0",
+        "tupperware1",
+        "vegetable0",
+        "vegetable1"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "PanTransfer": {
+      "activity": "Serving Food",
+      "category": "Food Preparation",
+      "description": "Pick up the pan and dump the vegetables in it onto the plate. Then return the pan to the stove.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.STOVE",
+          "ref_name": "stove",
+          "ref_name_static_prefix": "stove",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "STOVE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "PanTransfer",
+      "num_subtasks": 3,
+      "objects": [
+        {
+          "name": "vegetable",
+          "name_static_prefix": "vegetable",
+          "obj_groups": "vegetable",
+          "resolved": {
+            "categories": [
+              "artichoke",
+              "asparagus",
+              "avocado",
+              "beet",
+              "bell_pepper",
+              "broccoli",
+              "brussel_sprout",
+              "cabbage",
+              "carrot",
+              "cauliflower",
+              "celery",
+              "chili_pepper",
+              "corn",
+              "cucumber",
+              "eggplant",
+              "garlic",
+              "ginger",
+              "lemon",
+              "lemon_wedge",
+              "lettuce",
+              "lime",
+              "mushroom",
+              "onion",
+              "pickle",
+              "pickle_slice",
+              "potato",
+              "radish",
+              "squash",
+              "sweet_potato",
+              "tomato",
+              "tomato_slice",
+              "zucchini"
+            ],
+            "kind": "native_type_tag",
+            "tag": "vegetable"
+          }
+        },
+        {
+          "graspable": false,
+          "name": "plate",
+          "name_static_prefix": "plate",
+          "obj_groups": "plate",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "dstr_dining",
+          "name_static_prefix": "dstr_dining",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/serving_food/pan_transfer.py",
+      "success_related_entities": [
+        "plate",
+        "vegetable"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "PickPlaceCounterToCabinet": {
+      "description": "Pick the item from the counter and place it in the cabinet.",
+      "fixture_label": "Pick and Place",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.CABINET",
+          "ref_name": "cab",
+          "ref_name_static_prefix": "cab",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "PickPlaceCounterToCabinet",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": "self.obj_groups",
+          "resolved": {
+            "kind": "unresolved",
+            "raw": "self.obj_groups"
+          }
+        },
+        {
+          "name": "distr_counter",
+          "name_static_prefix": "distr_counter",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        },
+        {
+          "name": "distr_cab",
+          "name_static_prefix": "distr_cab",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "pick_and_place",
+        "label": "Pick & Place"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
+      "success_related_entities": [
+        "cab",
+        "obj"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "PickPlaceCounterToStove": {
+      "description": "Pick the item from the plate and place it in the pan.",
+      "fixture_label": "Pick and Place",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.STOVE",
+          "ref_name": "stove",
+          "ref_name_static_prefix": "stove",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "STOVE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "PickPlaceCounterToStove",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "name": "container",
+          "name_static_prefix": "container",
+          "obj_groups": "pan",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "cookable": true,
+          "graspable": true,
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": "self.obj_groups",
+          "resolved": {
+            "kind": "unresolved",
+            "raw": "self.obj_groups"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "pick_and_place",
+        "label": "Pick & Place"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
+      "success_related_entities": [
+        "container",
+        "obj"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "PickPlaceDrawerToCounter": {
+      "description": "Pick the item from the drawer and place it on the counter.",
+      "fixture_label": "Pick and Place",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.TOP_DRAWER",
+          "ref_name": "drawer",
+          "ref_name_static_prefix": "drawer",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "TOP_DRAWER"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "PickPlaceDrawerToCounter",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": [
+            "tool",
+            "utensil"
+          ],
+          "resolved": {
+            "groups": [
+              {
+                "categories": [
+                  "aluminum_foil",
+                  "bottle_opener",
+                  "can_opener",
+                  "cheese_grater",
+                  "digital_scale",
+                  "dish_brush",
+                  "measuring_cup",
+                  "peeler",
+                  "pizza_cutter",
+                  "reamer",
+                  "rolling_pin",
+                  "scissors",
+                  "strainer",
+                  "tongs"
+                ],
+                "kind": "native_type_tag",
+                "tag": "tool"
+              },
+              {
+                "categories": [
+                  "fork",
+                  "knife",
+                  "ladle",
+                  "spatula",
+                  "spoon",
+                  "whisk",
+                  "wooden_spoon"
+                ],
+                "kind": "native_type_tag",
+                "tag": "utensil"
+              }
+            ],
+            "kind": "multiple"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "pick_and_place",
+        "label": "Pick & Place"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
+      "success_related_entities": [
+        "obj"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "PickPlaceSinkToCounter": {
+      "description": "Pick the item from the sink and place it on the container located on the counter.",
+      "fixture_label": "Pick and Place",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.SINK",
+          "ref_name": "sink",
+          "ref_name_static_prefix": "sink",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "SINK"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "PickPlaceSinkToCounter",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": "self.obj_groups",
+          "resolved": {
+            "kind": "unresolved",
+            "raw": "self.obj_groups"
+          },
+          "washable": true
+        },
+        {
+          "name": "container",
+          "name_static_prefix": "container",
+          "obj_groups": "container",
+          "resolved": {
+            "categories": [
+              "plate"
+            ],
+            "kind": "hand_curated_obj_group"
+          }
+        },
+        {
+          "name": "distr_counter",
+          "name_static_prefix": "distr_counter",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "pick_and_place",
+        "label": "Pick & Place"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
+      "success_related_entities": [
+        "container",
+        "counter",
+        "obj"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "PickPlaceToasterToCounter": {
+      "description": "Place the toasted item on a plate.",
+      "fixture_label": "Pick and Place",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.TOASTER",
+          "ref_name": "toaster",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "TOASTER"
+          },
+          "via": "get_fixture"
+        }
+      ],
+      "moma_required": "No",
+      "name": "PickPlaceToasterToCounter",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": [
+            "sandwich_bread"
+          ],
+          "resolved": {
+            "groups": [
+              {
+                "category": "sandwich_bread",
+                "kind": "single_category_self_group"
+              }
+            ],
+            "kind": "multiple"
+          }
+        },
+        {
+          "graspable": false,
+          "name": "plate",
+          "name_static_prefix": "plate",
+          "obj_groups": "plate",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "pick_and_place",
+        "label": "Pick & Place"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_pick_place.py",
+      "success_related_entities": [
+        "obj",
+        "plate"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "PortionHotDogs": {
+      "activity": "Portioning Meals",
+      "category": "Serving",
+      "description": "Place one bun and one sausage from the bowl on each plate.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.DINING_COUNTER",
+          "ref_name": "dining_counter",
+          "ref_name_static_prefix": "dining_counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "DINING_COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "PortionHotDogs",
+      "num_subtasks": 4,
+      "objects": [
+        {
+          "name": "plate1",
+          "name_static_prefix": "plate1",
+          "obj_groups": "plate",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "plate2",
+          "name_static_prefix": "plate2",
+          "obj_groups": "plate",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "bowl",
+          "name_static_prefix": "bowl",
+          "obj_groups": "bowl",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "hotdog_bun1",
+          "name_static_prefix": "hotdog_bun1",
+          "obj_groups": "hotdog_bun",
+          "resolved": {
+            "category": "hotdog_bun",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "hotdog_bun2",
+          "name_static_prefix": "hotdog_bun2",
+          "obj_groups": "hotdog_bun",
+          "resolved": {
+            "category": "hotdog_bun",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "sausage1",
+          "name_static_prefix": "sausage1",
+          "obj_groups": "sausage",
+          "resolved": {
+            "category": "sausage",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "sausage2",
+          "name_static_prefix": "sausage2",
+          "obj_groups": "sausage",
+          "resolved": {
+            "category": "sausage",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          1,
+          3,
+          5,
+          6,
+          18,
+          20,
+          36,
+          39,
+          40,
+          43,
+          47,
+          50,
+          52,
+          22,
+          58
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/portioning_meals/portion_hot_dogs.py",
+      "success_related_entities": [
+        "hotdog_bun1",
+        "hotdog_bun2",
+        "plate1",
+        "plate2",
+        "sausage1",
+        "sausage2"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "PreSoakPan": {
+      "activity": "Washing Dishes",
+      "category": "Cleaning and Sanitizing",
+      "description": "Pick the pan and sponge and place them into the sink. Then turn on the water.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.SINK",
+          "ref_name": "sink",
+          "ref_name_static_prefix": "sink",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "SINK"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "PreSoakPan",
+      "num_subtasks": 3,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "obj1",
+          "name_static_prefix": "obj1",
+          "obj_groups": "pan",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          },
+          "washable": true
+        },
+        {
+          "name": "obj2",
+          "name_static_prefix": "obj2",
+          "obj_groups": "sponge",
+          "resolved": {
+            "category": "sponge",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/washing_dishes/pre_soak_pan.py",
+      "success_related_entities": [
+        "obj1",
+        "obj2",
+        "sink"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "PrepareCoffee": {
+      "activity": "Brewing",
+      "category": "Beverage Preparation",
+      "description": "Pick the mug from the cabinet, place it under the coffee machine dispenser, and press the start button.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.COFFEE_MACHINE",
+          "ref_name": "coffee_machine",
+          "ref_name_static_prefix": "coffee_machine",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COFFEE_MACHINE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.CABINET",
+          "ref_name": "cab",
+          "ref_name_static_prefix": "cab",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "PrepareCoffee",
+      "num_subtasks": 2,
+      "objects": [
+        {
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": "mug",
+          "resolved": {
+            "category": "mug",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "distr_cab",
+          "name_static_prefix": "distr_cab",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/brewing/prepare_coffee.py",
+      "success_related_entities": [
+        "coffee_machine",
+        "obj"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "RecycleBottlesByType": {
+      "activity": "Organizing Recycling",
+      "category": "Cleaning and Sanitizing",
+      "description": "Move the plastic bottles in the middle to the plastics group, and the glass bottles in the middle to the glass group.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.SINK",
+          "ref_name": "sink",
+          "ref_name_static_prefix": "sink",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "SINK"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.DINING_COUNTER",
+          "ref_name": "dining_counter",
+          "ref_name_static_prefix": "dining_counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "DINING_COUNTER"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "RecycleBottlesByType",
+      "num_subtasks": 3,
+      "objects": [
+        {
+          "name": "bottle_plastic_middle",
+          "name_static_prefix": "bottle_plastic_middle",
+          "obj_groups": "bottled_water",
+          "resolved": {
+            "category": "bottled_water",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "bottle_glass_middle",
+          "name_static_prefix": "bottle_glass_middle",
+          "obj_groups": "alcohol",
+          "resolved": {
+            "categories": [
+              "beer",
+              "liquor",
+              "wine"
+            ],
+            "kind": "native_type_tag",
+            "tag": "alcohol"
+          }
+        },
+        {
+          "name": "mystery_middle",
+          "name_static_prefix": "mystery_middle",
+          "obj_groups": "self.choice",
+          "resolved": {
+            "kind": "unresolved",
+            "raw": "self.choice"
+          }
+        },
+        {
+          "name": "f'bottle_plastic{i + 1}'",
+          "name_static_prefix": "bottle_plastic",
+          "obj_groups": "bottled_water",
+          "resolved": {
+            "category": "bottled_water",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "f'bottle_glass{i + 1}'",
+          "name_static_prefix": "bottle_glass",
+          "obj_groups": "alcohol",
+          "resolved": {
+            "categories": [
+              "beer",
+              "liquor",
+              "wine"
+            ],
+            "kind": "native_type_tag",
+            "tag": "alcohol"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          1,
+          3,
+          5,
+          6,
+          18,
+          20,
+          36,
+          39,
+          40,
+          43,
+          47,
+          50,
+          52,
+          8,
+          11,
+          12,
+          13,
+          19,
+          21,
+          22,
+          23,
+          25,
+          28,
+          29,
+          30,
+          33,
+          34,
+          38,
+          41,
+          42,
+          46,
+          49,
+          54,
+          57,
+          58,
+          60
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/organizing_recycling/recycle_bottles_by_type.py",
+      "success_related_entities": [
+        "bottle_glass_middle",
+        "bottle_plastic_middle",
+        "dining_counter",
+        "f'bottle_glass{i + 1}'",
+        "f'bottle_plastic{i + 1}'",
+        "mystery_middle"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "RinseSinkBasin": {
+      "activity": "Cleaning Sink",
+      "category": "Cleaning and Sanitizing",
+      "description": "Turn on the sink and manuever the spout to wash all locations of the sink basin.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.SINK",
+          "ref_name": "sink",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "SINK"
+          },
+          "via": "get_fixture"
+        }
+      ],
+      "moma_required": "No",
+      "name": "RinseSinkBasin",
+      "num_subtasks": 2,
+      "objects": [
+        {
+          "name": "plate",
+          "name_static_prefix": "plate",
+          "obj_groups": "plate",
+          "resolved": {
+            "category": "plate",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/cleaning_sink/rinse_sink_basin.py",
+      "success_related_entities": [
+        "sink"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "ScrubCuttingBoard": {
+      "activity": "Sanitizing Cutting Board",
+      "category": "Cleaning and Sanitizing",
+      "description": "Pick up the sponge from the counter and clean the cutting board by briefly scrubbing or pressing down on the cutting board. Once finished, release the sponge.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.SINK",
+          "ref_name": "sink",
+          "ref_name_static_prefix": "sink",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "SINK"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "ScrubCuttingBoard",
+      "num_subtasks": 2,
+      "objects": [
+        {
+          "name": "cutting_board",
+          "name_static_prefix": "cutting_board",
+          "obj_groups": "cutting_board",
+          "resolved": {
+            "category": "cutting_board",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "sponge",
+          "name_static_prefix": "sponge",
+          "obj_groups": "sponge",
+          "resolved": {
+            "category": "sponge",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/sanitizing_cutting_board/scrub_cutting_board.py",
+      "success_related_entities": [
+        "sponge"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "SearingMeat": {
+      "activity": "Frying",
+      "category": "Cooking",
+      "description": "Grab the pan from the cabinet and place it on the [*burner location*] burner on the stove. Then place the [*meat*] on the stove and turn the burner on.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.STOVE",
+          "ref_name": "stove",
+          "ref_name_static_prefix": "stove",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "STOVE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.CABINET_DOUBLE_DOOR",
+          "ref_name": "cab",
+          "ref_name_static_prefix": "cab",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET_DOUBLE_DOOR"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "SearingMeat",
+      "num_subtasks": 3,
+      "objects": [
+        {
+          "name": "pan",
+          "name_static_prefix": "pan",
+          "obj_groups": "pan",
+          "resolved": {
+            "category": "pan",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "meat",
+          "name_static_prefix": "meat",
+          "obj_groups": "meat",
+          "resolved": {
+            "categories": [
+              "bacon",
+              "chicken_breast",
+              "chicken_drumstick",
+              "dumpling",
+              "fish",
+              "ham",
+              "lamb_chop",
+              "lobster",
+              "pork_chop",
+              "pork_loin",
+              "salami",
+              "sausage",
+              "scallops",
+              "shrimp",
+              "skewers",
+              "steak",
+              "sushi",
+              "turkey_slice"
+            ],
+            "kind": "native_type_tag",
+            "tag": "meat"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          32,
+          41,
+          59
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/frying/searing_meat.py",
+      "success_related_entities": [
+        "meat",
+        "pan",
+        "stove"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "SeparateFreezerRack": {
+      "activity": "Managing Freezer Space",
+      "category": "Organizing and Storage",
+      "description": "Take the meat container that has the [*meat*] and place it on the second highest rack of the freezer. Then take the vegetable container that has the [*vegetables*] and place it on the highest rack of the freezer.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.FRIDGE",
+          "ref_name": "fridge",
+          "ref_name_static_prefix": "fridge",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "FRIDGE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "SeparateFreezerRack",
+      "num_subtasks": 7,
+      "objects": [
+        {
+          "name": "meat_tupperware",
+          "name_static_prefix": "meat_tupperware",
+          "obj_groups": "tupperware",
+          "resolved": {
+            "category": "tupperware",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "meat",
+          "name_static_prefix": "meat",
+          "obj_groups": "meat",
+          "resolved": {
+            "categories": [
+              "bacon",
+              "chicken_breast",
+              "chicken_drumstick",
+              "dumpling",
+              "fish",
+              "ham",
+              "lamb_chop",
+              "lobster",
+              "pork_chop",
+              "pork_loin",
+              "salami",
+              "sausage",
+              "scallops",
+              "shrimp",
+              "skewers",
+              "steak",
+              "sushi",
+              "turkey_slice"
+            ],
+            "kind": "native_type_tag",
+            "tag": "meat"
+          }
+        },
+        {
+          "name": "veg_tupperware",
+          "name_static_prefix": "veg_tupperware",
+          "obj_groups": "tupperware",
+          "resolved": {
+            "category": "tupperware",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "vegetable1",
+          "name_static_prefix": "vegetable1",
+          "obj_groups": "vegetable",
+          "resolved": {
+            "categories": [
+              "artichoke",
+              "asparagus",
+              "avocado",
+              "beet",
+              "bell_pepper",
+              "broccoli",
+              "brussel_sprout",
+              "cabbage",
+              "carrot",
+              "cauliflower",
+              "celery",
+              "chili_pepper",
+              "corn",
+              "cucumber",
+              "eggplant",
+              "garlic",
+              "ginger",
+              "lemon",
+              "lemon_wedge",
+              "lettuce",
+              "lime",
+              "mushroom",
+              "onion",
+              "pickle",
+              "pickle_slice",
+              "potato",
+              "radish",
+              "squash",
+              "sweet_potato",
+              "tomato",
+              "tomato_slice",
+              "zucchini"
+            ],
+            "kind": "native_type_tag",
+            "tag": "vegetable"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "vegetable2",
+          "name_static_prefix": "vegetable2",
+          "obj_groups": "vegetable",
+          "resolved": {
+            "categories": [
+              "artichoke",
+              "asparagus",
+              "avocado",
+              "beet",
+              "bell_pepper",
+              "broccoli",
+              "brussel_sprout",
+              "cabbage",
+              "carrot",
+              "cauliflower",
+              "celery",
+              "chili_pepper",
+              "corn",
+              "cucumber",
+              "eggplant",
+              "garlic",
+              "ginger",
+              "lemon",
+              "lemon_wedge",
+              "lettuce",
+              "lime",
+              "mushroom",
+              "onion",
+              "pickle",
+              "pickle_slice",
+              "potato",
+              "radish",
+              "squash",
+              "sweet_potato",
+              "tomato",
+              "tomato_slice",
+              "zucchini"
+            ],
+            "kind": "native_type_tag",
+            "tag": "vegetable"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          1,
+          3,
+          4,
+          5,
+          6,
+          8,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          19,
+          20,
+          22,
+          23,
+          25,
+          26,
+          27,
+          28,
+          30,
+          31,
+          33,
+          34,
+          35,
+          36,
+          37,
+          39,
+          40,
+          42,
+          46,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          58,
+          59,
+          60
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/managing_freezer_space/separate_freezer_rack.py",
+      "success_related_entities": [
+        "fridge",
+        "meat",
+        "meat_tupperware",
+        "veg_tupperware",
+        "vegetable1",
+        "vegetable2"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "SetUpCuttingStation": {
+      "activity": "Slicing Meat",
+      "category": "Food Preparation",
+      "description": "Pick up the knife from the drawer and place it on the cutting board. Then place the meat from the plate to the cutting board.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.TOP_DRAWER",
+          "ref_name": "drawer",
+          "ref_name_static_prefix": "drawer",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "TOP_DRAWER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "SetUpCuttingStation",
+      "num_subtasks": 2,
+      "objects": [
+        {
+          "graspable": false,
+          "name": "receptacle",
+          "name_static_prefix": "receptacle",
+          "obj_groups": "cutting_board",
+          "resolved": {
+            "category": "cutting_board",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "knife",
+          "name_static_prefix": "knife",
+          "obj_groups": "knife",
+          "resolved": {
+            "category": "knife",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "meat",
+          "name_static_prefix": "meat",
+          "obj_groups": "meat",
+          "resolved": {
+            "categories": [
+              "bacon",
+              "chicken_breast",
+              "chicken_drumstick",
+              "dumpling",
+              "fish",
+              "ham",
+              "lamb_chop",
+              "lobster",
+              "pork_chop",
+              "pork_loin",
+              "salami",
+              "sausage",
+              "scallops",
+              "shrimp",
+              "skewers",
+              "steak",
+              "sushi",
+              "turkey_slice"
+            ],
+            "kind": "native_type_tag",
+            "tag": "meat"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/slicing_meat/set_up_cutting_station.py",
+      "success_related_entities": [
+        "knife",
+        "meat",
+        "receptacle"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "SlideDishwasherRack": {
+      "description": "Fully slide the top dishwasher rack {in/out}.",
+      "fixture_label": "Drawer",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.DISHWASHER",
+          "ref_name": "dishwasher",
+          "ref_name_static_prefix": "dishwasher",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "DISHWASHER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "SlideDishwasherRack",
+      "num_subtasks": 1,
+      "objects": [],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "sliding_racks",
+        "label": "Slide Rack"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_drawer.py",
+      "success_related_entities": [
+        "dishwasher"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "StackBowlsCabinet": {
+      "activity": "Organizing Dishes and Containers",
+      "category": "Organizing and Storage",
+      "description": "Pick up the bowls on the counter and stack them on top of one another in the open cabinet. Place the smaller bowl on top of the larger bowl.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.CABINET",
+          "ref_name": "cabinet",
+          "ref_name_static_prefix": "cabinet",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "StackBowlsCabinet",
+      "num_subtasks": 2,
+      "objects": [
+        {
+          "name": "bowl1",
+          "name_static_prefix": "bowl1",
+          "obj_groups": "bowl",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "bowl2",
+          "name_static_prefix": "bowl2",
+          "obj_groups": "bowl",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/organizing_dishes_and_containers/stack_bowls_cabinet.py",
+      "success_related_entities": [
+        "bowl1",
+        "bowl2",
+        "cabinet"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "SteamInMicrowave": {
+      "activity": "Steaming Food",
+      "category": "Food Preparation",
+      "description": "Pick the [*vegetable*] from the sink and place it in the bowl. Then pick the bowl and place it in the microwave. Then close the microwave door and press the start button.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.SINK",
+          "ref_name": "sink",
+          "ref_name_static_prefix": "sink",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "SINK"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.MICROWAVE",
+          "ref_name": "microwave",
+          "ref_name_static_prefix": "microwave",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "MICROWAVE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "SteamInMicrowave",
+      "num_subtasks": 6,
+      "objects": [
+        {
+          "name": "bowl",
+          "name_static_prefix": "bowl",
+          "obj_groups": "bowl",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "vegetable",
+          "name_static_prefix": "vegetable",
+          "obj_groups": "vegetable",
+          "resolved": {
+            "categories": [
+              "artichoke",
+              "asparagus",
+              "avocado",
+              "beet",
+              "bell_pepper",
+              "broccoli",
+              "brussel_sprout",
+              "cabbage",
+              "carrot",
+              "cauliflower",
+              "celery",
+              "chili_pepper",
+              "corn",
+              "cucumber",
+              "eggplant",
+              "garlic",
+              "ginger",
+              "lemon",
+              "lemon_wedge",
+              "lettuce",
+              "lime",
+              "mushroom",
+              "onion",
+              "pickle",
+              "pickle_slice",
+              "potato",
+              "radish",
+              "squash",
+              "sweet_potato",
+              "tomato",
+              "tomato_slice",
+              "zucchini"
+            ],
+            "kind": "native_type_tag",
+            "tag": "vegetable"
+          },
+          "washable": true
+        },
+        {
+          "name": "distr_counter_0",
+          "name_static_prefix": "distr_counter_0",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        },
+        {
+          "name": "distr_counter_1",
+          "name_static_prefix": "distr_counter_1",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/steaming_food/steam_in_microwave.py",
+      "success_related_entities": [
+        "bowl",
+        "microwave",
+        "vegetable"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "StirVegetables": {
+      "activity": "Sauteing Vegetables",
+      "category": "Cooking",
+      "description": "Put the [*vegetables*] in the pot. Retrieve the spatula and lightly stir the vegetables in the pot.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.STOVE",
+          "ref_name": "stove",
+          "ref_name_static_prefix": "stove",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "STOVE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "StirVegetables",
+      "num_subtasks": 4,
+      "objects": [
+        {
+          "name": "spatula",
+          "name_static_prefix": "spatula",
+          "obj_groups": "spatula",
+          "resolved": {
+            "category": "spatula",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "name": "pot",
+          "name_static_prefix": "pot",
+          "obj_groups": "pot",
+          "resolved": {
+            "category": "pot",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "name",
+          "name_static_prefix": null,
+          "obj_groups": "vegetable",
+          "resolved": {
+            "categories": [
+              "artichoke",
+              "asparagus",
+              "avocado",
+              "beet",
+              "bell_pepper",
+              "broccoli",
+              "brussel_sprout",
+              "cabbage",
+              "carrot",
+              "cauliflower",
+              "celery",
+              "chili_pepper",
+              "corn",
+              "cucumber",
+              "eggplant",
+              "garlic",
+              "ginger",
+              "lemon",
+              "lemon_wedge",
+              "lettuce",
+              "lime",
+              "mushroom",
+              "onion",
+              "pickle",
+              "pickle_slice",
+              "potato",
+              "radish",
+              "squash",
+              "sweet_potato",
+              "tomato",
+              "tomato_slice",
+              "zucchini"
+            ],
+            "kind": "native_type_tag",
+            "tag": "vegetable"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/sauteing_vegetables/stir_vegetables.py",
+      "success_related_entities": [],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "StoreLeftoversInBowl": {
+      "activity": "Storing Leftovers",
+      "category": "Organizing and Storage",
+      "description": "Pick the chicken drumstick and [*vegetable*] from their plates and place them in the bowl. Then put the bowl in the fridge.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.DINING_COUNTER",
+          "ref_name": "dining_counter",
+          "ref_name_static_prefix": "dining_counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "DINING_COUNTER"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.FRIDGE",
+          "ref_name": "fridge",
+          "ref_name_static_prefix": "fridge",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "FRIDGE"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "StoreLeftoversInBowl",
+      "num_subtasks": 5,
+      "objects": [
+        {
+          "name": "chicken_drumstick",
+          "name_static_prefix": "chicken_drumstick",
+          "obj_groups": "chicken_drumstick",
+          "resolved": {
+            "category": "chicken_drumstick",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "vegetable",
+          "name_static_prefix": "vegetable",
+          "obj_groups": "vegetable",
+          "resolved": {
+            "categories": [
+              "artichoke",
+              "asparagus",
+              "avocado",
+              "beet",
+              "bell_pepper",
+              "broccoli",
+              "brussel_sprout",
+              "cabbage",
+              "carrot",
+              "cauliflower",
+              "celery",
+              "chili_pepper",
+              "corn",
+              "cucumber",
+              "eggplant",
+              "garlic",
+              "ginger",
+              "lemon",
+              "lemon_wedge",
+              "lettuce",
+              "lime",
+              "mushroom",
+              "onion",
+              "pickle",
+              "pickle_slice",
+              "potato",
+              "radish",
+              "squash",
+              "sweet_potato",
+              "tomato",
+              "tomato_slice",
+              "zucchini"
+            ],
+            "kind": "native_type_tag",
+            "tag": "vegetable"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "bowl",
+          "name_static_prefix": "bowl",
+          "obj_groups": "bowl",
+          "resolved": {
+            "category": "bowl",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          1,
+          3,
+          5,
+          6,
+          18,
+          20,
+          36,
+          39,
+          40,
+          43,
+          47,
+          50,
+          52
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/storing_leftovers/store_leftovers_in_bowl.py",
+      "success_related_entities": [
+        "bowl",
+        "chicken_drumstick",
+        "fridge",
+        "vegetable"
+      ],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "TurnOffStove": {
+      "description": "Turn off the [burner location] burner of the stove.",
+      "fixture_label": "Stove",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.STOVE",
+          "ref_name": "stove",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "STOVE"
+          },
+          "via": "get_fixture"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "TurnOffStove",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "name": "cookware",
+          "name_static_prefix": "cookware",
+          "obj_groups": "cookware",
+          "resolved": {
+            "categories": [
+              "pan",
+              "pot",
+              "saucepan",
+              "kettle_non_electric"
+            ],
+            "kind": "hand_curated_obj_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "twisting_knobs",
+        "label": "Twist Knob"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_stove.py",
+      "success_related_entities": [
+        "stove"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "TurnOnElectricKettle": {
+      "description": "Press down the lever to turn on the electric kettle.",
+      "fixture_label": "Electric Kettle",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.ELECTRIC_KETTLE",
+          "ref_name": "electric_kettle",
+          "ref_name_static_prefix": "electric_kettle",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "ELECTRIC_KETTLE"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "TurnOnElectricKettle",
+      "num_subtasks": 1,
+      "objects": [],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": [
+          21,
+          37,
+          49
+        ]
+      },
+      "skill": {
+        "id": "pressing_buttons",
+        "label": "Press Button"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_electric_kettle.py",
+      "success_related_entities": [
+        "electric_kettle"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "TurnOnMicrowave": {
+      "description": "Press the start button on the microwave.",
+      "fixture_label": "Microwave",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.MICROWAVE",
+          "ref_name": "microwave",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "MICROWAVE"
+          },
+          "via": "get_fixture"
+        }
+      ],
+      "moma_required": "No",
+      "name": "TurnOnMicrowave",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "pressing_buttons",
+        "label": "Press Button"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_microwave.py",
+      "success_related_entities": [
+        "microwave"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "TurnOnSinkFaucet": {
+      "description": "Turn on the sink faucet.",
+      "fixture_label": "Sink",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.SINK",
+          "ref_name": "sink",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "SINK"
+          },
+          "via": "get_fixture"
+        }
+      ],
+      "moma_required": "No",
+      "name": "TurnOnSinkFaucet",
+      "num_subtasks": 1,
+      "objects": [
+        {
+          "name": "distr_sink",
+          "name_static_prefix": "distr_sink",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          },
+          "washable": true
+        },
+        {
+          "name": "f'distr_counter_{i}'",
+          "name_static_prefix": "distr_counter_",
+          "obj_groups": "all",
+          "resolved": {
+            "count": 198,
+            "kind": "all_categories"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "skill": {
+        "id": "turning_levers",
+        "label": "Turn Lever"
+      },
+      "source_file": "robocasa/environments/kitchen/atomic/kitchen_sink.py",
+      "success_related_entities": [
+        "sink"
+      ],
+      "target_split": "atomic_seen",
+      "task_kind": "atomic"
+    },
+    "WaffleReheat": {
+      "activity": "Reheating Food",
+      "category": "Food Preparation",
+      "description": "Open the microwave, place the bowl with waffle inside the microwave, then close the microwave door and turn it on.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.MICROWAVE",
+          "ref_name": "microwave",
+          "ref_name_static_prefix": "microwave",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "MICROWAVE"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "Yes",
+      "name": "WaffleReheat",
+      "num_subtasks": 4,
+      "objects": [
+        {
+          "name": "waffle",
+          "name_static_prefix": "waffle",
+          "obj_groups": "waffle",
+          "resolved": {
+            "category": "waffle",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [
+          9
+        ],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/reheating_food/waffle_reheat.py",
+      "success_related_entities": [
+        "microwave",
+        "waffle"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "WashFruitColander": {
+      "activity": "Washing Fruits and Vegetables",
+      "category": "Food Preparation",
+      "description": "Put the colander in the sink, put the [*fruit*] in the colander, and turn on the sink faucet and pour water over the colander.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.SINK",
+          "ref_name": "sink",
+          "ref_name_static_prefix": "sink",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "SINK"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "WashFruitColander",
+      "num_subtasks": 4,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "colander",
+          "name_static_prefix": "colander",
+          "obj_groups": "colander",
+          "resolved": {
+            "category": "colander",
+            "kind": "single_category_self_group"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "f'fruit{i}'",
+          "name_static_prefix": "fruit",
+          "obj_groups": "fruit",
+          "resolved": {
+            "categories": [
+              "apple",
+              "apricot",
+              "banana",
+              "cantaloupe",
+              "cherry",
+              "coconut",
+              "dates",
+              "grapes",
+              "kiwi",
+              "mango",
+              "orange",
+              "peach",
+              "pear",
+              "pineapple",
+              "pomegranate",
+              "raspberry",
+              "strawberry",
+              "tangerine",
+              "watermelon"
+            ],
+            "kind": "native_type_tag",
+            "tag": "fruit"
+          },
+          "washable": true
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/washing_fruits_and_vegetables/wash_fruit_colander.py",
+      "success_related_entities": [
+        "colander",
+        "f'fruit{i}'",
+        "sink"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    },
+    "WashLettuce": {
+      "activity": "Making Salads",
+      "category": "Food Preparation",
+      "description": "Wash the lettuce in the sink by running water over it.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.SINK",
+          "ref_name": "sink",
+          "ref_name_static_prefix": "sink",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "SINK"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "WashLettuce",
+      "num_subtasks": 2,
+      "objects": [
+        {
+          "name": "lettuce",
+          "name_static_prefix": "lettuce",
+          "obj_groups": "lettuce",
+          "resolved": {
+            "category": "lettuce",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/making_salads/wash_lettuce.py",
+      "success_related_entities": [],
+      "target_split": "composite_seen",
+      "task_kind": "composite"
+    },
+    "WeighIngredients": {
+      "activity": "Measuring Ingredients",
+      "category": "Food Preparation",
+      "description": "Pick the [*packaged food*] and place it on the digital scale for weighing, and close the cabinet.",
+      "fixtures": [
+        {
+          "fixture_type_id": "FixtureType.CABINET_WITH_DOOR",
+          "ref_name": "cab",
+          "ref_name_static_prefix": "cab",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "CABINET_WITH_DOOR"
+          },
+          "via": "register_fixture_ref"
+        },
+        {
+          "fixture_type_id": "FixtureType.COUNTER",
+          "ref_name": "counter",
+          "ref_name_static_prefix": "counter",
+          "resolved": {
+            "in_native_enum": true,
+            "kind": "fixture_type_enum_member",
+            "member": "COUNTER"
+          },
+          "via": "register_fixture_ref"
+        }
+      ],
+      "moma_required": "No",
+      "name": "WeighIngredients",
+      "num_subtasks": 2,
+      "objects": [
+        {
+          "graspable": true,
+          "name": "obj",
+          "name_static_prefix": "obj",
+          "obj_groups": "packaged_food",
+          "resolved": {
+            "categories": [
+              "bagged_food",
+              "bar",
+              "boxed_food",
+              "canned_food",
+              "canola_oil",
+              "cereal",
+              "chips",
+              "honey_bottle",
+              "jam",
+              "jello_cup",
+              "olive_oil_bottle",
+              "peanut_butter",
+              "salsa",
+              "spaghetti_box",
+              "vinegar",
+              "yogurt"
+            ],
+            "kind": "native_type_tag",
+            "tag": "packaged_food"
+          }
+        },
+        {
+          "graspable": true,
+          "name": "obj_distractor",
+          "name_static_prefix": "obj_distractor",
+          "obj_groups": "packaged_food",
+          "resolved": {
+            "categories": [
+              "bagged_food",
+              "bar",
+              "boxed_food",
+              "canned_food",
+              "canola_oil",
+              "cereal",
+              "chips",
+              "honey_bottle",
+              "jam",
+              "jello_cup",
+              "olive_oil_bottle",
+              "peanut_butter",
+              "salsa",
+              "spaghetti_box",
+              "vinegar",
+              "yogurt"
+            ],
+            "kind": "native_type_tag",
+            "tag": "packaged_food"
+          }
+        },
+        {
+          "name": "digital_scale",
+          "name_static_prefix": "digital_scale",
+          "obj_groups": "digital_scale",
+          "resolved": {
+            "category": "digital_scale",
+            "kind": "single_category_self_group"
+          }
+        }
+      ],
+      "scene": {
+        "exclude_layouts": [],
+        "exclude_styles": []
+      },
+      "source_file": "robocasa/environments/kitchen/composite/measuring_ingredients/weigh_ingredients.py",
+      "success_related_entities": [
+        "cab",
+        "digital_scale",
+        "obj",
+        "obj_distractor"
+      ],
+      "target_split": "composite_unseen",
+      "task_kind": "composite"
+    }
+  }
+}
