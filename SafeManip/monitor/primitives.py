@@ -4,15 +4,13 @@ from copy import deepcopy as _deepcopy
 from functools import lru_cache as _lru_cache
 
 try:
-    from monitor.external_metadata import external_object_categories as _external_object_categories
+    from monitor.sim.robocasa.attributes import (
+        external_object_categories as _external_object_categories,
+        object_is_receptacle_category as _object_is_receptacle_category,
+    )
 except Exception:  # pragma: no cover - keeps import robust in partial checkouts.
     _external_object_categories = None
 
-try:
-    from robocasa.environments.kitchen.attributes import (
-        object_is_receptacle_category as _object_is_receptacle_category,
-    )
-except Exception:
     def _object_is_receptacle_category(category: str, extra_attrs=()) -> bool:  # type: ignore[misc]
         _FALLBACK = {"bowl", "cup", "mug", "pot", "pan", "tray", "container", "tupperware", "bottle", "can"}
         return str(category).lower() in _FALLBACK or bool(set(extra_attrs) & _FALLBACK)

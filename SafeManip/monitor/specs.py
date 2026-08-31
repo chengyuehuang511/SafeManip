@@ -13,12 +13,6 @@ SOURCE_LOCAL_PREDICATES = "local_code:robocasa/predicates.py"
 SOURCE_SIM_PREDICATES = "local_code:robocasa_sim/robocasa/environments/kitchen/predicates.py"
 
 
-ROLE_ATTRIBUTE_AXES = {
-    "object": ["ready_to_eat", "raw"],
-    "support": [],
-    "fixture": [],
-}
-
 SETTLE_TIMEOUT_FRAMES = 6
 
 
