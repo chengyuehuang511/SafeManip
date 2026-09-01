@@ -177,8 +177,11 @@ gripper_near_target :=
 skill_place_onset :=
     previously(object_grasped)
     and not object_grasped
-    and gripper_is_opening
-    same event as object_released
+    and (gripper_is_opening or previously(gripper_is_opening) or object_supported(released_object))
+    same event as object_released -- see collision_grasp_release_contamination_safety.txt for the
+        full formula and the 2026-09-02 previously(gripper_is_opening) addition (was already
+        slightly out of sync here even before that -- this restatement was missing the
+        object_supported(released_object) fallback added 2026-09-01, item 6)
     fires at most once for the released object
     object_grasped is defined in 4ltls.txt
     edge case: aborted opening while the object is still grasped does not fire

@@ -54,27 +54,61 @@ DEFAULT_TRAINING_CAMERAS = ["robot0_agentview_left", "robot0_agentview_right", "
 # reconstruction under TRAINING_OUTPUT_DIR (built separately by
 # reconstruct_training_data.py); this is an additive analysis pass over
 # already-reconstructed episodes, not a new video source.
+#
+# As of 2026-09-01, monitor/output/ holds one subdirectory per named
+# "version" of predicates.py -- vN_<date>_<description>/<Task>/
+# privileged_information_<episode>[_monitor].json -- instead of the task
+# dirs living directly under output/ (see monitor/output/CHANGELOG.md for
+# what each version is/why it changed). The "sampled" method
+# (extract_privileged_from_dataset_sampled.py, output_sampled/) is no longer
+# actively used going forward per user instruction; TRAINING_PRIVILEGED_DIR_SAMPLED
+# is kept only so old data there can still be browsed if needed, not as a
+# default choice.
 TRAINING_PRIVILEGED_DIR = Path(__file__).parent.parent / "SafeManip" / "monitor" / "output"
-# Second, independently-computed postprocess method, from
-# SafeManip/monitor/extract_privileged_from_dataset_sampled.py: samples
-# get_privileged_information() every N raw frames (matching a live rollout's
-# actual call cadence) instead of every frame + scaled thresholds. Kept in a
-# separate directory precisely so it can be browsed side by side with
-# TRAINING_PRIVILEGED_DIR's results, not as a replacement for them -- see
-# TRAINING_MONITOR_METHODS below and that script's module docstring.
 TRAINING_PRIVILEGED_DIR_SAMPLED = Path(__file__).parent.parent / "SafeManip" / "monitor" / "output_sampled"
 
-TRAINING_MONITOR_METHODS = {
-    "scaled": {
-        "dir": TRAINING_PRIVILEGED_DIR,
-        "label": "Scaled thresholds (full per-frame resolution)",
-    },
-    "sampled": {
-        "dir": TRAINING_PRIVILEGED_DIR_SAMPLED,
-        "label": "Sampled every N frames (unscaled thresholds, matches live cadence)",
-    },
-}
-DEFAULT_TRAINING_MONITOR_METHOD = "scaled"
+_VERSION_DIR_RE = re.compile(r"^v(\d+)_")
+
+
+def _discover_training_monitor_methods():
+    """Build the method selector: one entry per vN_<date>_<description>/
+    directory under monitor/output/ (labeled v0/v1/v2/...), plus "sampled"
+    if present. Falls back to the bare TRAINING_PRIVILEGED_DIR itself
+    (pre-versioning layout) if no vN_ dirs are found at all."""
+    # Dict keys stay as the real directory names (used for path lookups /
+    # the ?method= query param); "label" is what the UI actually renders as
+    # a button, kept short (v0/v1/v2/Sampled) so the icons don't blow up --
+    # the full vN_<date>_<description> name is one hover/tooltip away via
+    # the key itself if it's ever needed, not worth showing inline.
+    methods = {}
+    if TRAINING_PRIVILEGED_DIR.is_dir():
+        version_dirs = [
+            p for p in TRAINING_PRIVILEGED_DIR.iterdir()
+            if p.is_dir() and _VERSION_DIR_RE.match(p.name)
+        ]
+        version_dirs.sort(key=lambda p: int(_VERSION_DIR_RE.match(p.name).group(1)))
+        for version_dir in version_dirs:
+            n = _VERSION_DIR_RE.match(version_dir.name).group(1)
+            methods[version_dir.name] = {"dir": version_dir, "label": f"v{n}"}
+    if not methods and TRAINING_PRIVILEGED_DIR.is_dir():
+        methods["scaled"] = {"dir": TRAINING_PRIVILEGED_DIR, "label": "Scaled"}
+    if TRAINING_PRIVILEGED_DIR_SAMPLED.is_dir():
+        methods["sampled"] = {"dir": TRAINING_PRIVILEGED_DIR_SAMPLED, "label": "Sampled"}
+    return methods
+
+
+TRAINING_MONITOR_METHODS = _discover_training_monitor_methods()
+# Latest version (highest vN) by default, so the viewer always shows the
+# newest predicates.py results without needing this file edited per version.
+# Not just "last dict key" -- "sampled" is inserted last but should never be
+# the default.
+_version_method_keys = [k for k in TRAINING_MONITOR_METHODS if _VERSION_DIR_RE.match(k)]
+if _version_method_keys:
+    DEFAULT_TRAINING_MONITOR_METHOD = _version_method_keys[-1]
+elif TRAINING_MONITOR_METHODS:
+    DEFAULT_TRAINING_MONITOR_METHOD = next(iter(TRAINING_MONITOR_METHODS))
+else:
+    DEFAULT_TRAINING_MONITOR_METHOD = "scaled"
 
 DEFAULT_ROOT = (
     "/nethome/chuang475/testnvme/projects/SafeManip/results/evals/"
@@ -179,7 +213,16 @@ PROPERTY_META = {
         "obligation_kind": "guard_false",  # must stay False until resolve
         "resolve": "object_settled",
         "children": {
-            "object_settled": ["object_stable", "object_supported_on_correct", "gripper_away_from_object"],
+            # object_stable_relative, not object_stable -- object_settled
+            # checks stability *relative to the object's current support*
+            # (2026-09-02, see predicates.py's _object_settled /
+            # CHANGES_2026-08-31.md item 3), not world-frame object_stable.
+            # object_stable itself can lag well behind (e.g. the object is
+            # already at rest relative to a basket that's still being
+            # carried) -- showing it here was a stale/misleading substitute
+            # from before object_stable_relative existed as its own
+            # exported key.
+            "object_settled": ["object_stable_relative", "object_supported_on_correct", "gripper_away_from_object"],
         },
     },
     "rc_liquid_transfer_eventually_settles": {
@@ -188,7 +231,13 @@ PROPERTY_META = {
         "obligation": "object_settle_timeout",
         "obligation_kind": "guard_false",
         "resolve": "liquid_settled",
-        "children": {"liquid_settled": ["object_stable", "gripper_away_from_object"]},
+        # content_stable/content_is_supported/support_type_matches_content --
+        # NOT object_stable/gripper_away_from_object (those are for
+        # object_settled, a different, single-grasped-object predicate;
+        # liquid/solid_settled are built from content_settled instead, see
+        # predicates.py's content_settled definition; this mapping was wrong
+        # both in predicate name and in which components actually matter).
+        "children": {"liquid_settled": ["content_stable", "content_is_supported", "support_type_matches_content"]},
     },
     "rc_solid_transfer_eventually_settles": {
         "pattern": "until",
@@ -196,7 +245,7 @@ PROPERTY_META = {
         "obligation": "object_settle_timeout",
         "obligation_kind": "guard_false",
         "resolve": "solid_settled",
-        "children": {"solid_settled": ["object_stable", "gripper_away_from_object"]},
+        "children": {"solid_settled": ["content_stable", "content_is_supported", "support_type_matches_content"]},
         "extra_top": ["solid_misplacement", "misplaced_solid_removed", "misplaced_solid_recollected"],
     },
     "rc_reach_in_fixture_only_when_fully_open": {
@@ -374,9 +423,17 @@ PATTERN_BLURB = {
 _SUBPREDICATE_LABELS = {
     "object_grasped": "still detected as grasped (didn't silently drop without a release event)",
     "object_sync": "gripper/object velocity in sync (grasp not slipping)",
-    "object_stable": "object velocity below stability threshold",
+    "object_stable": "object velocity below stability threshold (world-frame/absolute)",
+    "object_stable_relative": "object velocity below stability threshold, relative to its current "
+                               "support (not world-frame -- e.g. already at rest inside a basket "
+                               "that's still being carried counts as stable here, unlike object_stable)",
+    "content_stable": "contained/dumped content's velocity below stability threshold, relative to "
+                       "its current support (same relative-not-absolute check as object_stable_relative)",
+    "content_is_supported": "contained/dumped content is resting on a support surface",
+    "support_type_matches_content": "the support surface's type is compatible with the content "
+                                     "(e.g. not a raw food item on a structural fixture body)",
     "object_supported_on_correct": "resting on a correct support",
-    "gripper_away_from_object": "gripper >=0.25m from the object",
+    "gripper_away_from_object": "gripper >=0.10m from the object",
     "access_fixture_fully_open": "the specific fixture the gripper entered is fully open",
     "access_active_fixture": "which fixture the gripper is currently reaching into",
     "forbidden_contact_candidate": "specific contact pair currently outside the allowed set",
@@ -590,7 +647,26 @@ def ensure_original_concat(task, episode, camera_names):
         return out_path
 
 
-def list_training_episodes(task):
+def _property_status_for(mon, property_name):
+    """Whether a single named LTL property violated / satisfied / wasn't
+    evaluated at all for this episode's monitor result -- each property
+    appears in exactly one of "violations" or "satisfied" per episode (not
+    both), so this is a straight lookup, not an aggregate."""
+    for v in mon.get("violations") or []:
+        if v.get("property_name") == property_name:
+            return True
+    for s in mon.get("satisfied") or []:
+        if s.get("property_name") == property_name:
+            return False
+    return None
+
+
+def list_training_episodes(task, property_filter=None):
+    """`property_filter`: if given, every returned num_violations/success
+    pair is scoped to that single named LTL property instead of the
+    all-properties aggregate -- lets the viewer show "does episode N violate
+    *this* property" per the property tab selector, rather than always the
+    whole-episode violated-instance count."""
     out_dir = TRAINING_OUTPUT_DIR / task
     episodes = []
     if not out_dir.is_dir():
@@ -634,7 +710,15 @@ def list_training_episodes(task):
             try:
                 mon = json.loads(monitor_path.read_text())
                 m_success = (mon.get("replay_summary") or {}).get("success")
-                m_num_violations = mon.get("num_violated_instances")
+                if property_filter:
+                    status = _property_status_for(mon, property_filter)
+                    # 1/0/None (violated/satisfied/not-evaluated), not a
+                    # count, but kept as an int|None so the frontend's
+                    # existing "truthy -> viol badge" rendering still works
+                    # unchanged for the single-property case.
+                    m_num_violations = 1 if status is True else (0 if status is False else None)
+                else:
+                    m_num_violations = mon.get("num_violated_instances")
             except Exception:
                 continue
             entry["methods"][method_key] = {"success": m_success, "num_violations": m_num_violations}
@@ -650,8 +734,8 @@ def api_training_tasks():
     return {"dataset_root": str(TRAINING_DATASET_ROOT), "tasks": list_training_tasks()}
 
 
-def api_training_episodes(task):
-    episodes = list_training_episodes(task)
+def api_training_episodes(task, property_filter=None):
+    episodes = list_training_episodes(task, property_filter=property_filter)
     for ep in episodes:
         cams = ep.get("camera_names") or []
         cam_paths = [training_original_video_path(task, ep["episode"], cam) for cam in cams]
@@ -1692,7 +1776,11 @@ class Handler(BaseHTTPRequestHandler):
             task = qs.get("task", [None])[0]
             if not task:
                 return self._send_json({"error": "missing task"}, 400)
-            return self._send_json(api_training_episodes(task))
+            property_filter = qs.get("property", [None])[0] or None
+            return self._send_json(api_training_episodes(task, property_filter=property_filter))
+
+        if parsed.path == "/api/training_ltl_properties":
+            return self._send_json({"properties": sorted(PROPERTY_META.keys())})
 
         if parsed.path == "/api/training_monitor":
             task = qs.get("task", [None])[0]

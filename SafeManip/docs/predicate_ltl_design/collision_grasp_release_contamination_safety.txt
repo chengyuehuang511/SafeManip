@@ -92,12 +92,64 @@ Recovery: object_settled
 
 (speed) object_stable:= obj_linear_speed < OBJ_LINEAR_STABLE_THRESHOLD
         and obj_angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD
-(sync) object_sync:= checks relative linear / angular motion between object
-        and gripper (norm of the velocity difference against the same
-        OBJ_LINEAR_STABLE_THRESHOLD / OBJ_ANGULAR_STABLE_THRESHOLD tolerances
-        used for absolute stability -- a tolerance gap, not exact velocity
-        equality)
-        object_sync is a raw relative-velocity check with no grasp-state
+(sync) object_sync:= checks frame-to-frame positional/rotational drift of
+        the object from rigid attachment to the gripper
+        (GRASP_SLIP_LINEAR_THRESHOLD / GRASP_SLIP_ANGULAR_THRESHOLD)
+        position-based, not velocity-based (2026-09-02): every frame,
+                computes where the object *should* be right now if it had
+                moved perfectly rigidly with the eef since *last* frame
+                (not since grasp onset -- see below), using the relative
+                pose recorded then as the reference (seeded at grasp
+                onset, overwritten every frame after -- see the grasp-onset
+                block and _object_grasp_slip in predicates.py), and
+                compares to where it *actually* is this frame.
+        replaces the previous velocity-based comparison (contact-point
+                slip speed, falling back to a lever-arm-corrected CoM
+                comparison, falling back further to raw obj_vel - eef_vel)
+                -- that approach correctly identified real relative motion,
+                but real transient angular velocities during ordinary
+                carrying (turning a corner, accelerating/decelerating) hit
+                up to ~1.1 rad/s in otherwise-safe-looking episodes
+                (ArrangeBreadBasket ep0 frame 640, ep3 frames 783-799 --
+                see monitor/output/CHANGELOG.md's v1/v2 entries), with no
+                static velocity threshold able to separate "brief real
+                wobble" from "actually unsafe". The velocity-based helpers
+                (_object_eef_relative_speeds, _object_contact_slip_speed)
+                are still defined in predicates.py and used as
+                object_sync's fallback when no slip reference is available
+                (e.g. right after a monitor restart mid-grasp), but are no
+                longer the primary check.
+        was accumulated-since-onset at first (compared against a single
+                baseline captured once at grasp onset, kept forever) --
+                that had its own failure mode: a one-time settling shift
+                larger than threshold flagged every subsequent frame for
+                the rest of the grasp, even after the object stabilized
+                (the stale baseline never decays). Fixed by overwriting
+                the reference to the current frame's actual relative pose
+                every frame instead, making the check frame-to-frame.
+                Trade-off, not fully resolved: confirmed on real data that
+                this makes the check blind to slow continuous drift that
+                never spikes in any single frame (ArrangeBreadBasket ep0's
+                basket swing, ~19-20 degrees over ~150 frames, mean
+                per-frame delta ~0.3 degrees -- completely undetected by
+                the frame-to-frame version, 0/19 violated vs 1/19 with the
+                accumulated-since-onset version). None of velocity /
+                accumulated-since-onset / frame-to-frame satisfies all of
+                "immune to brief transients", "forgets one-time settles",
+                and "still catches slow continuous drift" at once -- see
+                CHANGES_2026-08-31.md items 13-15 for the full history.
+        quaternion component-order bug found and fixed while verifying the
+                above on real data (2026-09-02): _object_orientation/
+                _eef_orientation read "orientation" as wxyz, but the
+                underlying data is stored as xyzw -- caused a real object
+                to appear to rotate far more than it actually did (bread:
+                ~50 degrees apparent vs ~2 degrees actual; basket: ~165
+                degrees apparent vs ~19-20 degrees actual). Fixed via
+                _xyzw_to_wxyz; see CHANGES_2026-08-31.md item 14 for the
+                diagnostic (checking object/eef absolute-rotation-axis
+                alignment, which should be parallel for rigid attachment
+                and was found anti-parallel before the fix).
+        object_sync is a raw relative-motion check with no grasp-state
         gating of its own; it is only a meaningful signal for an object that
         is actually being grasped, so callers are responsible for combining
         it with object_grasped themselves -- used only in object_grasped_safe
@@ -157,18 +209,50 @@ object_grasped_safe:= object_grasped and object_sync
 
 
 object_released:= previously(object_grasped) and !object_grasped
-        and (gripper_is_opening or object_supported(released_object))
+        and (gripper_is_opening or previously(gripper_is_opening)
+             or (object_supported(released_object) and object_stable_relative(released_object)))
         object_grasped is the smoothed predicate above, so brief grasp flickers do not count as release
         the released object is the active object
         object_supported(released_object) covers the gripper retracting away from the object
                 without ever opening its fingers (e.g. contact breaks as the arm moves off) while
                 the object is resting on a support -- still a deliberate release, just one that
                 doesn't show up as a finger-opening motion
-        uses object_supported rather than object_stable: a freshly-dropped object is essentially
-                never already resting on something at the exact frame contact breaks (it's still
-                in free-fall), so this doesn't reopen the accidental-drop case the way a plain
-                not-moving check could (which could read true for one frame before gravity builds
-                up velocity)
+        also requires object_stable_relative(released_object), added 2026-09-02:
+                object_supported alone fires on any contact with a support surface, including a
+                one-frame bilateral-contact dropout mid-carry that happens to graze something
+                while the object is still clearly moving -- confirmed false positive on
+                ArrangeBreadBasket ep6 frame 445 (basket still moving 0.1-0.3 m/s) and ArrangeTea
+                ep0 frame 85 (object still actively held); neither is a deliberate release. A
+                genuinely placed-down object should already be at rest relative to its support by
+                the time the gripper retracts, so this doesn't narrow the intended case, only
+                excludes the still-moving false positives. Uses object_stable_relative (not plain
+                object_stable) for the same reason object_settled does -- relative to the
+                support's own motion, so e.g. an object resting inside a basket that's still being
+                carried doesn't read as "moving" just because the basket is.
+                Caveat, confirmed on the ArrangeTea case: this closes the settle-timeout false
+                positive but doesn't eliminate the underlying issue -- the same one-frame
+                bilateral-contact dropout (object_grasped itself flickers False for one frame
+                while the object is clearly still held) now surfaces as a different violation
+                instead (rc_grasp_remains_safe_until_release, since neither object_grasped_safe
+                nor object_released holds at that exact frame). The real fix would be eliminating
+                the one-frame flicker in _object_gripper_bilateral_contact/_object_is_grasped
+                itself; not yet done. See CHANGES_2026-08-31.md item 16.
+        uses object_supported (plain, not relative) as the base condition rather than
+                object_stable: a freshly-dropped object is essentially never already resting on
+                something at the exact frame contact breaks (it's still in free-fall), so this
+                doesn't reopen the accidental-drop case the way a plain not-moving check could
+                (which could read true for one frame before gravity builds up velocity) --
+                object_stable_relative being ANDed in on top doesn't change this, since a
+                free-falling object also isn't yet stable relative to anything either
+        previously(gripper_is_opening) added 2026-09-02: gripper_is_opening is a raw single-frame
+                joint-velocity-sign check with no debounce, and can dip false for exactly one frame
+                right at the moment contact breaks even though it reads true on the frames on
+                either side; since object_grasped's own true->false edge is also single-frame, that
+                one dip made object_released miss the release permanently (confirmed on
+                ArrangeBreadBasket ep6, bread around frame 389 -- see CHANGES_2026-08-31.md item 10
+                and monitor/output/CHANGELOG.md's v1 entry for the full per-frame trace); ORed in
+                rather than replacing the current-frame check, so the ordinary same-frame case is
+                still covered
         a pending-release latch (tracking object_grasped's true->false transition separately from
                 check_contact(gripper, object) reaching zero) was tried here to close a gap that
                 existed while object_grasped's own definition still included object_sync (a
@@ -177,7 +261,11 @@ object_released:= previously(object_grasped) and !object_grasped
                 driven purely by contact/closed-finger state -- the same state gripper_is_opening
                 reads -- so the two are tightly correlated in time and the gap no longer applies;
                 the latch was reverted back to this simpler single-frame definition; see
-                CHANGES_2026-08-31.md for the full reasoning
+                CHANGES_2026-08-31.md for the full reasoning. That revert's premise (the two are
+                "tightly correlated") turned out to be incomplete -- gripper_is_opening's own
+                single-frame noise reopened a narrower version of the same gap independently,
+                fixed by the previously(gripper_is_opening) term above rather than reinstating the
+                full latch
 
 
 object_supported:= check_contact(object, any fixture/object support)

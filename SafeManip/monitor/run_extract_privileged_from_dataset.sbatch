@@ -6,9 +6,13 @@
 # Mirrors replay/official_playback/run_reconstruct_training_data.sbatch.
 #SBATCH --job-name=extract_privileged_from_dataset
 #SBATCH --nodes=1
-#SBATCH --gpus-per-node=l40s:1
-#SBATCH --cpus-per-gpu=8
-#SBATCH --mem-per-gpu=45G
+# No GPU requested: make_env() sets has_offscreen_renderer=False and
+# use_camera_obs=False (no rendering, pure physics-state replay), so this
+# never needed a GPU -- the earlier --gpus-per-node request just meant every
+# array task competed for the much more contended GPU queue for no reason.
+# CPU-only jobs land far faster on this cluster's shared partitions.
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
 #SBATCH --qos=debug
 #SBATCH --time=04:00:00
 #SBATCH --output=/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
@@ -32,8 +36,16 @@ CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"
 source "${CONDA_SH}"
 conda activate "${CONDA_ENV_NAME}"
 
-export MUJOCO_GL="${MUJOCO_GL:-egl}"
-export MUJOCO_EGL_DEVICE_ID="${MUJOCO_EGL_DEVICE_ID:-0}"
+# No MUJOCO_GL forced to egl anymore -- that's a GPU-backed offscreen-render
+# backend, and this pipeline never renders (see the no-GPU note above).
+# Leaving it unset lets mujoco skip GL init entirely on a CPU-only node;
+# still overridable via the environment if a future caller needs it.
+if [[ -n "${MUJOCO_GL:-}" ]]; then
+  export MUJOCO_GL
+fi
+if [[ -n "${MUJOCO_EGL_DEVICE_ID:-}" ]]; then
+  export MUJOCO_EGL_DEVICE_ID
+fi
 
 mkdir -p "${SCRIPT_DIR}/logs"
 

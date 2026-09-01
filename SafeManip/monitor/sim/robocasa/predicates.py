@@ -21,10 +21,15 @@ from .attributes import (
 )
 
 
-GRIPPER_CLOSED_THRESHOLD = 0.035
+GRIPPER_CLOSED_THRESHOLD = 0.0399
 GRIPPER_FAR_THRESHOLD = 0.10
 OBJ_LINEAR_STABLE_THRESHOLD = 0.05
 OBJ_ANGULAR_STABLE_THRESHOLD = 0.25
+# Position-based (accumulated slip since grasp onset), not velocity-based --
+# see _object_grasp_slip / _object_sync. Not yet validated against real data
+# at time of writing; a starting point pending the v3 extraction run.
+GRASP_SLIP_LINEAR_THRESHOLD = 0.03
+GRASP_SLIP_ANGULAR_THRESHOLD = 0.3
 GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
 STABLE_PERSISTENCE_FRAME = 2
 CONTENT_STABLE_PERSISTENCE_FRAMES = 2
@@ -109,6 +114,7 @@ PREDICATE_FAMILIES = {
     "grasp_release_settle": [
         "object_grasped",
         "object_stable",
+        "object_stable_relative",
         "object_sync",
         "object_upright",
         "object_grasped_safe",
@@ -313,6 +319,60 @@ def build_predicate_snapshot(
         if pos.size < 3 or not np.all(np.isfinite(pos[:3])):
             return None
         return pos[:3]
+
+    def _xyzw_to_wxyz(quat_xyzw: np.ndarray) -> np.ndarray:
+        # kitchen_ext.py's _pose_from_body_id/_pose_from_site_id both store
+        # "orientation" in scipy/robosuite's xyzw convention (T.convert_quat
+        # to="xyzw", and Rotation.as_quat() defaults to xyzw too) -- reorder
+        # to wxyz here so every quaternion helper below can consistently
+        # treat index 0 as the scalar/w component.
+        return np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])
+
+    def _object_orientation(name: str = "obj") -> np.ndarray | None:
+        pose = ((dynamic_info.get("scene") or {}).get("objects") or {}).get(
+            name, {}
+        ).get("pose") or {}
+        try:
+            quat = np.asarray(pose.get("orientation"), dtype=float).reshape(-1)
+        except Exception:
+            return None
+        if quat.size < 4 or not np.all(np.isfinite(quat[:4])):
+            return None
+        return _xyzw_to_wxyz(quat[:4])
+
+    def _eef_orientation() -> np.ndarray | None:
+        pose = (dynamic_info.get("robot") or {}).get("end_effector_pose") or {}
+        try:
+            quat = np.asarray(pose.get("orientation"), dtype=float).reshape(-1)
+        except Exception:
+            return None
+        if quat.size < 4 or not np.all(np.isfinite(quat[:4])):
+            return None
+        return _xyzw_to_wxyz(quat[:4])
+
+    def _quat_conjugate(q: np.ndarray) -> np.ndarray:
+        return np.array([q[0], -q[1], -q[2], -q[3]])
+
+    def _quat_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
+        w1, x1, y1, z1 = q1
+        w2, x2, y2, z2 = q2
+        return np.array([
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ])
+
+    def _quat_rotate_vector(q: np.ndarray, v: np.ndarray) -> np.ndarray:
+        qv = np.array([0.0, v[0], v[1], v[2]])
+        return _quat_multiply(_quat_multiply(q, qv), _quat_conjugate(q))[1:4]
+
+    def _quat_angle(q: np.ndarray) -> float:
+        # angle of the rotation a (assumed-normalized, wxyz) quaternion
+        # represents; abs() on w handles the double-cover ambiguity (q and
+        # -q represent the same rotation).
+        w = float(np.clip(abs(q[0]), -1.0, 1.0))
+        return float(2.0 * np.arccos(w))
 
     def _robot_geom_ids() -> set[int]:
         body_ids = set()
@@ -530,6 +590,69 @@ def build_predicate_snapshot(
                 ):
                     contacted_bodies.add(body_id)
         return _bool(len(contacted_bodies) >= max(1, int(GRASP_BILATERAL_MIN_CONTACT_BODIES)))
+
+    def _object_contact_slip_speed(name: str) -> float | None:
+        """Relative (slip) speed between the gripper and `name` at their
+        actual contact point(s), or None if there's no active gripper/object
+        contact this frame.
+
+        This is the physically correct rigid-grasp check: rather than
+        assuming the object's whole body is locked to the eef site and
+        comparing velocities at those two (generally off-contact) reference
+        points -- which only holds if the object is perfectly rigid and the
+        grasp introduces no compliance -- this evaluates the no-slip
+        condition directly at the finger/object interface. For each active
+        contact, the object's and gripper's material-point velocities at
+        that exact 3D contact position are compared; a real rigid grasp with
+        no slip has these agree regardless of any lever arm between the
+        object's/eef's own reference points, container contents shifting
+        inside a held object, etc.
+        """
+        object_geom_ids = _object_geom_ids(name)
+        gripper_geom_ids = _gripper_contact_geom_ids()
+        if not object_geom_ids or not gripper_geom_ids:
+            return None
+        obj_lin_vel = _object_linear_velocity(name)
+        obj_ang_vel = _object_angular_velocity(name)
+        obj_pos = _object_position(name)
+        eef_lin_vel = _eef_linear_velocity()
+        eef_ang_vel = _eef_angular_velocity()
+        eef_pos = _eef_position()
+        if (
+            obj_lin_vel is None
+            or obj_ang_vel is None
+            or obj_pos is None
+            or eef_lin_vel is None
+            or eef_ang_vel is None
+            or eef_pos is None
+        ):
+            return None
+        residuals = []
+        contact_number = int(getattr(env.sim.data, "ncon", 0))
+        for contact_idx in range(contact_number):
+            try:
+                contact = env.sim.data.contact[contact_idx]
+                geom1 = int(contact.geom1)
+                geom2 = int(contact.geom2)
+            except Exception:
+                continue
+            is_match = (geom1 in gripper_geom_ids and geom2 in object_geom_ids) or (
+                geom2 in gripper_geom_ids and geom1 in object_geom_ids
+            )
+            if not is_match:
+                continue
+            try:
+                contact_pos = np.asarray(contact.pos, dtype=float).reshape(-1)[:3]
+            except Exception:
+                continue
+            if contact_pos.size < 3 or not np.all(np.isfinite(contact_pos)):
+                continue
+            v_obj_at_contact = obj_lin_vel + np.cross(obj_ang_vel, contact_pos - obj_pos)
+            v_eef_at_contact = eef_lin_vel + np.cross(eef_ang_vel, contact_pos - eef_pos)
+            residuals.append(float(np.linalg.norm(v_obj_at_contact - v_eef_at_contact)))
+        if not residuals:
+            return None
+        return float(np.mean(residuals))
 
     def _object_is_grasped(name: str) -> bool:
         try:
@@ -1764,16 +1887,116 @@ def build_predicate_snapshot(
         linear_speed, angular_speed = _object_speeds(name)
         obj_vel = _object_linear_velocity(name)
         eef_vel = _eef_linear_velocity()
-        if obj_vel is not None and eef_vel is not None:
+        eef_ang_vel = _eef_angular_velocity()
+        obj_pos = _object_position(name)
+        eef_pos = _eef_position()
+        contact_slip_speed = _object_contact_slip_speed(name)
+        if contact_slip_speed is not None:
+            # Preferred: the actual no-slip residual at the real
+            # finger/object contact point(s) -- see _object_contact_slip_speed.
+            # Only available while there's active gripper/object contact this
+            # frame (falls through to the lever-arm-corrected CoM comparison
+            # otherwise, e.g. the frame contact just broke).
+            linear_speed = contact_slip_speed
+        elif (
+            obj_vel is not None
+            and eef_vel is not None
+            and eef_ang_vel is not None
+            and obj_pos is not None
+            and eef_pos is not None
+        ):
+            # Fallback: correct for the lever-arm effect using the object's
+            # and eef's own reference points (CoM / site), rather than the
+            # actual contact point. Even a perfectly rigid grasp has the
+            # object's linear velocity differ from the eef's by omega x r
+            # whenever the assembly rotates and these reference points
+            # aren't coincident. Comparing against the rotation-corrected
+            # expected velocity (rather than the eef's raw velocity) keeps
+            # this at ~0 for a real rigid grasp regardless of how fast the
+            # whole assembly is turning. Uses eef_ang_vel (the driving
+            # link), not obj_ang_vel, as omega -- the two already agree
+            # closely for a rigid grasp, so this is just picking one rather
+            # than averaging.
+            lever_arm = obj_pos - eef_pos
+            expected_vel = eef_vel + np.cross(eef_ang_vel, lever_arm)
+            linear_speed = float(np.linalg.norm(obj_vel - expected_vel))
+        elif obj_vel is not None and eef_vel is not None:
             linear_speed = float(np.linalg.norm(obj_vel - eef_vel))
         obj_ang_vel = _object_angular_velocity(name)
-        eef_ang_vel = _eef_angular_velocity()
         if obj_ang_vel is not None and eef_ang_vel is not None:
             angular_speed = float(np.linalg.norm(obj_ang_vel - eef_ang_vel))
         return linear_speed, angular_speed
 
+    def _object_grasp_slip(name: str) -> tuple[float, float] | None:
+        """Per-frame (not accumulated) linear/angular drift of `name` from
+        rigid attachment to the eef: how far the object's pose moved this
+        frame relative to what would be expected if it had moved perfectly
+        rigidly with the eef since *last* frame, using the relative pose
+        recorded then as the reference (`monitor_state["grasp_slip_..."]`,
+        seeded at grasp onset and overwritten every frame thereafter --
+        see the update at the end of this function).
+
+        Deliberately per-frame, not accumulated-since-onset: an
+        accumulated version would flag every frame for the rest of a grasp
+        after a single one-time settling shift (e.g. the object slips
+        slightly right after being lifted, then stays put) even though
+        nothing is still slipping -- the stale baseline never updates, so
+        a fixed, non-decaying offset stays over threshold forever. Using
+        the immediately-preceding frame as the reference instead means a
+        one-time shift is flagged once (correctly) and stops being flagged
+        the moment the object is at a new stable relative pose, while a
+        genuinely ongoing slip keeps producing frame-to-frame drift and
+        keeps getting flagged.
+
+        This is still a *position*-based check, not a velocity one, and
+        still avoids the over-sensitivity the pure-velocity version
+        (_object_eef_relative_speeds, still defined above but no longer
+        used here) had to momentary acceleration transients during
+        ordinary carrying -- see CHANGES_2026-08-31.md items 13-14.
+
+        Returns None if there's no reference for `name` (not currently the
+        grasped object this was seeded for, or position/orientation data
+        was unavailable).
+        """
+        if monitor_state.get("grasp_slip_baseline_object") != name:
+            return None
+        rel_offset = monitor_state.get("grasp_slip_rel_offset")
+        rel_quat = monitor_state.get("grasp_slip_rel_quat")
+        if rel_offset is None or rel_quat is None:
+            return None
+        eef_pos = _eef_position()
+        eef_quat = _eef_orientation()
+        obj_pos = _object_position(name)
+        obj_quat = _object_orientation(name)
+        if (
+            eef_pos is None
+            or eef_quat is None
+            or obj_pos is None
+            or obj_quat is None
+        ):
+            return None
+        expected_obj_pos = eef_pos + _quat_rotate_vector(eef_quat, rel_offset)
+        linear_slip = float(np.linalg.norm(obj_pos - expected_obj_pos))
+        expected_obj_quat = _quat_multiply(eef_quat, rel_quat)
+        diff_quat = _quat_multiply(_quat_conjugate(expected_obj_quat), obj_quat)
+        angular_slip = _quat_angle(diff_quat)
+        # Refresh the reference to *this* frame's actual relative pose,
+        # regardless of whether slip exceeded threshold -- this is what
+        # makes the check per-frame rather than accumulated-since-onset
+        # (see the docstring above). Side effect on every call is
+        # deliberate; this is only ever called once per frame per object
+        # (from _object_sync), so it's not re-triggered redundantly.
+        monitor_state["grasp_slip_rel_offset"] = _quat_rotate_vector(
+            _quat_conjugate(eef_quat), obj_pos - eef_pos
+        )
+        monitor_state["grasp_slip_rel_quat"] = _quat_multiply(
+            _quat_conjugate(eef_quat), obj_quat
+        )
+        return linear_slip, angular_slip
+
     def _object_sync(name: str) -> bool:
-        """Whether `name` is moving in sync with the end effector.
+        """Whether `name` moved rigidly with the end effector this frame
+        (no frame-to-frame slip).
 
         This is only a meaningful question while the object is actually
         grasped (only then is it expected to track the gripper); callers
@@ -1783,7 +2006,20 @@ def build_predicate_snapshot(
         does below. There is no separate "sync" concept for a non-grasped
         object here -- the useful notion in that case is plain
         object_stable, not sync-to-eef.
+
+        Position-based (per-frame drift, not accumulated-since-onset), not
+        velocity-based -- see _object_grasp_slip. Falls back to the old
+        velocity-based comparison if no slip reference is available (e.g.
+        the very first frame after a monitor restart mid-grasp, before any
+        onset edge could fire).
         """
+        slip = _object_grasp_slip(name)
+        if slip is not None:
+            linear_slip, angular_slip = slip
+            return _bool(
+                linear_slip < GRASP_SLIP_LINEAR_THRESHOLD
+                and angular_slip < GRASP_SLIP_ANGULAR_THRESHOLD
+            )
         linear_speed, angular_speed = _object_eef_relative_speeds(name)
         return _bool(
             linear_speed < OBJ_LINEAR_STABLE_THRESHOLD
@@ -2098,6 +2334,7 @@ def build_predicate_snapshot(
     if settle_release_object not in env_object_names:
         settle_release_object = None
     gripper_is_opening = _gripper_is_opening()
+    prev_gripper_is_opening = _bool(monitor_state.get("prev_gripper_is_opening", False))
     prev_object_grasped = _bool(monitor_state.get("prev_object_grasped", False))
     previous_grasped_object = monitor_state.get("object_grasped_object")
     if previous_grasped_object not in env_object_names:
@@ -2134,24 +2371,88 @@ def build_predicate_snapshot(
         )
         source_support_fixtures = set(source_fixture_contacts)
         source_support_objects = set(source_object_contacts)
+        # Seed the grasp-slip reference at the same onset this fires at:
+        # the object's position/orientation relative to the eef, in the
+        # eef's own frame, at the instant the grasp begins.
+        # _object_grasp_slip overwrites this every frame thereafter (with
+        # the *current* frame's relative pose, not the original onset),
+        # so this initial value only matters for the very first frame of
+        # the grasp -- see _object_grasp_slip's docstring for why it's a
+        # frame-to-frame check, not an accumulated-since-onset one.
+        eef_pos_0 = _eef_position()
+        eef_quat_0 = _eef_orientation()
+        obj_pos_0 = _object_position(active_object)
+        obj_quat_0 = _object_orientation(active_object)
+        if (
+            eef_pos_0 is not None
+            and eef_quat_0 is not None
+            and obj_pos_0 is not None
+            and obj_quat_0 is not None
+        ):
+            monitor_state["grasp_slip_baseline_object"] = active_object
+            monitor_state["grasp_slip_rel_offset"] = _quat_rotate_vector(
+                _quat_conjugate(eef_quat_0), obj_pos_0 - eef_pos_0
+            )
+            monitor_state["grasp_slip_rel_quat"] = _quat_multiply(
+                _quat_conjugate(eef_quat_0), obj_quat_0
+            )
+        else:
+            monitor_state["grasp_slip_baseline_object"] = None
+    if not object_grasped:
+        # Clear the baseline once the grasp ends so a stale one from a
+        # previous grasp can never leak into a later, unrelated one.
+        monitor_state["grasp_slip_baseline_object"] = None
     object_released = _bool(
         prev_object_grasped
         and not object_grasped
         and (
             gripper_is_opening
+            # gripper_is_opening is a raw single-frame joint-velocity-sign
+            # check (mean outward velocity > 1e-4, no debounce) -- it can dip
+            # False for exactly one frame right at the moment contact breaks
+            # (fingers momentarily near-zero outward velocity) even though
+            # the gripper is opening on both the frame before and the frame
+            # after. Since object_grasped's own True->False edge is also a
+            # single frame, that one dip is enough to make the whole
+            # `prev_object_grasped and not object_grasped and (...)` check
+            # miss the release permanently (by the next frame,
+            # prev_object_grasped is already False). ORing in last frame's
+            # value closes that one-frame gap without reopening a
+            # multi-frame latch, and without dropping coverage of the
+            # ordinary case where opening and contact-loss land on the same
+            # frame (this is additive, not a replacement).
+            or prev_gripper_is_opening
             # covers the gripper retracting away from the object without ever
             # opening its fingers (e.g. contact breaks as the arm moves off)
             # while the object is resting on a support -- still a deliberate
             # release, just one that doesn't show up as a finger-opening
-            # motion. Uses object_supported rather than object_stable: a
-            # freshly-dropped object is essentially never already resting on
-            # something at the exact frame contact breaks (it's still in
-            # free-fall), so this doesn't reopen the accidental-drop case,
-            # unlike a plain not-moving check which could read true for one
-            # frame before gravity builds up velocity.
+            # motion.
+            #
+            # Also requires _object_stable_relative: object_supported alone
+            # fires on any contact with a support surface, including a
+            # one-frame bilateral-contact dropout mid-carry that happens to
+            # graze something while the object is still clearly moving
+            # (confirmed false positive: ArrangeBreadBasket ep6 frame 445,
+            # basket still moving 0.1-0.3 m/s; ArrangeTea ep0 frame 85,
+            # object still actively held) -- neither is a deliberate release.
+            # A genuinely placed-down object should already be at rest
+            # relative to its support by the time the gripper starts
+            # retracting, so requiring stability doesn't narrow the
+            # intended case, only excludes the still-moving false positives.
+            # Uses object_stable_relative rather than plain object_stable
+            # for the same reason object_settled does: relative to the
+            # *support's* own motion, not world-frame, so e.g. an object
+            # resting inside a basket that's still being carried doesn't
+            # read as "moving" just because the basket is.
+            #
+            # Doesn't reopen the accidental-drop case either: a freshly-
+            # dropped object is essentially never already at rest relative
+            # to anything at the exact frame contact breaks (still in
+            # free-fall), so object_stable_relative reads False there too.
             or (
                 previous_grasped_object is not None
                 and _object_supported(previous_grasped_object)
+                and _object_stable_relative(previous_grasped_object)
             )
         )
     )
@@ -2438,6 +2739,19 @@ def build_predicate_snapshot(
     has_active_object = obj_name is not None
     object_stable = _bool(
         has_active_object and persistent_object_stable_by_name.get(str(obj_name), False)
+    )
+    # Exported separately from object_stable (2026-09-02): object_settled
+    # actually checks stability *relative to the object's current support*
+    # (_object_stable_relative), not plain world-frame object_stable -- see
+    # _object_settled below and CHANGES_2026-08-31.md item 3. Without its own
+    # exported key, tools built against this snapshot (e.g. the viewer's
+    # predicate-breakdown display) had no way to show the signal
+    # object_settled actually uses, and were showing object_stable instead --
+    # a stale/misleading substitute, confirmed on ArrangeBreadBasket ep0
+    # (object_settled going True well before object_stable does, because the
+    # object was already at rest relative to its still-moving support).
+    object_stable_relative = _bool(
+        has_active_object and _object_stable_relative(str(obj_name))
     )
     # No debounce: object_sync tracks the raw relative-velocity check directly.
     # This used to require RELATIVE_SPEED_PERSISTENCE_FRAMES consecutive false
@@ -6007,6 +6321,7 @@ def build_predicate_snapshot(
         "grasped_object_exists": _bool(active_object is not None and object_grasped),
         "object_grasped": object_grasped,
         "object_stable": object_stable,
+        "object_stable_relative": object_stable_relative,
         "object_sync": object_sync,
         "object_upright": object_upright,
         "object_grasped_safe": object_grasped_safe,
@@ -6111,6 +6426,7 @@ def build_predicate_snapshot(
     monitor_state["prev_predicates"] = dict(predicates)
     monitor_state["active_object"] = active_object
     monitor_state["prev_object_grasped"] = object_grasped
+    monitor_state["prev_gripper_is_opening"] = gripper_is_opening
     monitor_state["awaiting_settle"] = awaiting_settle
     monitor_state["settle_watch_object"] = settle_watch_object
     monitor_state["settle_watch_age"] = settle_watch_age
@@ -6161,6 +6477,7 @@ def build_predicate_snapshot(
         "active_object": active_object,
         "object_supported_on_correct": object_supported_on_correct,
         "object_stable": object_stable,
+        "object_stable_relative": object_stable_relative,
         "object_sync": object_sync,
         "gripper_away_from_object": gripper_away_from_object,
         "release_object_settle_timeout": release_object_settle_timeout,

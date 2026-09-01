@@ -16,10 +16,32 @@ Shared sub-predicates (defined once here, referenced by name below):
 object_stable := obj_linear_speed < OBJ_LINEAR_STABLE_THRESHOLD
                   and obj_angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD
 
-object_sync := object_stable_relative_to_gripper
-               [checks relative linear/angular motion between object and gripper;
-                a tolerance gap against the same thresholds as object_stable, not
-                exact velocity equality]
+object_sync := object_has_not_slipped_from_rigid_grasp_reference
+               [(2026-09-02) position-based, not velocity-based: every frame, checks how
+                far the object's pose has moved relative to where it would be if it had
+                moved perfectly rigidly with the eef since *last* frame (not since grasp
+                onset -- an accumulated-since-onset version was tried first, but never
+                forgets a one-time settling shift, flagging every later frame forever
+                even after the object stabilizes; fixed by comparing against last frame's
+                relative pose instead, updated every frame) (GRASP_SLIP_LINEAR_THRESHOLD /
+                GRASP_SLIP_ANGULAR_THRESHOLD). Unlike a velocity check, this doesn't
+                confuse a brief real acceleration transient (confirmed up to ~1.1 rad/s
+                during otherwise-safe carrying) with genuine unsafe motion -- but being
+                frame-to-frame rather than accumulated, it's also blind to slow continuous
+                drift that never spikes in any single frame (confirmed on real data: a
+                real ~19-20 degree swing spread over ~150 frames went fully undetected).
+                Neither this nor the accumulated-since-onset version nor plain velocity
+                satisfies all three desirable properties at once -- open design question.
+                Falls back to the previous velocity-based comparison (relative linear/
+                angular motion against the same tolerances as object_stable) only if no
+                slip baseline is available yet (e.g. right after a monitor restart
+                mid-grasp): that check prefers the actual contact-point slip speed --
+                finds the real gripper/object contact point(s) and compares each body's
+                material-point velocity there, the direct no-slip condition at the
+                finger/object interface -- falling back further to a lever-arm-corrected
+                comparison at the object's/eef's own reference points (CoM/site) when
+                there's no active contact that frame, and further still to the fully
+                uncorrected raw velocity comparison if position data is unavailable too.]
 
 object_upright := check_obj_upright (simulator)
 
@@ -84,24 +106,45 @@ object_grasped_safe          [see shared def]
 object_released
 ├─ previously(object_grasped)
 ├─ not object_grasped
-└─ gripper_is_opening OR object_supported(released_object)
+└─ gripper_is_opening OR previously(gripper_is_opening) OR
+   (object_supported(released_object) AND object_stable_relative(released_object))
   [gripper_is_opening: the usual deliberate-release signal.
+   previously(gripper_is_opening): added 2026-09-02 -- gripper_is_opening is a
+   raw single-frame check with no debounce and can dip false for exactly one
+   frame right at contact-loss even though it's true on both neighboring
+   frames; since object_grasped's own fall is also single-frame, that one dip
+   could make object_released miss the release permanently. ORed in
+   additively (same-frame case still covered).
    object_supported(released_object): covers the gripper retracting away
    without ever opening its fingers while the object rests on a support --
    still a deliberate release. Uses object_supported rather than
    object_stable: a freshly-dropped object is essentially never already
    resting on something at the exact frame contact breaks, so this doesn't
    reopen the accidental-drop case the way a not-moving check could.
-   Neither term being true (grasp lost, not opening, not supported --
-   genuine mid-air drop) intentionally does NOT satisfy this; that's meant
-   to surface as an object_grasped_safe violation instead, not an
-   object_released event.
+   AND object_stable_relative(released_object): added 2026-09-02 --
+   object_supported alone fires on any support contact, including a
+   one-frame bilateral-contact dropout mid-carry while the object is still
+   clearly moving (confirmed false positive on real data). A genuinely
+   placed-down object should already be at rest relative to its support, so
+   this doesn't narrow the intended case, only excludes the still-moving
+   false positives. Caveat: this closes one false positive (a phantom
+   release that then never settles) but exposes the same underlying
+   one-frame flicker as a different violation instead
+   (rc_grasp_remains_safe_until_release) -- the real fix (eliminating the
+   flicker at the bilateral-contact source) isn't done yet.
+   None of the three terms being true (grasp lost, not opening on either of
+   the last two frames, not supported-and-stable -- genuine mid-air drop)
+   intentionally does NOT satisfy this; that's meant to surface as an
+   object_grasped_safe violation instead, not an object_released event.
    A pending-release latch was tried and reverted: it closed a gap that only
    existed while object_grasped's own definition included object_sync (since
    removed, see shared def) -- with object_sync gone, object_grasped's fall
    is driven purely by contact/closed-finger state, tightly correlated in
    time with gripper_is_opening, so the gap no longer applies -- see
-   CHANGES_2026-08-31.md]
+   CHANGES_2026-08-31.md. That premise turned out incomplete:
+   gripper_is_opening's own single-frame noise reopened a narrower version of
+   the same gap independently, fixed by the previously(gripper_is_opening)
+   term above instead of reinstating the full latch.]
 ```
 
 ### 3. `G(object_released -> (!release_object_settle_timeout U object_settled))`

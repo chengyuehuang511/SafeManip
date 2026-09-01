@@ -24,8 +24,9 @@ const reconVideo = el("#recon-video");
 // picker, no monitor/violations (just ground-truth reconstructed video + the
 // recorded language instruction). See server.py's api_training_* /
 // replay/official_playback/README.md.
-const tdState = { task: null, episode: null, loaded: false, monitorMethod: null };
+const tdState = { task: null, episode: null, loaded: false, monitorMethod: null, property: null };
 const tdTaskSelect = el("#td-task-select");
+const tdPropertySelect = el("#td-property-select");
 const tdEpisodeList = el("#td-episode-list");
 const tdEmptyState = el("#td-empty-state");
 const tdEpisodeView = el("#td-episode-view");
@@ -136,16 +137,49 @@ async function initTrainingData() {
     tdTaskSelect.appendChild(opt);
   }
   tdTaskSelect.addEventListener("change", () => loadTrainingEpisodes(tdTaskSelect.value));
+  await initTrainingLtlPropertyPicker();
   if (data.tasks.length) {
     tdTaskSelect.value = data.tasks[0].task;
     loadTrainingEpisodes(data.tasks[0].task);
   }
 }
 
+// LTL property picker: scopes both the left-column per-episode violation
+// badges (server-side, via /api/td_episodes?property=...) and the main
+// detail panel's violations/satisfied lists (client-side filter in
+// loadTrainingMonitor) to a single named property instead of the
+// whole-episode aggregate / all 19 properties. "All properties" (empty
+// value) restores the unfiltered view in both places. See server.py's
+// list_training_episodes' property_filter param / _property_status_for.
+async function initTrainingLtlPropertyPicker() {
+  try {
+    const data = await fetchJSON("/api/training_ltl_properties");
+    for (const name of data.properties) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      tdPropertySelect.appendChild(opt);
+    }
+  } catch (e) {
+    // non-fatal -- "All properties" still works, just no per-property option
+  }
+  tdPropertySelect.addEventListener("change", () => {
+    tdState.property = tdPropertySelect.value || null;
+    if (tdState.task) loadTrainingEpisodes(tdState.task);
+  });
+}
+
 async function loadTrainingEpisodes(task) {
+  // captured before tdState.task/episode get overwritten below -- used to
+  // re-select the same episode after a property-filter change reloads this
+  // same task's list (see the bottom of this function).
+  const previousTask = tdState.task;
+  const previousEpisode = tdState.episode;
   tdState.task = task;
   tdEpisodeList.innerHTML = "<div class='loading'>loading episodes…</div>";
-  const data = await fetchJSON(`/api/td_episodes?task=${encodeURIComponent(task)}`);
+  await ensureTrainingMonitorMethods();  // so tdMethodLabel() has short labels ready for the badges below
+  const propertyParam = tdState.property ? `&property=${encodeURIComponent(tdState.property)}` : "";
+  const data = await fetchJSON(`/api/td_episodes?task=${encodeURIComponent(task)}${propertyParam}`);
   tdEpisodeList.innerHTML = "";
   if (!data.episodes.length) {
     tdEpisodeList.innerHTML = "<div class='muted'>no reconstructed episodes yet for this task"
@@ -168,12 +202,24 @@ async function loadTrainingEpisodes(task) {
     // list_training_episodes), not just the default method, so both are
     // visible at a glance without opening the episode.
     const methodEntries = Object.entries(ep.methods || {});
+    // When a single LTL property is selected (tdState.property), m.num_violations
+    // is 1/0/null (violated/satisfied/not-evaluated-for-this-episode) instead of
+    // an aggregate count -- worded as such rather than "N viol" for clarity.
     const violBadges = methodEntries.length
-      ? methodEntries.map(([key, m]) =>
-          m.num_violations
-            ? `<span class="mini-badge viol" title="${key}">${key}: ${m.num_violations} viol</span>`
-            : `<span class="mini-badge ok" title="${key}">${key}: 0 viol</span>`
-        ).join("\n      ")
+      ? methodEntries.map(([key, m]) => {
+          const label = tdMethodLabel(key);
+          if (tdState.property) {
+            if (m.num_violations == null) {
+              return `<span class="mini-badge" title="${key}">${label}: n/a</span>`;
+            }
+            return m.num_violations
+              ? `<span class="mini-badge viol" title="${key}">${label}: ✗</span>`
+              : `<span class="mini-badge ok" title="${key}">${label}: ✓</span>`;
+          }
+          return m.num_violations
+            ? `<span class="mini-badge viol" title="${key}">${label}: ${m.num_violations} viol</span>`
+            : `<span class="mini-badge ok" title="${key}">${label}: 0 viol</span>`;
+        }).join("\n      ")
       : "";
     row.innerHTML = `<span class="ep-num">#${ep.episode}</span>
       ${successBadge}
@@ -182,8 +228,17 @@ async function loadTrainingEpisodes(task) {
     row.addEventListener("click", () => selectTrainingEpisode(task, ep, row));
     tdEpisodeList.appendChild(row);
   }
-  // auto-select the first episode
-  selectTrainingEpisode(task, data.episodes[0], tdEpisodeList.querySelector(".ep-row"));
+  // Re-select whichever episode was already open if this reload is for the
+  // *same* task (e.g. the property filter just changed) and that episode
+  // still exists in the list; otherwise fall back to the first episode
+  // (task actually changed, or first load).
+  const rows = tdEpisodeList.querySelectorAll(".ep-row");
+  let keepIdx = 0;
+  if (previousTask === task && previousEpisode != null) {
+    const idx = data.episodes.findIndex((e) => e.episode === previousEpisode);
+    if (idx !== -1) keepIdx = idx;
+  }
+  selectTrainingEpisode(task, data.episodes[keepIdx], rows[keepIdx]);
 }
 
 function selectTrainingEpisode(task, ep, rowEl) {
@@ -244,6 +299,14 @@ function selectTrainingEpisode(task, ep, rowEl) {
 // --------------------------------------------------------------------------
 
 let tdMethodsLoaded = false;
+// method key (e.g. "v0_2026-08-27_baseline_upstream_predicates") -> short
+// label (e.g. "v0"), populated by ensureTrainingMonitorMethods(). Used so
+// the per-episode violation-count badges in the left column show the same
+// short label as the method dropdown instead of the full directory name.
+const tdMethodLabels = {};
+function tdMethodLabel(key) {
+  return tdMethodLabels[key] || key;
+}
 
 async function ensureTrainingMonitorMethods() {
   if (tdMethodsLoaded) return;
@@ -254,6 +317,7 @@ async function ensureTrainingMonitorMethods() {
     tdState.monitorMethod = tdState.monitorMethod || data.default;
     select.innerHTML = "";
     for (const [key, info] of Object.entries(data.methods)) {
+      tdMethodLabels[key] = info.label;
       const opt = document.createElement("option");
       opt.value = key;
       opt.textContent = info.label;
@@ -295,6 +359,17 @@ async function loadTrainingMonitor(task, episode, method) {
     missing.classList.remove("hidden");
     body.classList.add("hidden");
     return;
+  }
+  // When a single LTL property is selected in the left-column picker, the
+  // main detail panel shows only that property's violation/satisfied entry
+  // (if any) instead of all 19 -- client-side filter, server still returns
+  // the full set (so switching properties doesn't need a re-fetch).
+  if (tdState.property) {
+    detail = {
+      ...detail,
+      violations: detail.violations.filter((v) => v.property_name === tdState.property),
+      satisfied: detail.satisfied.filter((s) => s.property_name === tdState.property),
+    };
   }
   missing.classList.add("hidden");
   body.classList.remove("hidden");

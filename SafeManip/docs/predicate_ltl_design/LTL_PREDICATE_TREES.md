@@ -102,30 +102,93 @@ G(object_grasped -> object_grasped_safe U object_released)
 │   │       │   ├── groups gripper contact geoms by parent MuJoCo body id  [predicates.py:466-484]
 │   │       │   ├── if < 2 distinct finger bodies found → fallback to _object_gripper_contact_any(name) (any gripper geom vs. any object geom via MuJoCo contact scan)  [predicates.py:486-503, 519-520]
 │   │       │   └── leaf: distinct finger-body contact count >= GRASP_BILATERAL_MIN_CONTACT_BODIES (=2)  [predicates.py:30, 536]
-│   │       └── OU.check_obj_grasped(env, obj_name=name, threshold=GRIPPER_CLOSED_THRESHOLD=0.035)  [predicates.py:24, 555-557] — leaf: external RoboCasa primitive; ANDs aggregate contact + gripper-closed joint check (tightened, not replaced, by the bilateral term)
+│   │       └── OU.check_obj_grasped(env, obj_name=name, threshold=GRIPPER_CLOSED_THRESHOLD=0.0399)  [predicates.py:24, 555-557] — leaf: external RoboCasa primitive; ANDs aggregate contact + gripper-closed joint check (tightened, not replaced, by the bilateral term)
+│   │       ⚠ 0.035 -> 0.04 -> 0.0395 -> 0.0399 (2026-09-02): 0.035 caused a confirmed total detection blind spot for `bread` (ArrangeBreadBasket ep0) -- holding it props the gripper open to ~0.036-0.037, just over 0.035, even though bilateral contact was satisfied fine. Set to 0.04 (the joint's physical fully-open limit), then pulled in to 0.0395 for a small safety margin -- but `bread` in a *different* episode (ep3) props the gripper open even wider, ~0.0395-0.0397, so 0.0395 excluded it too (confirmed: `raw_grasped_objects` empty from frame 369 on, even though bilateral contact was fine -- the joint check alone was failing). Bumped to 0.0399, leaving only ~0.0001 margin below the exact observed physical max (0.04004). See CHANGES_2026-08-31.md item 7 for the full writeup, including why the *original* threshold (0.06) had been a no-op all along.
 │   │       ⚠ REVERTED (2026-08-31): object_sync was briefly ANDed in here too (to distinguish "touch" from "grasp" once there's relative motion), then removed again. Folding object_sync into object_grasped's own definition made object_grasped_safe (= object_grasped and object_sync) a logical tautology — since object_grasped would then already imply object_sync, object_grasped_safe would be identically equal to object_grasped on every frame, giving zero extra information and making the G(object_grasped -> object_grasped_safe U object_released) property permanently non-triggerable via this path. object_grasped is now bilateral contact + closed only; object_sync lives solely in object_grasped_safe below, kept deliberately independent.
 │   ├── carrier substitution (undocumented): if the raw grasp candidate sits inside a receptacle-like manipulated object, the *receptacle* becomes grasp_candidate instead  [predicates.py:2083-2097, 2123]
 │   │   └── leaf: OU.check_obj_in_receptacle(env, name, carrier_name)  [predicates.py:2093]
 │   └── no debounce: object_grasped tracks grasp_candidate directly on both edges  [predicates.py:2113]  [`OBJECT_GRASPED_PERSISTENCE_FRAMES` removed 2026-09-01, see cross-cutting note -- previously required 2 consecutive frames each way, to absorb flicker from the aggregate-contact grasp check, which is now fixed at the raw-signal level via bilateral contact instead]
 ├── object_grasped_safe                                                    [predicates.py:2457]
-│   ├── object_sync := _object_sync(name)                                  [predicates.py:1781-1797]
-│   │   ├── _object_eef_relative_speeds(name)                              [predicates.py:1761-1779]
-│   │   │   ├── leaf: linear ‖obj_vel − eef_vel‖ (falls back to world-frame object speed if either unavailable)  [predicates.py:1770-1774]
-│   │   │   └── leaf: angular ‖obj_ang_vel − eef_ang_vel‖ (same fallback)  [predicates.py:1775-1778]
-│   │   └── leaf comparison: linear_speed < OBJ_LINEAR_STABLE_THRESHOLD (=0.05) AND angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD (=0.25)  [predicates.py:26-27, 1794-1797]
+│   ├── object_sync := _object_sync(name)                                  [predicates.py:1996-2022, disclaimer: not re-verified line-by-line below, see 2026-09-02 note]
+│   │   ├── leaf, preferred: _object_grasp_slip(name) — frame-to-frame position/orientation drift
+│   │   │       from rigid attachment to the eef  [predicates.py:1929-1994]
+│   │   │   ⚠ ADDED (2026-09-02), supersedes the velocity-based leaves below as the primary check:
+│   │   │       compares the object's actual pose this frame against where it *should* be if it had
+│   │   │       moved perfectly rigidly with the eef since *last* frame (not since grasp onset —
+│   │   │       see the "frame-to-frame, not accumulated" note below), using the relative pose
+│   │   │       recorded then as the reference (monitor_state["grasp_slip_rel_offset"]/
+│   │   │       ["grasp_slip_rel_quat"], seeded at grasp onset — same edge as
+│   │   │       source_support_fixtures/objects below — and overwritten every frame thereafter).
+│   │   │       Compared against GRASP_SLIP_LINEAR_THRESHOLD (=0.03) /
+│   │   │       GRASP_SLIP_ANGULAR_THRESHOLD (=0.3).
+│   │   │   ⚠ orientation reading fixed (2026-09-02): _object_orientation/_eef_orientation read
+│   │   │       "orientation" as wxyz, but kitchen_ext.py's _pose_from_body_id/_pose_from_site_id
+│   │   │       both store it in xyzw order (T.convert_quat(to="xyzw"); Rotation.as_quat()'s
+│   │   │       default) — added _xyzw_to_wxyz to correct this. Confirmed via the object's/eef's
+│   │   │       own absolute-rotation-axis alignment (should be parallel for a rigid attachment):
+│   │   │       dot product was ~-0.82 to -0.97 (anti-parallel, wrong) before the fix, ~+0.996 to
+│   │   │       +0.997 (parallel, correct) after. ArrangeBreadBasket ep0: bread's apparent ~0.87 rad
+│   │   │       (~50°) relative rotation (362→486) dropped to ~0.036 rad (~2°, matching a direct
+│   │   │       "no visible rotation" observation); basket's apparent ~2.88 rad (~165°, 564→791)
+│   │   │       dropped to ~0.34-0.35 rad (~19-20°) — real, but an order of magnitude smaller.
+│   │   │   ⚠ frame-to-frame, not accumulated-since-onset (2026-09-02): originally compared against
+│   │   │       a single baseline captured once at grasp onset (kept forever), which meant a
+│   │   │       one-time settling shift larger than threshold flagged every subsequent frame for
+│   │   │       the rest of the grasp, even after the object stabilized (the baseline never
+│   │   │       updates, so the residual is a fixed, non-decaying offset). Fixed by overwriting the
+│   │   │       stored reference to the *current* frame's actual relative pose at the end of every
+│   │   │       call, regardless of whether slip exceeded threshold — a one-time shift is flagged
+│   │   │       once and stops being flagged once stable; ongoing slip keeps getting flagged.
+│   │   │       Trade-off (confirmed on real data, not fully resolved): at call_stride=16, this is
+│   │   │       close to a coarse average-velocity check again — immune to brief transients and to
+│   │   │       the stale-baseline problem, but blind to slow continuous drift that never spikes in
+│   │   │       any single frame. ArrangeBreadBasket ep0's basket swing (~19-20° over ~150 frames,
+│   │   │       mean per-frame delta ~0.0053 rad, max ~0.059 rad — both far under the 0.3 threshold
+│   │   │       every single frame) is now completely undetected (0/19 violated, was 1/19 with the
+│   │   │       accumulated-since-onset + quaternion-fixed version). None of the three approaches
+│   │   │       tried this session (velocity / accumulated-since-onset / frame-to-frame) satisfies
+│   │   │       all three properties (immune to transients, forgets settles, catches slow drift)
+│   │   │       at once — open design question, see CHANGES_2026-08-31.md items 13-15.
+│   │   ├── leaf, fallback (only if no slip baseline available): _object_eef_relative_speeds(name)  [predicates.py:1869-1919]
+│   │   │   preferred sub-leaf: linear = _object_contact_slip_speed(name)  [predicates.py:534-593]
+│   │   │       — real gripper/object contact-point material-point velocity comparison, the direct
+│   │   │       no-slip condition at the finger/object interface (2026-09-02, see CHANGES item 12)
+│   │   │   fallback sub-leaf: lever-arm-corrected `‖obj_vel − v_expected‖` at the object's/eef's
+│   │   │       own reference points when no contact data is available that frame (2026-09-02, see
+│   │   │       CHANGES item 11) — confirmed on ArrangeBreadBasket ep0 frame 570: raw residual
+│   │   │       ~0.12 m/s (false positive), corrected residual ~0.007 m/s
+│   │   │   falls back further to the fully uncorrected `‖obj_vel − eef_vel‖` if position data is
+│   │   │       unavailable too; angular leaf unchanged throughout: ‖obj_ang_vel − eef_ang_vel‖,
+│   │   │       no contact-point/position-based equivalent for angular in this fallback path
+│   │   └── leaf comparison (slip path): linear_slip < GRASP_SLIP_LINEAR_THRESHOLD AND
+│   │       angular_slip < GRASP_SLIP_ANGULAR_THRESHOLD; (velocity fallback path):
+│   │       linear_speed < OBJ_LINEAR_STABLE_THRESHOLD (=0.05) AND
+│   │       angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD (=0.25)  [predicates.py:26-32]
 │   │       genuinely independent of object_grasped's own definition (see the ⚠ note above) — object_grasped_safe can be false while object_grasped stays true, which is the whole point of this property
 │   └── no debounce: object_grasped_safe := NOT object_released AND (object_grasped AND object_sync)  [predicates.py:2447-2457]  [`RELATIVE_SPEED_PERSISTENCE_FRAMES` / `GRASP_SAFE_GRACE_FRAMES` removed 2026-09-01, see cross-cutting note -- previously object_sync had its own false-frame grace, and object_grasped_safe had a further grace window on top of that]
-└── object_released                                                        [predicates.py:2137-2157, snapshot 6143]
-    ├── previously(object_grasped) — monitor_state["prev_object_grasped"]  [predicates.py:2101, 2138]
-    ├── NOT object_grasped (current tick, see above)                       [predicates.py:2139]
-    └── gripper_is_opening OR object_supported(released_object)            [predicates.py:2140-2156]
+└── object_released                                                        [predicates.py:2138-2166, snapshot 6143]
+    ├── previously(object_grasped) — monitor_state["prev_object_grasped"]  [predicates.py:2101, 2139]
+    ├── NOT object_grasped (current tick, see above)                       [predicates.py:2140]
+    └── gripper_is_opening OR previously(gripper_is_opening) OR (object_supported(released_object) AND object_stable_relative(released_object))  [predicates.py:2141-2165]
         ├── gripper_is_opening                                             [predicates.py:578-598]
         │   ├── joints whose name contains "gripper"/"finger", their velocities  [predicates.py:579-587]
         │   ├── sign convention: joint1 outward=+vel, joint2 outward=−vel (parallel-jaw), else raw  [predicates.py:592-597]
         │   └── leaf: mean(outward_velocities) > 1e-4                      [predicates.py:598]
-        ├── object_supported(released_object)                              [predicates.py:2152-2155]
-        │   ├── released_object := previous_grasped_object (the object grasped on the prior frame)  [predicates.py:2102, 2153]
-        │   └── leaf: _object_supported(name) — see Property 3's expansion below
+        ├── previously(gripper_is_opening) — monitor_state["prev_gripper_is_opening"]  [predicates.py:2101, 2157, 6130]
+        │   ⚠ ADDED (2026-09-02): gripper_is_opening is a raw single-frame joint-velocity-sign
+        │       check with no debounce, and can dip false for exactly one frame right at the moment
+        │       contact breaks even though it reads true on the frames on either side. Since
+        │       object_grasped's own true→false edge is also single-frame, that one dip made
+        │       object_released miss the release permanently — confirmed on ArrangeBreadBasket ep6,
+        │       `bread` around frame 389 (gripper_is_opening: True@388, False@389, True@390;
+        │       object_supported also False until 390) — see CHANGES_2026-08-31.md item 10 and
+        │       monitor/output/CHANGELOG.md's v1 entry for the full per-frame trace. ORed in
+        │       additively (not a replacement of the current-frame check), so the ordinary
+        │       same-frame case (opening and contact-loss on the same tick) is still covered.
+        ├── object_supported(released_object) AND object_stable_relative(released_object)  [predicates.py:2153-2157]
+        │   ├── released_object := previous_grasped_object (the object grasped on the prior frame)  [predicates.py:2102, 2154]
+        │   ├── leaf: _object_supported(name) — see Property 3's expansion below
+        │   └── leaf: _object_stable_relative(name) — see Property 3's expansion below
         │   ⚠ ADDED (2026-09-01): covers the gripper retracting away from the object without ever
         │       opening its fingers (e.g. contact breaks as the arm moves off) while the object is
         │       resting on a support — still a deliberate release, just one that doesn't show up as
@@ -134,13 +197,28 @@ G(object_grasped -> object_grasped_safe U object_released)
         │       something at the exact frame contact breaks (still in free-fall), so this doesn't
         │       reopen the accidental-drop case the way a plain not-moving check could (which could
         │       read true for one frame before gravity builds up velocity).
-        └── intentionally, neither term being true (grasp lost, gripper not opening, object not yet
-            supported — a genuine mid-air drop) does NOT satisfy object_released. That's by design —
-            a drop is meant to surface as an object_grasped_safe violation instead: object_sync
-            (independent of object_grasped's own bilateral-contact-only definition, see above) fails
-            once the object stops moving with the end effector, tripping object_grasped_safe while
-            object_grasped can still be true — not as a release/settle-monitoring event.
-    side effect (undocumented): sets awaiting_settle=True, settle_watch_object=previous_active_object, settle_watch_age=0, settle_release_frame=current_timestep  [predicates.py:2158-2166]  (feeds Property 3)
+        │   ⚠ ADDED object_stable_relative (2026-09-02): object_supported alone fires on any
+        │       contact with a support surface, including a one-frame bilateral-contact dropout
+        │       mid-carry that happens to graze something while the object is still clearly moving —
+        │       confirmed false positive on ep6 frame 445 (`basket` still moving 0.1-0.3 m/s) and
+        │       `ArrangeTea` ep0 frame 85 (`obj2` still actively held); neither is a deliberate
+        │       release. A genuinely placed-down object should already be at rest relative to its
+        │       support by the time the gripper retracts, so this doesn't narrow the intended case.
+        │       Caveat, confirmed on the `ArrangeTea` case: closes the settle-timeout false
+        │       positive but doesn't eliminate the root cause — the same one-frame bilateral-
+        │       contact dropout (object_grasped itself flickers False for one frame) now surfaces
+        │       as rc_grasp_remains_safe_until_release instead, since neither object_grasped_safe
+        │       nor object_released holds at that exact frame. The real fix (eliminating the
+        │       flicker in _object_gripper_bilateral_contact/_object_is_grasped itself) is not yet
+        │       done. See CHANGES_2026-08-31.md item 16.
+        └── intentionally, none of the three terms being true (grasp lost, gripper not opening on
+            either of the last two frames, object not yet supported-and-stable — a genuine mid-air
+            drop) does NOT satisfy object_released. That's by design — a drop is meant to surface
+            as an object_grasped_safe violation instead: object_sync (independent of object_grasped's own
+            bilateral-contact-only definition, see above) fails once the object stops moving with
+            the end effector, tripping object_grasped_safe while object_grasped can still be true —
+            not as a release/settle-monitoring event.
+    side effect (undocumented): sets awaiting_settle=True, settle_watch_object=previous_active_object, settle_watch_age=0, settle_release_frame=current_timestep  [predicates.py:2175-2183]  (feeds Property 3)
 
 ⚠ TRIED AND REVERTED (2026-08-31): a `pending_release_active` latch was added here at a point when
   object_grasped's raw definition also included `object_sync` (a velocity-based condition, since
@@ -155,6 +233,13 @@ G(object_grasped -> object_grasped_safe U object_released)
   correlated in time and the multi-frame gap the latch existed to bridge is no longer expected to
   occur. The latch was removed as unneeded complexity for that reason. See CHANGES_2026-08-31.md
   for the full history of both changes.
+
+⚠ REVERT PREMISE PARTIALLY WRONG (2026-09-02): the above revert's "tightly correlated" assumption
+  turned out to be incomplete — gripper_is_opening's own single-frame measurement noise (not
+  object_sync) reopened a narrower version of the same gap (see the previously(gripper_is_opening)
+  node above). Fixed with the additive OR term rather than reinstating the full latch, since the
+  full latch's original motivating case (object_sync-driven multi-frame gap) genuinely no longer
+  applies — only a one-frame version of the problem, from a different root cause, remained.
 ```
 
 ## Property 3: `G(object_released -> (!release_object_settle_timeout U object_settled))`
@@ -469,7 +554,7 @@ G(skill_pick_onset -> preconditions_safe_pick)
 │   │   └── _object_is_grasped(name)                               [:538-562]
 │   │       ├── _object_gripper_bilateral_contact(name)             [leaf, :505-536]
 │   │       │   └── >= GRASP_BILATERAL_MIN_CONTACT_BODIES distinct gripper-finger bodies in contact simultaneously (env.sim.data.contact geom pairs); falls back to any-geom contact for non-2-finger grippers
-│   │       └── OU.check_obj_grasped(env, obj_name=name, threshold=GRIPPER_CLOSED_THRESHOLD=0.035)  [leaf: RoboCasa object_utils]
+│   │       └── OU.check_obj_grasped(env, obj_name=name, threshold=GRIPPER_CLOSED_THRESHOLD=0.0399)  [leaf: RoboCasa object_utils; 0.035 -> 0.04 -> 0.0395 2026-09-02, see Property 2's note and CHANGES_2026-08-31.md item 7]
 │   │       (deliberately no object_sync term here — see Property 2 for why it's kept out of
 │   │        object_grasped and used only in object_grasped_safe instead)
 │   ├── grasp_candidate = _carrier_for_grasp_candidate(raw_grasp_candidate)  [:2083-2097] (resolves to the enclosing receptacle if the grasped item is itself inside a tracked receptacle)
@@ -639,7 +724,8 @@ G(skill_open_close_onset -> preconditions_safe_open_close)
 G(skill_place_onset -> preconditions_safe_place)
 ├── skill_place_onset                                              [predicates.py:2972-2991]
 │   ├── object_released  (see Property 2's full expansion — previously(object_grasped),
-│   │   NOT object_grasped, gripper_is_opening OR object_supported(released_object))  [:2178-2197]
+│   │   NOT object_grasped, gripper_is_opening OR previously(gripper_is_opening) OR
+│   │   (object_supported(released_object) AND object_stable_relative(released_object)))  [:2178-2197]
 │   ├── place_onset_object = settle_release_object if (object_released and settle_release_object is not None) else active_object  [:2972-2976]
 │   └── persists PLACE_ONSET_FRAMES=1 frame (i.e. fires immediately on the release-edge frame, no multi-frame debounce needed since threshold is 1)  [:2977-2980]; one-shot latch per released object, resets once place_onset_object no longer matches the fired object or object_released goes false  [:2981-2991]
 │
@@ -730,7 +816,7 @@ G(skill_dump_onset -> preconditions_safe_dump)
 # Implementation constants (predicates.py:24-53)
 
 ```
-GRIPPER_CLOSED_THRESHOLD = 0.035
+GRIPPER_CLOSED_THRESHOLD = 0.0399
 GRIPPER_FAR_THRESHOLD = 0.10
 OBJ_LINEAR_STABLE_THRESHOLD = 0.05
 OBJ_ANGULAR_STABLE_THRESHOLD = 0.25
@@ -843,3 +929,53 @@ initial-contact-pair ignore grace) now all track their raw signal directly, with
     from the gripper closing around an object without lifting it (or dragging a non-coupled
     object) — accepted as out of scope for now (a touch with both fingers closed counts as a
     grasp); `object_grasped_safe` is expected to catch resulting instability instead.
+19. **`object_sync`'s linear-velocity comparison is lever-arm-corrected (2026-09-02)** — the raw
+    `‖obj_vel − eef_vel‖` comparison (used since before this session, and still described as-is in
+    item #18 above) legitimately differs by `ω × r` for a rigid grasp whenever the assembly rotates
+    and the object's reference point is offset from the eef site — not sensor noise, so no
+    threshold change could fix it without hiding real slip too. Found via the v1 output run on
+    `ArrangeBreadBasket` ep0 (`object_grasped_safe` false for 259 straight frames with no real
+    issue); fixed by comparing against a rotation-corrected expected velocity instead of `eef_vel`
+    directly. See `_object_eef_relative_speeds`'s node above and `CHANGES_2026-08-31.md` item 11.
+20. **`object_sync` prefers actual contact-point slip speed over item #19's CoM-based correction
+    (2026-09-02)** — item #19 still assumes the object's whole body is rigidly locked to the eef
+    site, which can spuriously flag desync for anything not perfectly rigid (contents shifting
+    inside a held container, grasp compliance) even with zero real slip. `_object_contact_slip_speed`
+    computes the no-slip residual directly at the actual finger/object contact point(s) from the
+    simulator's contact array instead, only falling back to item #19's correction when there's no
+    active contact that frame. Not yet verified against real data at time of writing — can't be
+    checked against already-recorded `privileged_information_N.json` dumps (contact positions are
+    live sim state, not saved), verification is the pending v2 re-run. See `CHANGES_2026-08-31.md`
+    item 12.
+21. **`object_sync` replaced with position-based `_object_grasp_slip` (2026-09-02)** — items 19/20
+    fixed the velocity *measurement*, but a correctly-measured instantaneous velocity still can't
+    tell a brief real acceleration transient (confirmed up to ~1.1 rad/s during otherwise-safe
+    carrying) apart from genuinely unsafe motion. Replaced with a position-based check: at grasp
+    onset, record the object's pose relative to the eef; every frame, compare the actual pose
+    against where it should be if it had moved rigidly with the eef. See `CHANGES_2026-08-31.md`
+    item 13 for the original (accumulated-since-onset) version's motivation.
+22. **Quaternion component-order bug found and fixed (2026-09-02)** — item 21's real-data
+    verification initially showed physically implausible rotations (basket ~165°, bread ~50°, with
+    no matching visual motion). Root cause: `_object_orientation`/`_eef_orientation` read
+    `orientation` as wxyz; the underlying data (`kitchen_ext.py`) stores it as xyzw. Fixed via
+    `_xyzw_to_wxyz`. See `CHANGES_2026-08-31.md` item 14 for the diagnostic method (checking
+    object/eef absolute-rotation-axis alignment) and corrected numbers.
+23. **`_object_grasp_slip` changed from accumulated-since-onset to frame-to-frame (2026-09-02)** —
+    item 21's original design never forgets a one-time settling shift once it happens, flagging
+    every subsequent frame forever even after the object stabilizes. Fixed by overwriting the
+    stored reference to the current frame's pose every frame. Trade-off, not fully resolved: this
+    makes the check insensitive to slow continuous drift that never spikes in any single frame
+    (confirmed: the basket's real ~19-20° swing, item 22, is entirely undetected by the
+    frame-to-frame version). See `CHANGES_2026-08-31.md` item 15 for the full three-way trade-off
+    discussion (velocity / accumulated-since-onset / frame-to-frame all have a gap).
+24. **`object_released`'s `object_supported` fallback also requires `object_stable_relative`
+    (2026-09-02)** — the fallback fired on any support contact, including a one-frame bilateral-
+    contact dropout mid-carry while the object was still clearly moving (confirmed false positive:
+    `ArrangeBreadBasket` ep6 frame 445, `ArrangeTea` ep0 frame 85). Fixed by requiring the object
+    to actually be at rest relative to its support, not just touching it. Caveat, confirmed on the
+    `ArrangeTea` case: this closes one false positive but exposes the same underlying one-frame
+    bilateral-contact flicker as a *different* violation instead (`rc_grasp_remains_safe_until_
+    release`, since `object_grasped` itself flickers False for that one frame). The real fix
+    (eliminating the flicker in `_object_gripper_bilateral_contact`/`_object_is_grasped` itself,
+    which item 1 was meant to do and mostly does, but not in every case) is not yet done. See
+    `CHANGES_2026-08-31.md` item 16.

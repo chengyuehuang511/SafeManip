@@ -476,7 +476,7 @@ def extract_episode(env, dataset_dir, ep_num, trajectory_horizon, call_stride=1)
 
 
 def process_task(task, dataset_root, output_root, episodes, trajectory_horizon,
-                  run_monitor, skip_existing, call_stride=1):
+                  run_monitor, skip_existing, call_stride=1, properties=None):
     dataset_dir = find_dataset_dir(dataset_root, task)
     out_dir = Path(output_root) / task
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -521,7 +521,9 @@ def process_task(task, dataset_root, output_root, episodes, trajectory_horizon,
                 entry = {"episode": ep, "status": "extracted", "n_frames": n_frames, "elapsed_s": elapsed}
 
                 if run_monitor:
-                    monitor_result = run_monitor_on(out_path, monitor_out_path, call_stride=call_stride)
+                    monitor_result = run_monitor_on(
+                        out_path, monitor_out_path, call_stride=call_stride, properties=properties
+                    )
                     entry["monitor_output"] = str(monitor_out_path)
                     entry["num_violated_instances"] = monitor_result.get("num_violated_instances")
                     entry["num_satisfied_instances"] = monitor_result.get("num_satisfied_instances")
@@ -561,7 +563,7 @@ def process_task(task, dataset_root, output_root, episodes, trajectory_horizon,
     return summary
 
 
-def run_monitor_on(privileged_json_path, output_path, call_stride=1):
+def run_monitor_on(privileged_json_path, output_path, call_stride=1, properties=None):
     """Call SafeManip/monitor/run_monitor_on_privileged.py's `monitor_rollout`
     directly (in-process function call, not subprocess -- simpler, and this
     script already runs inside the same repo) on our freshly-written
@@ -572,7 +574,16 @@ def run_monitor_on(privileged_json_path, output_path, call_stride=1):
     (a separate constant from predicates.py's, used to interpret the
     *recorded* predicate-value sequence for settle-timeout LTL properties --
     see _scale_settle_timeout_for_monitor's docstring) so it stays consistent
-    with the scaling already applied to predicates.py during extraction."""
+    with the scaling already applied to predicates.py during extraction.
+
+    `properties`: optional set of LTL property names (e.g.
+    {"rc_grasp_remains_safe_until_release"}) to scope this run's monitor
+    output to. Doesn't skip any per-frame predicate computation (predicates.py
+    always computes every predicate regardless -- this is a purely
+    post-extraction filter of which already-computed properties get
+    evaluated/reported), so it doesn't speed up extraction itself, only
+    narrows the resulting violations/satisfied list, e.g. for "run one
+    property across all tasks/episodes at a time" experiments."""
     _ensure_safemanip_on_syspath()
     from monitor.run_monitor_on_privileged import monitor_rollout
 
@@ -583,7 +594,7 @@ def run_monitor_on(privileged_json_path, output_path, call_stride=1):
               f"SETTLE_TIMEOUT_FRAMES by {call_stride}x -- 16th constant, "
               f"not part of the 15 in predicates.py)", flush=True)
     try:
-        result = monitor_rollout(str(privileged_json_path))
+        result = monitor_rollout(str(privileged_json_path), properties=properties)
     finally:
         _restore_settle_timeout_for_monitor(original_settle_timeout)
     with open(output_path, "w", encoding="utf-8") as f:
@@ -632,6 +643,15 @@ def main():
              "with no loss of temporal resolution. See module docstring's 'TEMPORAL-PERSISTENCE-"
              "THRESHOLD GRANULARITY MISMATCH' section before picking a value.",
     )
+    ap.add_argument(
+        "--properties", nargs="+", default=None,
+        help="scope the monitor to just these LTL property names (e.g. "
+             "rc_grasp_remains_safe_until_release), instead of all of them. Doesn't skip any "
+             "per-frame predicate computation or speed up extraction -- predicates.py always "
+             "computes every predicate regardless -- this only filters which already-computed "
+             "properties get evaluated/reported, for 'test one property across all tasks/episodes "
+             "at a time' experiments. Default: all properties (unchanged behavior).",
+    )
     args = ap.parse_args()
 
     episodes = _parse_episode_list(args)
@@ -639,6 +659,7 @@ def main():
         args.task, args.dataset_root, args.output_root, episodes,
         args.trajectory_horizon, args.run_monitor, args.skip_existing,
         call_stride=args.call_stride,
+        properties=set(args.properties) if args.properties else None,
     )
 
 

@@ -1122,6 +1122,7 @@ def _describe_violation(
 def monitor_rollout(
     path: str,
     monitor: RoboCasaSymbolicMonitor | None = None,
+    properties: set[str] | None = None,
 ):
     static_info, dynamic_frames, replay_summary = _load_rollout(path)
     _ensure_object_settle_timeout(dynamic_frames)
@@ -1179,6 +1180,25 @@ def monitor_rollout(
             property_description=(PROPERTY_SPECS.get("rc_fixture_placement_release_after_internal_support") or {}).get("description")
         ),
     }
+    if properties is not None:
+        # Scoped to a chosen subset of LTL properties for this run (e.g. "just
+        # test rc_grasp_remains_safe_until_release across all tasks/episodes").
+        # This trims the repeated-violation monitors dict itself (a separate
+        # side-purpose from the actual satisfied/violations result -- see the
+        # matching skip inside the frame loop below, which is what actually
+        # makes the returned violations/satisfied lists reflect the filter).
+        # Doesn't skip any per-frame predicate computation (predicates.py
+        # always computes every predicate regardless), so this doesn't speed
+        # up extraction, just narrows the reported result.
+        unknown = set(properties) - set(repeated_monitors)
+        if unknown:
+            raise ValueError(
+                f"unknown propert{'y' if len(unknown) == 1 else 'ies'} requested: "
+                f"{sorted(unknown)} -- valid names: {sorted(repeated_monitors)}"
+            )
+        repeated_monitors = {
+            name: m for name, m in repeated_monitors.items() if name in properties
+        }
     repeated_monitor_frames_seen = {
         property_name: set() for property_name in repeated_monitors
     }
@@ -1197,6 +1217,13 @@ def monitor_rollout(
             (dynamic_info.get("predicates") or {}).get("violation_evidence") or {}
         )
         for status in statuses:
+            if properties is not None and status.property_name not in properties:
+                # This is the actual property filter (not the repeated_monitors
+                # one above, which only feeds repeated-occurrence tracking, a
+                # separate side-purpose) -- `history` below is what
+                # satisfied/violations actually get built from, so skipping
+                # unwanted properties here is what makes --properties work.
+                continue
             predicate_values = _augment_precondition_predicate_values(
                 status.property_name,
                 status.predicate_values,
