@@ -1,0 +1,838 @@
+{
+  "1_what_attributes_py_got_wrong": {
+    "category_set_drift_vs_native_tags": [
+      {
+        "extra_in_hand_written_not_native": [
+          "bottle",
+          "can",
+          "coffee_cup",
+          "container"
+        ],
+        "hand_written_count": 15,
+        "hand_written_set": "RECEPTACLE_CATEGORIES",
+        "missing_from_hand_written": [
+          "baking_sheet",
+          "basket",
+          "blender_jug",
+          "colander",
+          "cutting_board",
+          "ice_cube_tray",
+          "jar",
+          "kettle_non_electric",
+          "oven_tray",
+          "placemat",
+          "plate",
+          "saucepan",
+          "saucepan_with_lid",
+          "strainer",
+          "teapot",
+          "wine_glass"
+        ],
+        "native_count": 27,
+        "native_tag": "receptacle"
+      },
+      {
+        "extra_in_hand_written_not_native": [
+          "cutting_board",
+          "fork",
+          "knife",
+          "ladle",
+          "spatula",
+          "spoon",
+          "whisk"
+        ],
+        "hand_written_count": 19,
+        "hand_written_set": "TOOL_CATEGORIES",
+        "missing_from_hand_written": [
+          "aluminum_foil",
+          "dish_brush"
+        ],
+        "native_count": 14,
+        "native_tag": "tool"
+      }
+    ],
+    "dead_native_type_checks_in_source": [
+      {
+        "checked_against": "types",
+        "line": 526,
+        "literal": "cookware"
+      },
+      {
+        "checked_against": "types",
+        "line": 528,
+        "literal": "raw"
+      },
+      {
+        "checked_against": "types",
+        "line": 530,
+        "literal": "ready_to_eat"
+      },
+      {
+        "checked_against": "types",
+        "line": 532,
+        "literal": "in_container"
+      },
+      {
+        "checked_against": "types",
+        "line": 476,
+        "literal": "cookware"
+      },
+      {
+        "checked_against": "types",
+        "line": 522,
+        "literal": "liquid"
+      },
+      {
+        "checked_against": "types",
+        "line": 442,
+        "literal": "liquid"
+      },
+      {
+        "checked_against": "types",
+        "line": 491,
+        "literal": "raw"
+      },
+      {
+        "checked_against": "types",
+        "line": 493,
+        "literal": "ready_to_eat"
+      }
+    ],
+    "dead_object_axis_members": {
+      "actually_used": [
+        "alcohol",
+        "bread_food",
+        "closeable",
+        "condiment",
+        "cookable",
+        "cooked_food",
+        "dairy",
+        "dishwashable",
+        "drink",
+        "food",
+        "fragile",
+        "freezable",
+        "fridgable",
+        "fruit",
+        "graspable",
+        "meat",
+        "microwavable",
+        "openable",
+        "pastry",
+        "pourable",
+        "raw",
+        "ready_to_eat",
+        "receptacle",
+        "spice",
+        "sweet",
+        "toastable",
+        "tool",
+        "twistable",
+        "utensil",
+        "vegetable",
+        "washable"
+      ],
+      "dead_never_assigned": [
+        "cleaner",
+        "cold",
+        "cookware",
+        "cuttable",
+        "hot",
+        "lid",
+        "liquid",
+        "packaged_food",
+        "pressable",
+        "slideable",
+        "stackable",
+        "turnable"
+      ],
+      "declared_object_axis_members": [
+        "alcohol",
+        "bread_food",
+        "cleaner",
+        "closeable",
+        "cold",
+        "condiment",
+        "cookable",
+        "cooked_food",
+        "cookware",
+        "cuttable",
+        "dairy",
+        "dishwashable",
+        "drink",
+        "food",
+        "fragile",
+        "freezable",
+        "fridgable",
+        "fruit",
+        "graspable",
+        "hot",
+        "lid",
+        "liquid",
+        "meat",
+        "microwavable",
+        "openable",
+        "packaged_food",
+        "pastry",
+        "pourable",
+        "pressable",
+        "raw",
+        "ready_to_eat",
+        "receptacle",
+        "slideable",
+        "spice",
+        "stackable",
+        "sweet",
+        "toastable",
+        "tool",
+        "turnable",
+        "twistable",
+        "utensil",
+        "vegetable",
+        "washable"
+      ]
+    },
+    "dead_role_axis_members": {
+      "button": {
+        "actually_used": [],
+        "dead_never_assigned": [
+          "lever",
+          "mode_select",
+          "power",
+          "pressable",
+          "toggle"
+        ],
+        "declared": [
+          "lever",
+          "mode_select",
+          "power",
+          "pressable",
+          "toggle"
+        ]
+      },
+      "fixture": {
+        "actually_used": [
+          "cabinet",
+          "closeable",
+          "cooktop",
+          "cooling",
+          "dispensing",
+          "drawer",
+          "fridge",
+          "heated",
+          "microwave",
+          "mixing",
+          "openable",
+          "oven",
+          "powered",
+          "pressable",
+          "sink",
+          "slideable",
+          "storage",
+          "stove",
+          "toasting",
+          "turnable",
+          "twistable",
+          "washing"
+        ],
+        "dead_never_assigned": [
+          "dirty"
+        ],
+        "declared": [
+          "cabinet",
+          "closeable",
+          "cooktop",
+          "cooling",
+          "dirty",
+          "dispensing",
+          "drawer",
+          "fridge",
+          "heated",
+          "microwave",
+          "mixing",
+          "openable",
+          "oven",
+          "powered",
+          "pressable",
+          "sink",
+          "slideable",
+          "storage",
+          "stove",
+          "toasting",
+          "turnable",
+          "twistable",
+          "washing"
+        ]
+      },
+      "support": {
+        "actually_used": [
+          "cold_storage",
+          "containment",
+          "heated",
+          "prep_zone",
+          "serving_zone",
+          "storage_zone",
+          "wash_zone"
+        ],
+        "dead_never_assigned": [],
+        "declared": [
+          "cold_storage",
+          "containment",
+          "heated",
+          "prep_zone",
+          "serving_zone",
+          "storage_zone",
+          "wash_zone"
+        ]
+      },
+      "tool": {
+        "actually_used": [],
+        "dead_never_assigned": [
+          "cleaning_tool",
+          "cutting_tool",
+          "measuring_tool",
+          "mixing_tool",
+          "serving_tool"
+        ],
+        "declared": [
+          "cleaning_tool",
+          "cutting_tool",
+          "measuring_tool",
+          "mixing_tool",
+          "serving_tool"
+        ]
+      }
+    },
+    "fixture_class_coverage_gap": {
+      "attributes_py_classes_not_in_native_hierarchy": [
+        "Box",
+        "Floor",
+        "Wall",
+        "WindowProc"
+      ],
+      "native_classes_missing_from_attributes_py": [
+        "Cabinet",
+        "Fridge",
+        "ProcGenFixture",
+        "Stool"
+      ]
+    },
+    "tool_utensil_conflation": {
+      "hand_written_TOOL_CATEGORIES_that_are_actually_native_utensil": [
+        "fork",
+        "knife",
+        "ladle",
+        "spatula",
+        "spoon",
+        "whisk"
+      ],
+      "native_tool_categories": [
+        "aluminum_foil",
+        "bottle_opener",
+        "can_opener",
+        "cheese_grater",
+        "digital_scale",
+        "dish_brush",
+        "measuring_cup",
+        "peeler",
+        "pizza_cutter",
+        "reamer",
+        "rolling_pin",
+        "scissors",
+        "strainer",
+        "tongs"
+      ],
+      "native_utensil_categories": [
+        "fork",
+        "knife",
+        "ladle",
+        "spatula",
+        "spoon",
+        "whisk",
+        "wooden_spoon"
+      ],
+      "native_utensil_categories_missing_any_utensil_label_in_attributes_py": []
+    },
+    "unmodeled_accessory_instances": {
+      "fixture_classes_with_zero_attributes_in_attributes_py": [
+        "Accessory",
+        "BlenderLid",
+        "Box",
+        "Floor",
+        "Hood",
+        "Wall",
+        "WallAccessory"
+      ],
+      "named_fixture_instances_that_therefore_get_zero_attributes": [
+        "accessory",
+        "blender_lid",
+        "box",
+        "candle",
+        "cinnamon",
+        "digital_scale",
+        "floor",
+        "flower_vase",
+        "fruit_bowl",
+        "glass_cup",
+        "hood",
+        "jar",
+        "jar_lid",
+        "knife_block",
+        "oil_bottle",
+        "paper_towel",
+        "paprika",
+        "pepper_shaker",
+        "plant",
+        "salt_shaker",
+        "soap_dispenser",
+        "tiered_basket",
+        "turmeric",
+        "utensil_holder",
+        "utensil_rack",
+        "utensil_set",
+        "vinegar_bottle",
+        "wall",
+        "wall_accessory"
+      ]
+    },
+    "unused_native_fixture_type_enum": [
+      "BLENDER",
+      "CABINET",
+      "CABINET_DOUBLE_DOOR",
+      "CABINET_SINGLE_DOOR",
+      "CABINET_WITH_DOOR",
+      "COFFEE_MACHINE",
+      "COUNTER",
+      "COUNTER_NON_CORNER",
+      "COUNTER_NON_DINING",
+      "DINING_COUNTER",
+      "DISHWASHER",
+      "DISH_RACK",
+      "DRAWER",
+      "ELECTRIC_KETTLE",
+      "FRIDGE",
+      "ISLAND",
+      "MICROWAVE",
+      "OVEN",
+      "SHELF",
+      "SINK",
+      "STAND_MIXER",
+      "STOOL",
+      "STOVE",
+      "TOASTER",
+      "TOASTER_OVEN",
+      "TOP_DRAWER",
+      "WINDOW"
+    ]
+  },
+  "2_what_attributes_py_adds_beyond_robocasa": {
+    "invented_attribute_names": {
+      "invented_attribute_count": 49,
+      "invented_attributes": [
+        {
+          "attribute": "cabinet",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "cleaning_tool",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "closeable",
+          "status": "used",
+          "used_in": [
+            "object",
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "cold",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "cold_storage",
+          "status": "used",
+          "used_in": [
+            "support"
+          ]
+        },
+        {
+          "attribute": "containment",
+          "status": "used",
+          "used_in": [
+            "support"
+          ]
+        },
+        {
+          "attribute": "cooktop",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "cookware",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "cooling",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "cuttable",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "cutting_tool",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "dirty",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "dispensing",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "drawer",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "food",
+          "status": "used",
+          "used_in": [
+            "object"
+          ]
+        },
+        {
+          "attribute": "fragile",
+          "status": "used",
+          "used_in": [
+            "object"
+          ]
+        },
+        {
+          "attribute": "fridge",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "heated",
+          "status": "used",
+          "used_in": [
+            "fixture",
+            "support"
+          ]
+        },
+        {
+          "attribute": "hot",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "lever",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "liquid",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "measuring_tool",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "microwave",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "mixing",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "mixing_tool",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "mode_select",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "openable",
+          "status": "used",
+          "used_in": [
+            "object",
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "oven",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "pourable",
+          "status": "used",
+          "used_in": [
+            "object"
+          ]
+        },
+        {
+          "attribute": "power",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "powered",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "prep_zone",
+          "status": "used",
+          "used_in": [
+            "support"
+          ]
+        },
+        {
+          "attribute": "pressable",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "raw",
+          "status": "used",
+          "used_in": [
+            "object"
+          ]
+        },
+        {
+          "attribute": "ready_to_eat",
+          "status": "used",
+          "used_in": [
+            "object"
+          ]
+        },
+        {
+          "attribute": "serving_tool",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "serving_zone",
+          "status": "used",
+          "used_in": [
+            "support"
+          ]
+        },
+        {
+          "attribute": "sink",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "slideable",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "storage",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "storage_zone",
+          "status": "used",
+          "used_in": [
+            "support"
+          ]
+        },
+        {
+          "attribute": "stove",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "toastable",
+          "status": "used",
+          "used_in": [
+            "object"
+          ]
+        },
+        {
+          "attribute": "toasting",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "toggle",
+          "status": "declared but never assigned",
+          "used_in": []
+        },
+        {
+          "attribute": "turnable",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "twistable",
+          "status": "used",
+          "used_in": [
+            "object",
+            "fixture"
+          ]
+        },
+        {
+          "attribute": "wash_zone",
+          "status": "used",
+          "used_in": [
+            "support"
+          ]
+        },
+        {
+          "attribute": "washing",
+          "status": "used",
+          "used_in": [
+            "fixture"
+          ]
+        }
+      ]
+    },
+    "invented_category_sets": {
+      "FRAGILE_CATEGORIES": [
+        "bowl",
+        "coffee_cup",
+        "cup",
+        "egg",
+        "glass_cup",
+        "mug",
+        "plate",
+        "wine_glass"
+      ],
+      "LIQUID_CATEGORIES": [
+        "brewed_coffee",
+        "coffee",
+        "sauce",
+        "soup",
+        "water"
+      ],
+      "OPENABLE_OBJECT_CATEGORIES": [
+        "bottle",
+        "can",
+        "jar",
+        "thermos"
+      ],
+      "POURABLE_CATEGORIES": [
+        "brewed_coffee",
+        "coffee",
+        "coffee_cup",
+        "cup",
+        "glass_cup",
+        "jug",
+        "jug_wide_opening",
+        "mug",
+        "pitcher",
+        "sauce",
+        "soup",
+        "teapot",
+        "thermos",
+        "water",
+        "wine_glass"
+      ],
+      "READY_TO_EAT_TYPE_NAMES": [
+        "bread_food",
+        "condiment",
+        "cooked_food",
+        "dairy",
+        "drink",
+        "fruit",
+        "pastry",
+        "sweets",
+        "vegetable"
+      ],
+      "TWISTABLE_CATEGORIES": [
+        "bottle",
+        "can",
+        "jar",
+        "thermos"
+      ]
+    },
+    "invented_role_axes": {
+      "button (lever/toggle/power/mode_select/...)": [
+        "lever",
+        "toggle",
+        "power",
+        "mode_select",
+        "pressable"
+      ],
+      "support (support-zone semantics -- containment/heated/wash_zone/...)": [
+        "containment",
+        "heated",
+        "cold_storage",
+        "wash_zone",
+        "prep_zone",
+        "serving_zone",
+        "storage_zone"
+      ],
+      "tool (cleaning_tool/cutting_tool/mixing_tool/.../measuring_tool)": [
+        "cleaning_tool",
+        "cutting_tool",
+        "mixing_tool",
+        "serving_tool",
+        "measuring_tool"
+      ]
+    }
+  }
+}

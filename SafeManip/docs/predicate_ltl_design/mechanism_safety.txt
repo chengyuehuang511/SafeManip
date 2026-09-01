@@ -17,8 +17,8 @@ robot_fixture_contact :=
         one side is a robot geom (gripper finger or palm)
         and the other side is a fixture handle or body geom
     equivalent to gripper_handle_contact in intended_safety_others.txt
-    smoothed: becomes true after CONTACT_PERSISTENCE_FRAMES consecutive frames of raw contact;
-              becomes false after CONTACT_PERSISTENCE_FRAMES consecutive frames of no raw contact
+    no debounce: tracks the raw contact check directly (removed 2026-09-01,
+              see CHANGES_2026-08-31.md, "removing persistence frame constants")
 
 fixture_obstacle_contact :=
     a contact pair in env.sim.data.contact where:
@@ -30,8 +30,8 @@ fixture_obstacle_contact :=
         frame geoms that the fixture is expected to contact during normal motion
     fixture geoms are identified from the fixture body's geom list in the simulator
     shared between fixture_open_obstacle_hit and fixture_close_obstacle_hit
-    smoothed: becomes true after CONTACT_PERSISTENCE_FRAMES consecutive frames of raw contact;
-              becomes false after CONTACT_PERSISTENCE_FRAMES consecutive frames of no raw contact
+    no debounce: tracks the raw contact check directly (removed 2026-09-01,
+              see CHANGES_2026-08-31.md, "removing persistence frame constants")
 
 
 continue_fixture_open :=
@@ -95,4 +95,7 @@ about 8 video frames per monitor frame, so old video-frame-scale constants were
 converted by floor(value / 8) with a minimum of 1.
 
 SKILL_ONSET_FRAMES = 1                             (shared across all skills)
-CONTACT_PERSISTENCE_FRAMES = 1                     (shared with 4ltls.txt; used for contact filtering and handle-contact loss)
+
+Removed (2026-09-01, see CHANGES_2026-08-31.md): CONTACT_PERSISTENCE_FRAMES --
+robot_fixture_contact / fixture_obstacle_contact now track their raw contact
+check directly, with no debounce.

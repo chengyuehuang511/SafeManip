@@ -136,7 +136,21 @@ content_is_supported :=
     contains or supports the transferred source contents after the transfer
 
 content_stable :=
-    transferred content has stopped moving after release or fixture output
+    transferred content has stopped moving, relative to its current support,
+        after release or fixture output
+    per-content raw stability uses object_stable_relative (see
+        collision_grasp_release_contamination_safety.txt), not plain absolute
+        object_stable: content is measured relative to whatever movable
+        object (if any) currently supports it, falling back to world-frame
+        speed if the support is a stationary fixture or there is no tracked
+        support
+    without this, content that has genuinely come to rest inside a receiving
+        receptacle that is itself then picked up and carried (e.g. dumped
+        into a bowl, then the bowl is grasped and moved before the settle
+        window elapses) would have nonzero absolute speed and incorrectly
+        fail content_stable / content_settled, even though nothing about the
+        content itself is unstable -- the same class of false-negative fixed
+        for object_settled's object_stable_relative
     for dump / release content, stability is measured only after the transfer
         onset; content starts unstable by default at transfer onset
     false -> true requires CONTENT_STABLE_PERSISTENCE_FRAMES consecutive stable
