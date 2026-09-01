@@ -21,14 +21,11 @@ from .attributes import (
 )
 
 
-GRIPPER_CLOSED_THRESHOLD = 0.06
-GRIPPER_FAR_THRESHOLD = 0.25
+GRIPPER_CLOSED_THRESHOLD = 0.035
+GRIPPER_FAR_THRESHOLD = 0.10
 OBJ_LINEAR_STABLE_THRESHOLD = 0.05
 OBJ_ANGULAR_STABLE_THRESHOLD = 0.25
-CONTACT_PERSISTENCE_FRAMES = 1
-OBJECT_GRASPED_PERSISTENCE_FRAMES = 2
-RELATIVE_SPEED_PERSISTENCE_FRAMES = 2
-GRASP_SAFE_GRACE_FRAMES = 2
+GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
 STABLE_PERSISTENCE_FRAME = 2
 CONTENT_STABLE_PERSISTENCE_FRAMES = 2
 FIXTURE_OUTPUT_IDLE_FRAMES = 1
@@ -462,10 +459,96 @@ def build_predicate_snapshot(
                 continue
         return geom_ids
 
+    def _gripper_finger_body_contact_map() -> dict[int, set[int]]:
+        """Group gripper contact geoms by their parent body id.
+
+        A parallel-jaw gripper's two finger pads live on two distinct MuJoCo
+        bodies. Grouping by body (rather than treating the whole gripper as
+        one geom set) lets grasp detection require *bilateral* contact
+        instead of "any gripper geom touches the object", which is what let
+        transient single-pad contact during the approach/close phase get
+        misdetected as a full grasp.
+        """
+        geom_ids = _gripper_contact_geom_ids()
+        body_map: dict[int, set[int]] = {}
+        for geom_id in geom_ids:
+            try:
+                body_id = int(env.sim.model.geom_bodyid[geom_id])
+            except Exception:
+                continue
+            body_map.setdefault(body_id, set()).add(geom_id)
+        return body_map
+
+    def _object_gripper_contact_any(name: str) -> bool:
+        """Fallback aggregate contact check (any gripper geom vs. object geom)."""
+        object_geom_ids = _object_geom_ids(name)
+        gripper_geom_ids = _gripper_contact_geom_ids()
+        if not object_geom_ids or not gripper_geom_ids:
+            return False
+        contact_number = int(getattr(env.sim.data, "ncon", 0))
+        for contact_idx in range(contact_number):
+            try:
+                geom1 = int(env.sim.data.contact[contact_idx].geom1)
+                geom2 = int(env.sim.data.contact[contact_idx].geom2)
+            except Exception:
+                continue
+            if (geom1 in gripper_geom_ids and geom2 in object_geom_ids) or (
+                geom2 in gripper_geom_ids and geom1 in object_geom_ids
+            ):
+                return True
+        return False
+
+    def _object_gripper_bilateral_contact(name: str) -> bool:
+        """Require contact from at least GRASP_BILATERAL_MIN_CONTACT_BODIES
+        distinct gripper finger bodies simultaneously (an antipodal-contact
+        precondition), instead of aggregate any-geom contact.
+
+        Falls back to the aggregate any-geom check if the gripper's contact
+        geoms can't be split into >=2 distinct bodies (e.g. a non
+        two-finger / suction end-effector), so non-parallel-jaw grippers are
+        unaffected.
+        """
+        object_geom_ids = _object_geom_ids(name)
+        if not object_geom_ids:
+            return False
+        finger_body_map = _gripper_finger_body_contact_map()
+        if len(finger_body_map) < 2:
+            return _object_gripper_contact_any(name)
+        contacted_bodies = set()
+        contact_number = int(getattr(env.sim.data, "ncon", 0))
+        for contact_idx in range(contact_number):
+            try:
+                geom1 = int(env.sim.data.contact[contact_idx].geom1)
+                geom2 = int(env.sim.data.contact[contact_idx].geom2)
+            except Exception:
+                continue
+            for body_id, geom_ids in finger_body_map.items():
+                if body_id in contacted_bodies:
+                    continue
+                if (geom1 in geom_ids and geom2 in object_geom_ids) or (
+                    geom2 in geom_ids and geom1 in object_geom_ids
+                ):
+                    contacted_bodies.add(body_id)
+        return _bool(len(contacted_bodies) >= max(1, int(GRASP_BILATERAL_MIN_CONTACT_BODIES)))
+
     def _object_is_grasped(name: str) -> bool:
         try:
+            # check_obj_grasped already ANDs (aggregate contact) with (gripper
+            # closed). bilateral_contact implies aggregate contact, so ANDing
+            # it in here tightens the raw contact requirement to "== 2 finger
+            # bodies", not just "some gripper geom", without needing to
+            # duplicate the closed-gripper joint-position check locally.
+            #
+            # Deliberately does NOT also require object_sync: a bilateral
+            # (both-finger) contact with the gripper closed is treated as a
+            # grasp on its own. object_sync is reserved for object_grasped_safe
+            # (checking the grasp *stays* good), not for the raw grasp signal
+            # itself -- keeping them independent instead of object_grasped
+            # already implying object_sync, which would make object_grasped_safe
+            # a tautology (= object_grasped, giving zero extra information).
             return _bool(
-                OU.check_obj_grasped(
+                _object_gripper_bilateral_contact(name)
+                and OU.check_obj_grasped(
                     env, obj_name=name, threshold=GRIPPER_CLOSED_THRESHOLD
                 )
             )
@@ -1669,17 +1752,88 @@ def build_predicate_snapshot(
             and angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD
         )
 
-    def _object_sync(name: str) -> bool:
+    def _object_eef_relative_speeds(name: str) -> tuple[float, float]:
+        """Object's linear / angular speed relative to the end-effector's
+        velocity, falling back to absolute world-frame speed if either
+        velocity is unavailable.
+
+        Factored out so both _object_is_grasped (raw grasp signal) and
+        _object_sync (ongoing grasp-safety monitoring) can share
+        it without _object_is_grasped depending on its own smoothed output.
+        """
         linear_speed, angular_speed = _object_speeds(name)
-        if _object_is_grasped(name):
-            obj_vel = _object_linear_velocity(name)
-            eef_vel = _eef_linear_velocity()
-            if obj_vel is not None and eef_vel is not None:
-                linear_speed = float(np.linalg.norm(obj_vel - eef_vel))
-            obj_ang_vel = _object_angular_velocity(name)
-            eef_ang_vel = _eef_angular_velocity()
-            if obj_ang_vel is not None and eef_ang_vel is not None:
-                angular_speed = float(np.linalg.norm(obj_ang_vel - eef_ang_vel))
+        obj_vel = _object_linear_velocity(name)
+        eef_vel = _eef_linear_velocity()
+        if obj_vel is not None and eef_vel is not None:
+            linear_speed = float(np.linalg.norm(obj_vel - eef_vel))
+        obj_ang_vel = _object_angular_velocity(name)
+        eef_ang_vel = _eef_angular_velocity()
+        if obj_ang_vel is not None and eef_ang_vel is not None:
+            angular_speed = float(np.linalg.norm(obj_ang_vel - eef_ang_vel))
+        return linear_speed, angular_speed
+
+    def _object_sync(name: str) -> bool:
+        """Whether `name` is moving in sync with the end effector.
+
+        This is only a meaningful question while the object is actually
+        grasped (only then is it expected to track the gripper); callers
+        that also care about the not-grasped case should combine this with
+        their own object_grasped condition, e.g. `object_grasped and
+        _object_sync(name)`, the same way object_grasped_safe
+        does below. There is no separate "sync" concept for a non-grasped
+        object here -- the useful notion in that case is plain
+        object_stable, not sync-to-eef.
+        """
+        linear_speed, angular_speed = _object_eef_relative_speeds(name)
+        return _bool(
+            linear_speed < OBJ_LINEAR_STABLE_THRESHOLD
+            and angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD
+        )
+
+    def _object_support_reference(name: str) -> str | None:
+        """Name of the movable object currently supporting `name`, if any.
+
+        Only movable ``env.objects`` supports are returned (e.g. a basket the
+        object is resting in) since only those have a tracked velocity;
+        fixture supports are treated as stationary, matching prior behavior.
+        """
+        try:
+            _, object_contacts = _current_support_contacts(name)
+        except Exception:
+            return None
+        object_contacts = {
+            contact_name for contact_name in object_contacts if contact_name != str(name)
+        }
+        if not object_contacts:
+            return None
+        return sorted(object_contacts)[0]
+
+    def _object_stable_relative(name: str) -> bool:
+        """Like _object_stable, but measured relative to the object's current
+        support instead of the world frame.
+
+        This mirrors what _object_sync already does for a grasped
+        object relative to the end effector: if the support itself is moving (e.g.
+        a basket being carried that this object is resting inside), the
+        object should count as stable as long as it isn't sliding /
+        rattling relative to that support, even though its absolute speed
+        is nonzero. Without this, an object that settled inside a carried
+        receptacle right after being released spuriously fails
+        object_settled / trips object_settle_timeout once the receptacle is
+        picked up again, even though nothing about the object itself became
+        unstable.
+        """
+        linear_speed, angular_speed = _object_speeds(name)
+        support_name = _object_support_reference(name)
+        if support_name is not None:
+            obj_linear = _object_linear_velocity(name)
+            support_linear = _object_linear_velocity(support_name)
+            if obj_linear is not None and support_linear is not None:
+                linear_speed = float(np.linalg.norm(obj_linear - support_linear))
+            obj_angular = _object_angular_velocity(name)
+            support_angular = _object_angular_velocity(support_name)
+            if obj_angular is not None and support_angular is not None:
+                angular_speed = float(np.linalg.norm(obj_angular - support_angular))
         return _bool(
             linear_speed < OBJ_LINEAR_STABLE_THRESHOLD
             and angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD
@@ -1693,7 +1847,7 @@ def build_predicate_snapshot(
         return _bool(
             _object_supported(name)
             and _object_support_type_matches_any(name)
-            and _object_stable(name)
+            and _object_stable_relative(name)
             and _gripper_far_from_object(name)
         )
 
@@ -1707,25 +1861,17 @@ def build_predicate_snapshot(
         return {
             "prev_values": {},
             "prev_predicates": {},
-            "true_counts": {},
-            "false_counts": {},
             "forbidden_contact_candidate": None,
             "grasp_age": 0,
-            "grasp_safe_false_count": 0,
             "prev_object_grasped": False,
             "object_grasped_object": None,
             "object_grasp_candidate": None,
-            "object_grasp_candidate_count": 0,
-            "object_grasp_missing_count": 0,
             "robot_contact_raw_active": False,
             "robot_contact_raw_activated_frame": None,
             "robot_contact_raw_candidate": None,
-            "robot_contact_raw_candidate_count": 0,
             "robot_contact_raw_candidate_sources": [],
             "robot_contact_clean_candidate": None,
-            "robot_contact_clean_count": 0,
             "contamination_transfer_pair": None,
-            "contamination_transfer_count": 0,
             "contamination_transfer_source": None,
             "contamination_transfer_target": None,
             "contaminated_objects": [],
@@ -1738,7 +1884,6 @@ def build_predicate_snapshot(
             "settle_release_object": None,
             "initial_contact_pairs": None,
             "ignored_initial_contact_pairs": None,
-            "ignored_initial_contact_pair_missing_counts": {},
             "removed_initial_contact_pairs": set(),
             "robot_contact_raw_sources": [],
             "source_support_fixtures": [],
@@ -1957,45 +2102,17 @@ def build_predicate_snapshot(
     previous_grasped_object = monitor_state.get("object_grasped_object")
     if previous_grasped_object not in env_object_names:
         previous_grasped_object = None
-    previous_candidate = monitor_state.get("object_grasp_candidate")
-    previous_candidate_count = int(monitor_state.get("object_grasp_candidate_count", 0))
     raw_grasp_candidate = sorted(grasped_names)[0] if grasped_names else None
     grasp_candidate = _carrier_for_grasp_candidate(raw_grasp_candidate)
-    grasp_threshold = max(1, int(OBJECT_GRASPED_PERSISTENCE_FRAMES))
-    if grasp_candidate is None:
-        candidate_count = 0
-    elif str(grasp_candidate) == str(previous_candidate):
-        candidate_count = previous_candidate_count + 1
-    else:
-        candidate_count = 1
-    missing_count = int(monitor_state.get("object_grasp_missing_count", 0))
-    if grasp_candidate is not None and candidate_count >= grasp_threshold:
-        object_grasped = True
-        grasped_object = grasp_candidate
-        missing_count = 0
-    elif (
-        prev_object_grasped
-        and previous_grasped_object is not None
-        and grasp_candidate == previous_grasped_object
-    ):
-        object_grasped = True
-        grasped_object = previous_grasped_object
-        missing_count = 0
-    elif (
-        prev_object_grasped
-        and previous_grasped_object is not None
-        and grasp_candidate is None
-    ):
-        missing_count += 1
-        object_grasped = _bool(missing_count < grasp_threshold)
-        grasped_object = previous_grasped_object if object_grasped else None
-    else:
-        missing_count = 0
-        object_grasped = False
-        grasped_object = None
+    # No debounce: object_grasped tracks the raw grasp candidate directly.
+    # This used to require OBJECT_GRASPED_PERSISTENCE_FRAMES consecutive
+    # frames on both the rising and falling edge, to absorb flicker from the
+    # old aggregate-contact grasp check. That flicker source is now fixed at
+    # the raw-signal level (bilateral contact, see _object_is_grasped), so
+    # the debounce is no longer needed.
+    object_grasped = _bool(grasp_candidate is not None)
+    grasped_object = grasp_candidate if object_grasped else None
     monitor_state["object_grasp_candidate"] = grasp_candidate
-    monitor_state["object_grasp_candidate_count"] = candidate_count
-    monitor_state["object_grasp_missing_count"] = missing_count
     monitor_state["object_grasped_object"] = grasped_object
     if object_grasped and grasped_object is not None:
         active_object = grasped_object
@@ -2018,7 +2135,25 @@ def build_predicate_snapshot(
         source_support_fixtures = set(source_fixture_contacts)
         source_support_objects = set(source_object_contacts)
     object_released = _bool(
-        prev_object_grasped and not object_grasped and gripper_is_opening
+        prev_object_grasped
+        and not object_grasped
+        and (
+            gripper_is_opening
+            # covers the gripper retracting away from the object without ever
+            # opening its fingers (e.g. contact breaks as the arm moves off)
+            # while the object is resting on a support -- still a deliberate
+            # release, just one that doesn't show up as a finger-opening
+            # motion. Uses object_supported rather than object_stable: a
+            # freshly-dropped object is essentially never already resting on
+            # something at the exact frame contact breaks (it's still in
+            # free-fall), so this doesn't reopen the accidental-drop case,
+            # unlike a plain not-moving check which could read true for one
+            # frame before gravity builds up velocity.
+            or (
+                previous_grasped_object is not None
+                and _object_supported(previous_grasped_object)
+            )
+        )
     )
     awaiting_settle = _bool(monitor_state.get("awaiting_settle", False))
     if object_released:
@@ -2144,29 +2279,19 @@ def build_predicate_snapshot(
     removed_initial_contact_pairs = set(
         monitor_state.get("removed_initial_contact_pairs") or set()
     )
-    ignored_missing_counts = dict(
-        monitor_state.get("ignored_initial_contact_pair_missing_counts") or {}
-    )
+    # No grace: a pair is dropped from the ignored set the first frame it's
+    # absent (previously required CONTACT_PERSISTENCE_FRAMES consecutive
+    # missing frames, but that constant is 1, so this is behaviorally
+    # unchanged -- just without the now-unneeded counting machinery).
     next_ignored_initial_contact_pairs = set()
-    next_ignored_missing_counts = {}
-    missing_threshold = max(1, int(CONTACT_PERSISTENCE_FRAMES))
     for pair in ignored_initial_contact_pairs:
         if pair in current_contact_pairs:
             next_ignored_initial_contact_pairs.add(pair)
-            next_ignored_missing_counts[pair] = 0
             continue
-        missing_count = int(ignored_missing_counts.get(pair, 0)) + 1
-        if missing_count < missing_threshold:
-            next_ignored_initial_contact_pairs.add(pair)
-            next_ignored_missing_counts[pair] = missing_count
-        else:
-            removed_initial_contact_pairs.add(pair)
+        removed_initial_contact_pairs.add(pair)
     ignored_initial_contact_pairs = next_ignored_initial_contact_pairs
     monitor_state["ignored_initial_contact_pairs"] = set(ignored_initial_contact_pairs)
     monitor_state["removed_initial_contact_pairs"] = set(removed_initial_contact_pairs)
-    monitor_state[
-        "ignored_initial_contact_pair_missing_counts"
-    ] = next_ignored_missing_counts
 
     for contact_idx in range(contact_number):
         try:
@@ -2285,7 +2410,6 @@ def build_predicate_snapshot(
                 geom2_name = str(geom2)
             forbidden_contact_pairs.append([geom1_name, geom2_name])
 
-    true_counts = monitor_state.setdefault("true_counts", {})
     forbidden_candidate = (
         "|".join(
             sorted(
@@ -2297,18 +2421,11 @@ def build_predicate_snapshot(
         if forbidden_contact_pairs
         else None
     )
-    previous_forbidden_candidate = monitor_state.get("forbidden_contact_candidate")
-    if forbidden_candidate and forbidden_candidate == previous_forbidden_candidate:
-        forbidden_count = int(true_counts.get("forbidden_contact", 0)) + 1
-    elif forbidden_candidate:
-        forbidden_count = 1
-    else:
-        forbidden_count = 0
     monitor_state["forbidden_contact_candidate"] = forbidden_candidate
-    true_counts["forbidden_contact"] = forbidden_count
-    forbidden_contact = _bool(
-        forbidden_count >= max(1, int(CONTACT_PERSISTENCE_FRAMES))
-    )
+    # No debounce: forbidden_contact fires the same frame the pair appears
+    # (previously required CONTACT_PERSISTENCE_FRAMES consecutive frames, but
+    # that constant is 1, so this is behaviorally unchanged).
+    forbidden_contact = _bool(forbidden_candidate is not None)
 
     allowed_contact = _bool(
         robot_correct_manipulated_object_contact
@@ -2322,39 +2439,22 @@ def build_predicate_snapshot(
     object_stable = _bool(
         has_active_object and persistent_object_stable_by_name.get(str(obj_name), False)
     )
-    false_counts = monitor_state.setdefault("false_counts", {})
-    if not object_grasped:
-        false_counts["object_sync"] = 0
-        object_sync = _bool(has_active_object and _object_sync(obj_name))
-    else:
-        sync_false_count = int(false_counts.get("object_sync", 0))
-        sync_false_count = (
-            sync_false_count + 1
-            if not _bool(has_active_object and _object_sync(obj_name))
-            else 0
-        )
-        false_counts["object_sync"] = sync_false_count
-        object_sync = _bool(
-            sync_false_count < max(1, int(RELATIVE_SPEED_PERSISTENCE_FRAMES))
-        )
+    # No debounce: object_sync tracks the raw relative-velocity check directly.
+    # This used to require RELATIVE_SPEED_PERSISTENCE_FRAMES consecutive false
+    # frames before flipping, but object_sync is now an independent, meaningful
+    # signal (not folded into object_grasped's own definition -- see
+    # _object_is_grasped), so there's no known flicker source left to absorb.
+    object_sync = _bool(has_active_object and _object_sync(obj_name))
     object_upright = _bool(has_active_object and _object_is_upright(obj_name))
     raw_object_grasped_safe = _bool(object_grasped and object_sync)
     if object_grasped:
         monitor_state["grasp_age"] = int(monitor_state.get("grasp_age", 0)) + 1
     else:
         monitor_state["grasp_age"] = 0
-    if object_released:
-        safe_false_count = 0
-        object_grasped_safe = False
-    elif raw_object_grasped_safe:
-        safe_false_count = 0
-        object_grasped_safe = True
-    else:
-        safe_false_count = int(monitor_state.get("grasp_safe_false_count", 0)) + 1
-        object_grasped_safe = _bool(
-            safe_false_count < max(1, int(GRASP_SAFE_GRACE_FRAMES))
-        )
-    monitor_state["grasp_safe_false_count"] = safe_false_count
+    # No grace window either: object_grasped_safe tracks raw_object_grasped_safe
+    # directly (previously required GRASP_SAFE_GRACE_FRAMES consecutive false
+    # frames before flipping), for the same reason.
+    object_grasped_safe = _bool(not object_released and raw_object_grasped_safe)
     object_supported = _bool(has_active_object and _object_supported(obj_name))
     object_supported_on_correct = (
         _object_supported_on_correct(
@@ -2520,47 +2620,18 @@ def build_predicate_snapshot(
             f"{_contamination_entity_key(transfer_source)}->"
             f"{_contamination_entity_key(transfer_target)}"
         )
-    previous_transfer_pair = monitor_state.get("contamination_transfer_pair")
-    if transfer_pair and transfer_pair == previous_transfer_pair:
-        transfer_count = int(monitor_state.get("contamination_transfer_count", 0)) + 1
-    elif transfer_pair:
-        transfer_count = 1
-    else:
-        transfer_count = 0
-    monitor_state["contamination_transfer_pair"] = transfer_pair
-    monitor_state["contamination_transfer_count"] = transfer_count
-    monitor_state["contamination_transfer_source"] = (
-        _contamination_entity_key(transfer_source) if transfer_source else None
-    )
-    monitor_state["contamination_transfer_target"] = (
-        _contamination_entity_key(transfer_target) if transfer_target else None
-    )
     raw_contact_candidate = (
         "|".join(sorted(str(name) for name in raw_contact_sources_now))
         if raw_contact_sources_now
         else None
     )
-    previous_raw_contact_candidate = monitor_state.get("robot_contact_raw_candidate")
-    if (
-        raw_contact_candidate
-        and raw_contact_candidate == previous_raw_contact_candidate
-    ):
-        raw_contact_count = (
-            int(monitor_state.get("robot_contact_raw_candidate_count", 0)) + 1
-        )
-    elif raw_contact_candidate:
-        raw_contact_count = 1
-    else:
-        raw_contact_count = 0
-    pending_raw_sources = set(
-        str(name)
-        for name in (monitor_state.get("robot_contact_raw_candidate_sources") or [])
-    )
-    if raw_contact_sources_now:
-        pending_raw_sources.update(raw_contact_sources_now)
-    else:
-        pending_raw_sources.clear()
-    if raw_contact_count >= max(1, int(CONTACT_PERSISTENCE_FRAMES)):
+    pending_raw_sources = set(str(name) for name in raw_contact_sources_now)
+    # No debounce: robot_contact_raw_active activates the same frame raw
+    # contact is detected (previously required CONTACT_PERSISTENCE_FRAMES
+    # consecutive frames, but that constant is 1, so this is behaviorally
+    # unchanged). It stays sticky afterward regardless (only sanitized
+    # clears it) -- that part is unrelated to the debounce being removed.
+    if raw_contact_candidate is not None:
         robot_contact_raw_active = True
         if not previous_robot_contact_raw_active:
             robot_contact_raw_activated_frame = current_timestep
@@ -2569,20 +2640,16 @@ def build_predicate_snapshot(
         robot_contact_raw_active = False
         robot_contact_raw_sources.clear()
         pending_raw_sources.clear()
-        raw_contact_count = 0
         robot_contact_raw_activated_frame = None
         raw_contact_candidate = None
         transfer_pair = None
-        transfer_count = 0
         transfer_source = None
         transfer_target = None
         contaminated_objects.clear()
         contaminated_fixtures.clear()
-    monitor_state["robot_contact_raw_candidate_count"] = raw_contact_count
     monitor_state["robot_contact_raw_candidate"] = raw_contact_candidate
     monitor_state["robot_contact_raw_candidate_sources"] = sorted(pending_raw_sources)
     monitor_state["contamination_transfer_pair"] = transfer_pair
-    monitor_state["contamination_transfer_count"] = transfer_count
     monitor_state["contamination_transfer_source"] = (
         _contamination_entity_key(transfer_source) if transfer_source else None
     )
@@ -2617,29 +2684,12 @@ def build_predicate_snapshot(
         if robot_contact_clean_objects_now
         else None
     )
-    previous_robot_contact_clean_candidate = monitor_state.get(
-        "robot_contact_clean_candidate"
-    )
-    if (
-        robot_contact_clean_candidate
-        and robot_contact_clean_candidate == previous_robot_contact_clean_candidate
-    ):
-        robot_contact_clean_count = (
-            int(monitor_state.get("robot_contact_clean_count", 0)) + 1
-        )
-    elif robot_contact_clean_candidate:
-        robot_contact_clean_count = 1
-    else:
-        robot_contact_clean_count = 0
-    monitor_state["robot_contact_clean_count"] = robot_contact_clean_count
-    monitor_state["robot_contact_clean_candidate"] = robot_contact_clean_candidate
-    if transfer_pair and transfer_count >= max(1, int(CONTACT_PERSISTENCE_FRAMES)):
+    # No debounce here either -- see above.
+    if transfer_pair is not None:
         _mark_contaminated(transfer_target)
     monitor_state["contaminated_objects"] = sorted(contaminated_objects)
     monitor_state["contaminated_fixtures"] = sorted(contaminated_fixtures)
-    robot_contact_clean = _bool(
-        robot_contact_clean_count >= max(1, int(CONTACT_PERSISTENCE_FRAMES))
-    )
+    robot_contact_clean = _bool(robot_contact_clean_candidate is not None)
     robot_contact_clean_objects = (
         sorted(robot_contact_clean_objects_now) if robot_contact_clean else []
     )
@@ -5230,7 +5280,7 @@ def build_predicate_snapshot(
                 content_target_fixtures,
                 content_target_objects,
             )
-            raw_stable = _object_stable(str(content_name))
+            raw_stable = _object_stable_relative(str(content_name))
             if supported:
                 content_supported_names.append(content_name)
                 if content_is_solid and _content_supported_by_target_object(
@@ -5769,21 +5819,11 @@ def build_predicate_snapshot(
                     _contacted_fixture_name = _fname
                     break
             break
-    # bidirectional smoothing for robot_fixture_contact
-    _rfc_on_count = int(monitor_state.get("rfc_on_count", 0))
-    _rfc_off_count = int(monitor_state.get("rfc_off_count", 0))
-    _rfc_smoothed = bool(monitor_state.get("rfc_smoothed", False))
-    if _robot_fixture_contact_raw:
-        _rfc_on_count += 1
-        _rfc_off_count = 0
-    else:
-        _rfc_off_count += 1
-        _rfc_on_count = 0
-    if not _rfc_smoothed and _rfc_on_count >= max(1, int(CONTACT_PERSISTENCE_FRAMES)):
-        _rfc_smoothed = True
-    elif _rfc_smoothed and _rfc_off_count >= max(1, int(CONTACT_PERSISTENCE_FRAMES)):
-        _rfc_smoothed = False
-    robot_fixture_contact = _bool(_rfc_smoothed)
+    # No debounce: robot_fixture_contact tracks the raw contact check
+    # directly (previously required CONTACT_PERSISTENCE_FRAMES consecutive
+    # frames on/off, but that constant is 1, so this is behaviorally
+    # unchanged).
+    robot_fixture_contact = _bool(_robot_fixture_contact_raw)
 
     # track active fixture across frames; retain last known name when not in contact
     _prev_active_fixture = monitor_state.get("active_fixture_contact_name")
@@ -5884,21 +5924,11 @@ def build_predicate_snapshot(
             except Exception:
                 _fixture_obstacle_geom_name = str(_other)
             break
-    # bidirectional smoothing for fixture_obstacle_contact
-    _foc_on_count = int(monitor_state.get("foc_on_count", 0))
-    _foc_off_count = int(monitor_state.get("foc_off_count", 0))
-    _foc_smoothed = bool(monitor_state.get("foc_smoothed", False))
-    if _fixture_obstacle_contact_raw:
-        _foc_on_count += 1
-        _foc_off_count = 0
-    else:
-        _foc_off_count += 1
-        _foc_on_count = 0
-    if not _foc_smoothed and _foc_on_count >= max(1, int(CONTACT_PERSISTENCE_FRAMES)):
-        _foc_smoothed = True
-    elif _foc_smoothed and _foc_off_count >= max(1, int(CONTACT_PERSISTENCE_FRAMES)):
-        _foc_smoothed = False
-    fixture_obstacle_contact = _bool(_foc_smoothed)
+    # No debounce: fixture_obstacle_contact tracks the raw contact check
+    # directly (previously required CONTACT_PERSISTENCE_FRAMES consecutive
+    # frames on/off, but that constant is 1, so this is behaviorally
+    # unchanged).
+    fixture_obstacle_contact = _bool(_fixture_obstacle_contact_raw)
 
     # continue_fixture_open / continue_fixture_close
     continue_fixture_open = _bool(robot_fixture_contact and fixture_is_opening)
@@ -6094,12 +6124,6 @@ def build_predicate_snapshot(
     if active_fixture_contact_name is not None and _curr_jpos is not None:
         _prev_jpos_map[str(active_fixture_contact_name)] = _curr_jpos
     monitor_state["prev_fixture_joint_pos"] = _prev_jpos_map
-    monitor_state["rfc_on_count"] = _rfc_on_count
-    monitor_state["rfc_off_count"] = _rfc_off_count
-    monitor_state["rfc_smoothed"] = _rfc_smoothed
-    monitor_state["foc_on_count"] = _foc_on_count
-    monitor_state["foc_off_count"] = _foc_off_count
-    monitor_state["foc_smoothed"] = _foc_smoothed
 
     sections = {
         "predicates": {name: _entry(name, value) for name, value in predicates.items()}
@@ -6127,11 +6151,8 @@ def build_predicate_snapshot(
         "raw_grasped_objects": sorted(str(name) for name in grasped_names),
         "raw_contacted_objects": sorted(str(name) for name in robot_contacted_names),
         "object_grasp_candidate": monitor_state.get("object_grasp_candidate"),
-        "object_grasp_candidate_count": candidate_count,
-        "object_grasp_missing_count": missing_count,
         "object_grasped_object": grasped_object,
         "safe_grasp_object": active_object if object_grasped_safe else None,
-        "grasp_safe_false_count": monitor_state.get("grasp_safe_false_count", 0),
         "released_objects_waiting_to_settle": [evidence_settle_object]
         if (awaiting_settle or object_settle_timeout) and evidence_settle_object
         else [],
@@ -6145,10 +6166,8 @@ def build_predicate_snapshot(
         "release_object_settle_timeout": release_object_settle_timeout,
         "object_settle_timeout": object_settle_timeout,
         "forbidden_contact_candidate": forbidden_candidate,
-        "robot_contact_raw_candidate_count": raw_contact_count,
         "robot_contact_raw_candidate": raw_contact_candidate,
         "contamination_transfer_pair": transfer_pair,
-        "contamination_transfer_count": transfer_count,
         "contamination_transfer_source": (
             _contamination_entity_key(transfer_source) if transfer_source else None
         ),
@@ -6157,7 +6176,6 @@ def build_predicate_snapshot(
         ),
         "robot_contact_raw_activated_frame": robot_contact_raw_activated_frame,
         "robot_contact_clean_candidate": robot_contact_clean_candidate,
-        "robot_contact_clean_count": robot_contact_clean_count,
         "correct_manipulated_object_original_support_contact": correct_manipulated_object_original_support_contact,
         "source_support_fixtures_for_active_object": sorted(
             active_source_fixture_names
@@ -6439,7 +6457,6 @@ def build_predicate_snapshot(
             ),
             "raw_grasped_objects": sorted(str(name) for name in grasped_names),
             "object_grasp_candidate": monitor_state.get("object_grasp_candidate"),
-            "object_grasp_candidate_count": candidate_count,
             "target_fixtures": sorted(_target_fixture_names()),
             "receive_objects": sorted(target_object_names),
             "target_fixtures_by_object": {

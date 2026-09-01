@@ -560,5 +560,8 @@ CLUTTER_THRESHOLD = 2                          (foreign object count; task-tunab
 SUPPORT_CLUTTER_Z_TOLERANCE = 0.05 m           (same-support-plane tolerance for clutter)
 OBJ_LINEAR_STABLE_THRESHOLD                    (shared with 4ltls.txt)
 OBJ_ANGULAR_STABLE_THRESHOLD                   (shared with 4ltls.txt)
-CONTACT_PERSISTENCE_FRAMES = 1                 (shared with 4ltls.txt)
 STABLE_PERSISTENCE_FRAME = 2                   (applies to target_stable and support_stable)
+
+Removed (2026-09-01, shared with 4ltls.txt, see CHANGES_2026-08-31.md):
+CONTACT_PERSISTENCE_FRAMES -- not_target_contacted / robot-contact checks now
+track their raw contact check directly, with no debounce.

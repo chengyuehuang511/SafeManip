@@ -19,8 +19,10 @@ trajectory_horizon=...)` once per step, where `raw_env` is the underlying
 it's called, plus a handful of small accumulators it keeps on `self`
 (`_privileged_history`, `_privileged_static_cache`, `_privileged_prev_eef_pose`,
 `_privileged_prev_time`) and one more kept by the predicate module itself
-(`_predicate_monitor_state`, set by `robocasa.environments.kitchen.predicates
-.build_predicate_snapshot`). Critically, it does **not** read the action the
+(`_predicate_monitor_state`, set by `build_predicate_snapshot` -- as of
+2026-09-01, SafeManip's own `monitor.sim.robocasa.predicates.build_predicate_snapshot`,
+monkeypatched onto `Kitchen.get_privileged_information` by `monitor.sim.robocasa.kitchen_ext`,
+not upstream robocasa's; see make_env below). Critically, it does **not** read the action the
 policy took to get there -- only the resulting simulator state. That means:
 
   - We can call the *exact same* `env.get_privileged_information()` method
@@ -29,7 +31,7 @@ policy took to get there -- only the resulting simulator state. That means:
     instead of a live rollout step, and get identical predicate-computation
     code paths -- not a reimplementation.
   - No `action` column is needed. Confirmed by inspection of
-    `robocasa/robocasa/environments/kitchen/predicates.py`: no predicate
+    `monitor/sim/robocasa/predicates.py` (SafeManip's own copy, see above): no predicate
     reads `self.action`/any action-like attribute; every predicate is a
     function of qpos/qvel/contacts/site & body poses etc., all of which are
     fully determined by the flattened MuJoCo state we already load per frame.
@@ -47,7 +49,7 @@ policy took to get there -- only the resulting simulator state. That means:
 CRITICAL FIX -- `env.timestep` must be advanced manually, or every
 persistence-threshold predicate silently breaks:
 -----------------------------------------------------------------------
-`robocasa.environments.kitchen.predicates.build_predicate_snapshot` guards
+SafeManip's `monitor/sim/robocasa/predicates.py`'s `build_predicate_snapshot` guards
 its persisted `_predicate_monitor_state` with a "did the episode restart"
 check: it reads `dynamic_info["task"]["timestep"]` (== `env.timestep`) and
 wipes the whole monitor_state dict back to fresh whenever
@@ -101,7 +103,7 @@ frame" == `n_action_steps` raw simulator steps.
 
 This matters more than just "the frame axis is coarser live" -- it's a real
 correctness issue, verified by reading the actual persistence-counter code in
-`robocasa/robocasa/environments/kitchen/predicates.py`, not assumed:
+SafeManip's own `monitor/sim/robocasa/predicates.py`, not assumed:
 **every persistence/settle-timeout counter in that file increments by
 exactly 1 per *call* to `build_predicate_snapshot`
 (`get_privileged_information()`'s callee), not per elapsed raw frame or
@@ -207,6 +209,19 @@ _desanitize_sys_path()
 import numpy as np  # noqa: E402
 
 
+def _ensure_safemanip_on_syspath():
+    """Put SafeManip's own package roots on sys.path so `import monitor...`
+    resolves, without doing it at module-import time (this file is meant to
+    be importable -- e.g. by run_monitor_on_privileged.py -- without forcing
+    robocasa/robosuite to be importable too; only call sites that actually
+    touch the simulator call this)."""
+    repo_root = str(Path(__file__).resolve().parents[2])  # .../SafeManip
+    monitor_pkg_root = str(Path(__file__).resolve().parents[1])  # .../SafeManip/SafeManip
+    for p in (monitor_pkg_root, repo_root):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+
+
 DEFAULT_DATASET_ROOT = "~/flash/datasets/robocasa/v1.0/target"
 THIS_DIR = Path(__file__).parent
 DEFAULT_OUTPUT_ROOT = THIS_DIR / "output"
@@ -223,12 +238,19 @@ _PRIVILEGED_ACCUMULATOR_ATTRS = (
 )
 
 # Every module-level persistence/onset/grace-period constant in
-# robocasa/environments/kitchen/predicates.py whose name contains
-# "FRAME"/"FRAMES" (confirmed by grep -- exactly 15, no others hiding under a
-# different name; double-checked the remaining non-FRAME-named constants:
-# CLUTTER_THRESHOLD counts *objects*, not frames, and
-# TARGET_REGION_BLOCKED_THRESHOLD is defined but never actually used anywhere
-# in the file). Each increments by 1 per *call* to build_predicate_snapshot
+# SafeManip's own monitor/sim/robocasa/predicates.py whose name contains
+# "FRAME"/"FRAMES" (confirmed by grep). get_privileged_information() is
+# monkeypatched (via monitor.sim.robocasa.kitchen_ext, imported in make_env
+# below) to call *this* module's build_predicate_snapshot, not upstream
+# robocasa's -- so these constants must be patched here, not on
+# robocasa.environments.kitchen.predicates (patching the upstream module
+# would silently do nothing, since SafeManip's copy has its own separate
+# module globals). As of 2026-09-01, CONTACT_PERSISTENCE_FRAMES,
+# OBJECT_GRASPED_PERSISTENCE_FRAMES, RELATIVE_SPEED_PERSISTENCE_FRAMES, and
+# GRASP_SAFE_GRACE_FRAMES no longer exist at all (removed along with the
+# debounce logic that read them -- those predicates now track their raw
+# signal directly, so there's nothing left to scale); the remaining 11 are
+# listed below. Each increments by 1 per *call* to build_predicate_snapshot
 # (see module docstring's granularity-mismatch section) -- scaling all of
 # them by `call_stride` before extraction, while still calling
 # get_privileged_information() every single raw frame, gives correct
@@ -236,10 +258,6 @@ _PRIVILEGED_ACCUMULATOR_ATTRS = (
 # simultaneously (better than the previous skip-based approach, which traded
 # resolution for correctness instead of getting both).
 _PREDICATES_FRAME_CONSTANTS = (
-    "CONTACT_PERSISTENCE_FRAMES",
-    "OBJECT_GRASPED_PERSISTENCE_FRAMES",
-    "RELATIVE_SPEED_PERSISTENCE_FRAMES",
-    "GRASP_SAFE_GRACE_FRAMES",
     "STABLE_PERSISTENCE_FRAME",
     "CONTENT_STABLE_PERSISTENCE_FRAMES",
     "FIXTURE_OUTPUT_IDLE_FRAMES",
@@ -255,19 +273,20 @@ _PREDICATES_FRAME_CONSTANTS = (
 
 
 def _scale_predicates_frame_constants(call_stride):
-    """Monkeypatch predicates.py's module-level constants (bare globals,
-    referenced by name inside its own functions -- NOT imported elsewhere via
-    `from ... import NAME`, so setting the attribute on the module object
-    here *does* affect every subsequent call into predicates.py, since
-    Python resolves a bare global name from the enclosing module's __dict__
-    at call time, not at function-definition time). Returns the original
-    values so they can be restored afterward -- this mutates shared,
-    importable state for the whole process, so every caller of this must
-    pair it with `_restore_predicates_frame_constants`.
+    """Monkeypatch SafeManip's predicates.py's module-level constants (bare
+    globals, referenced by name inside its own functions -- NOT imported
+    elsewhere via `from ... import NAME`, so setting the attribute on the
+    module object here *does* affect every subsequent call into
+    predicates.py, since Python resolves a bare global name from the
+    enclosing module's __dict__ at call time, not at function-definition
+    time). Returns the original values so they can be restored afterward --
+    this mutates shared, importable state for the whole process, so every
+    caller of this must pair it with `_restore_predicates_frame_constants`.
 
     Only meaningful when call_stride > 1; at call_stride == 1 this is a
     no-op (scale factor 1)."""
-    import robocasa.environments.kitchen.predicates as predicates_mod
+    _ensure_safemanip_on_syspath()
+    import monitor.sim.robocasa.predicates as predicates_mod
 
     originals = {}
     for name in _PREDICATES_FRAME_CONSTANTS:
@@ -278,7 +297,8 @@ def _scale_predicates_frame_constants(call_stride):
 
 
 def _restore_predicates_frame_constants(originals):
-    import robocasa.environments.kitchen.predicates as predicates_mod
+    _ensure_safemanip_on_syspath()
+    import monitor.sim.robocasa.predicates as predicates_mod
 
     for name, original in originals.items():
         setattr(predicates_mod, name, original)
@@ -334,6 +354,14 @@ def make_env(dataset_dir):
     conventions); this is ~10 lines, not worth an awkward sys.path hack."""
     import robosuite
     import robocasa.utils.lerobot_utils as LU
+
+    _ensure_safemanip_on_syspath()
+    import monitor.sim.robocasa.kitchen_ext  # noqa: F401  (side effect: makes
+    # Kitchen.get_privileged_information call SafeManip's own
+    # build_predicate_snapshot, not upstream robocasa's -- must be imported
+    # before get_privileged_information() is first called, which the
+    # monkeypatch being applied on the class rather than the instance makes
+    # safe to do here, after robosuite.make() below)
 
     env_meta = LU.get_env_metadata(dataset_dir)
     env_kwargs = dict(env_meta["env_kwargs"])
@@ -545,11 +573,7 @@ def run_monitor_on(privileged_json_path, output_path, call_stride=1):
     *recorded* predicate-value sequence for settle-timeout LTL properties --
     see _scale_settle_timeout_for_monitor's docstring) so it stays consistent
     with the scaling already applied to predicates.py during extraction."""
-    repo_root = str(Path(__file__).resolve().parents[2])  # .../SafeManip
-    monitor_pkg_root = str(Path(__file__).resolve().parents[1])  # .../SafeManip/SafeManip
-    for p in (monitor_pkg_root, repo_root):
-        if p not in sys.path:
-            sys.path.insert(0, p)
+    _ensure_safemanip_on_syspath()
     from monitor.run_monitor_on_privileged import monitor_rollout
 
     call_stride = max(1, int(call_stride))

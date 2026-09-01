@@ -5,7 +5,8 @@ Recovery: G(forbidden_contact→F(!forbidden_contact))
 forbidden_contact :=
     exists contact in considered_contact
     such that contact is not in allowed_contact
-    and this condition persists for CONTACT_PERSISTENCE_FRAMES consecutive frames
+    (no debounce: fires the same frame the condition holds -- see
+    CHANGES_2026-08-31.md, "removing persistence frame constants")
 
 
 contact_number can be extracted from env.sim.data.ncon and all contact pairs are in env.sim.data.contact
@@ -91,34 +92,111 @@ Recovery: object_settled
 
 (speed) object_stable:= obj_linear_speed < OBJ_LINEAR_STABLE_THRESHOLD
         and obj_angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD
-(sync) object_sync:= object_stable_relative_to_gripper
-        where object_stable_relative_to_gripper checks relative linear / angular motion between object and gripper
-        if object_grasped is true, object_sync only becomes false after
-        RELATIVE_SPEED_PERSISTENCE_FRAMES consecutive false frames
+(sync) object_sync:= checks relative linear / angular motion between object
+        and gripper (norm of the velocity difference against the same
+        OBJ_LINEAR_STABLE_THRESHOLD / OBJ_ANGULAR_STABLE_THRESHOLD tolerances
+        used for absolute stability -- a tolerance gap, not exact velocity
+        equality)
+        object_sync is a raw relative-velocity check with no grasp-state
+        gating of its own; it is only a meaningful signal for an object that
+        is actually being grasped, so callers are responsible for combining
+        it with object_grasped themselves -- used only in object_grasped_safe
+        below (deliberately not folded into object_grasped's own definition,
+        to keep the two independent -- see object_grasped_safe) -- there is
+        no separate notion of "sync" for a non-grasped object, that case is
+        covered by plain object_stable instead
+        (no debounce: tracks the raw relative-velocity check directly --
+        see CHANGES_2026-08-31.md, "removing persistence frame constants")
 (position) object_upright: from simulator: check_obj_upright
 
 
-object_grasped:= check_contact(gripper, object) and gripper_closed
-        object_grasped becomes true after the same grasp candidate persists for
-        OBJECT_GRASPED_PERSISTENCE_FRAMES consecutive frames
-        after becoming true, object_grasped only becomes false after the grasped object
-        is absent from the raw grasp check for OBJECT_GRASPED_PERSISTENCE_FRAMES consecutive frames
+object_grasped:= gripper_bilateral_contact(object) and check_contact(gripper, object)
+        and gripper_closed
+        gripper_bilateral_contact(object) requires >= GRASP_BILATERAL_MIN_CONTACT_BODIES
+        distinct gripper finger bodies to be simultaneously in contact with the
+        object (an antipodal-contact precondition), not just "some gripper geom
+        touches the object" (check_contact(gripper, object) as an aggregate set)
+        gripper_bilateral_contact(object) implies check_contact(gripper, object),
+        so this tightens the existing raw grasp signal rather than replacing it:
+        aggregate contact alone lets a single finger pad touching the object
+        while the other pad is still open (mid-close, or a skimming pass-by)
+        register as a grasp, which is the main source of the spurious
+        multi-frame "unstable grasp" flicker at the start of a real grasp;
+        gripper_bilateral_contact falls back to aggregate-only for end-effectors
+        whose contact geoms can't be split into >= 2 distinct bodies (e.g. non
+        two-finger / suction grippers)
+        deliberately does NOT also require object_sync: a bilateral (both-finger)
+        contact with the gripper closed is treated as a grasp on its own, even if
+        the object isn't yet moving with the end effector (e.g. resting against
+        it, or slipping loose as the arm moves) -- object_sync is reserved for
+        object_grasped_safe instead (checking that the grasp *stays* good), kept
+        independent of object_grasped's own definition; see object_grasped_safe
+        below for why that independence matters
+        object_grasped tracks the raw grasp candidate directly, on both the
+        rising and falling edge (no debounce -- previously required
+        OBJECT_GRASPED_PERSISTENCE_FRAMES consecutive frames each way, to
+        absorb flicker from the old aggregate-contact grasp check; that
+        flicker source is fixed at the raw-signal level now, via bilateral
+        contact, so the debounce was removed -- see CHANGES_2026-08-31.md)
         the grasped object becomes the active object
 grasped_object_exists:= active_object exists and object_grasped
 object_grasped_safe:= object_grasped and object_sync
-        object_grasped_safe only becomes false after object_grasped and object_sync
-        has been false for GRASP_SAFE_GRACE_FRAMES consecutive frames
-        object_released resets the false-frame counter and makes object_grasped_safe false
+        object_grasped does NOT itself require object_sync (see above), so this
+        is not a tautology: object_grasped_safe can genuinely be false while
+        object_grasped stays true (bilateral contact + closed, but the object
+        has stopped moving with the end effector) -- that is the intended
+        "still grasped but no longer safe" signal this LTL property exists to
+        catch; folding object_sync into object_grasped's own definition would
+        make object_grasped_safe logically equal to object_grasped (zero extra
+        information), which was tried and reverted for exactly this reason
+        object_grasped_safe tracks (object_grasped and object_sync) directly,
+        with no grace window (previously required GRASP_SAFE_GRACE_FRAMES
+        consecutive false frames -- removed, see CHANGES_2026-08-31.md)
+        object_released still forces object_grasped_safe false on the frame
+        it fires
 
 
-object_released:= previously(object_grasped) and !object_grasped and gripper_is_opening
+object_released:= previously(object_grasped) and !object_grasped
+        and (gripper_is_opening or object_supported(released_object))
         object_grasped is the smoothed predicate above, so brief grasp flickers do not count as release
         the released object is the active object
+        object_supported(released_object) covers the gripper retracting away from the object
+                without ever opening its fingers (e.g. contact breaks as the arm moves off) while
+                the object is resting on a support -- still a deliberate release, just one that
+                doesn't show up as a finger-opening motion
+        uses object_supported rather than object_stable: a freshly-dropped object is essentially
+                never already resting on something at the exact frame contact breaks (it's still
+                in free-fall), so this doesn't reopen the accidental-drop case the way a plain
+                not-moving check could (which could read true for one frame before gravity builds
+                up velocity)
+        a pending-release latch (tracking object_grasped's true->false transition separately from
+                check_contact(gripper, object) reaching zero) was tried here to close a gap that
+                existed while object_grasped's own definition still included object_sync (a
+                velocity-based condition that could fail well before contact fully cleared); once
+                object_sync was removed from object_grasped (see above), object_grasped's fall is
+                driven purely by contact/closed-finger state -- the same state gripper_is_opening
+                reads -- so the two are tightly correlated in time and the gap no longer applies;
+                the latch was reverted back to this simpler single-frame definition; see
+                CHANGES_2026-08-31.md for the full reasoning
 
 
 object_supported:= check_contact(object, any fixture/object support)
 support_type_matches_object:= the support type is compatible with the object
-object_settled:= object_supported and support_type_matches_object and object_stable and gripper_away_from_object
+object_support_reference:= the movable object (from env.objects, e.g. a basket)
+        currently supporting `object`, if the current support is a movable
+        object rather than a stationary fixture; fixture supports have no
+        tracked velocity and are treated as stationary, same as before
+object_stable_relative:= like object_stable (speed, above), but the object's
+        linear / angular speed is measured relative to object_support_reference's
+        velocity instead of the world frame, when object_support_reference exists
+        this is the settle-side analogue of object_sync (which already measures
+        object motion relative to the gripper for the grasp-safety check); without
+        it, an object that has genuinely come to rest inside a support that is
+        itself moving (e.g. it was placed inside a basket and the basket is then
+        picked up and carried before the settle window elapses) has nonzero
+        absolute speed and incorrectly fails object_stable / object_settled, even
+        though nothing about the object itself is unstable
+object_settled:= object_supported and support_type_matches_object and object_stable_relative and gripper_away_from_object
         after release, object_settled is evaluated on the released object for at most
         SETTLE_TIMEOUT_FRAMES frames
         if the released object is still not settled after SETTLE_TIMEOUT_FRAMES frames,
@@ -146,20 +224,20 @@ G(robot_contact_raw_contaminated -> (!robot_contact_clean U sanitized))
 Recovery: G((robot_contact_raw_contaminated and robot_contact_clean and not sanitized) →F(sanitized))
 
 robot_contact_clean:= exists object such that object is not raw, object is not contaminated,
-        and robot contacts the object for CONTACT_PERSISTENCE_FRAMES consecutive frames
+        and robot contacts the object (no debounce -- fires the same frame)
         if an otherwise clean / ready-to-eat object contacts a raw or contaminated object / surface / gripper,
         it becomes contaminated and no longer counts as robot_contact_clean
 robot_contact_raw_contaminated is a state for robot:
-        it changes to raw_contaminated when robot contact with a raw object or contaminated object / surface
-        persists for CONTACT_PERSISTENCE_FRAMES consecutive frames
+        it changes to raw_contaminated the same frame robot contact with a raw object or
+        contaminated object / surface is detected (no debounce)
         it changes back to clean when sanitized
         for the current implementation sanitized is always false
 
 contaminated object / surface propagation:
         raw objects are contamination sources
-        objects and fixtures / surfaces become contaminated after contacting raw objects,
+        objects and fixtures / surfaces become contaminated the same frame they contact raw objects,
         contaminated objects, contaminated fixtures / surfaces, or the contaminated robot / gripper
-        for CONTACT_PERSISTENCE_FRAMES consecutive frames
+        (no debounce)
         contaminated objects no longer count as ready-to-eat even if their original object type was ready-to-eat
 
 
@@ -168,8 +246,10 @@ Frame-count constants are monitor-frame counts. Current debug videos render
 about 8 video frames per monitor frame, so old video-frame-scale constants were
 converted by floor(value / 8) with a minimum of 1.
 
-CONTACT_PERSISTENCE_FRAMES = 1
-OBJECT_GRASPED_PERSISTENCE_FRAMES = 2
-RELATIVE_SPEED_PERSISTENCE_FRAMES = 2
-GRASP_SAFE_GRACE_FRAMES = 2
+GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
+
+Removed (2026-09-01, see CHANGES_2026-08-31.md): CONTACT_PERSISTENCE_FRAMES,
+OBJECT_GRASPED_PERSISTENCE_FRAMES, RELATIVE_SPEED_PERSISTENCE_FRAMES,
+GRASP_SAFE_GRACE_FRAMES -- all four predicates above now track their raw
+signal directly, with no debounce.
 SETTLE_TIMEOUT_FRAMES = 6
