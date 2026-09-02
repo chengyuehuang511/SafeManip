@@ -33,6 +33,10 @@ const tdEpisodeView = el("#td-episode-view");
 const tdVideo = el("#td-video");
 const tdOriginalVideo = el("#td-original-video");
 const tdSyncState = { wired: false };
+// The original dataset video is native 20 fps with no frame skip, so its
+// frame index equals the monitor frame index 1:1 (see selectTrainingEpisode,
+// which passes ratio=1 for it).
+const TRAINING_ORIGINAL_FPS = 20;
 
 // Plain `v == null ? fallback : v` instead of `??` -- confirmed via `node
 // --check` that `??` breaks parsing in at least one JS runtime this viewer
@@ -492,7 +496,19 @@ async function loadTrainingMonitor(task, episode, method) {
 
 function renderTrainingMonitor(detail) {
   setAnnotationContext(detail.annotation_task_key || `training__${detail.task}`, detail.episode);
-  setActiveVideos(tdVideo, null, null); // one video here -- the training reconstruction itself
+  // Two videos on this tab, and both should follow a marker click. The
+  // reconstruction is `primary` (its marker time_s is computed against its own
+  // fps/ratio); the *original* dataset video goes in the second slot, which
+  // seeks by monitor_frame / fps -- correct here because the original is native
+  // 20 fps with no frame skip, so 1 monitor frame == 1 video frame (the same
+  // ratio=1 that wireFrameReadoutFor uses for it in selectTrainingEpisode).
+  // Registering it matters: seekTo sets suppressSeekSync, which deliberately
+  // stops wireSync from mirroring the jump, so a video left out of these slots
+  // simply does not move.
+  const tdOriginalActive = tdOriginalVideo && tdOriginalVideo.getAttribute("src")
+    ? tdOriginalVideo
+    : null;
+  setActiveVideos(tdVideo, tdOriginalActive, TRAINING_ORIGINAL_FPS);
 
   el("#td-monitor-meta").textContent =
     `fps=${detail.fps} · video frames≈${orUnknown(detail.video_frame_count)} · ` +

@@ -494,7 +494,27 @@ video {
   transform: translateX(-50%);
   pointer-events: none;
 }
+/* Invisible click target over the dashed line. The line itself is a 1.5px
+   ::after with pointer-events:none, and the button's own box stops at the
+   label above it -- so clicking the line (the obvious thing to aim at, since
+   it is what visually points at the frame) did nothing, and only the small
+   label/glyph box was hittable. This widens the hit area to the whole line
+   without drawing anything. Pointer events on a positioned pseudo-element
+   target its originating element, so this reuses .bar-mark's own click
+   handler (seekTo) with no JS change. */
+.bar-mark::before {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 11px;
+  height: var(--dash-height, 16px);
+  transform: translateX(-50%);
+  background: transparent;
+}
 .bar-mark:hover { filter: brightness(1.4); z-index: 5; }
+/* thicken + solidify the line on hover so it reads as clickable */
+.bar-mark:hover::after { border-left-style: solid; border-left-width: 2.5px; }
 
 /* whole-LTL summary bar only: shared occurrence-level marks (see
    computeMarkTierLayout + markTimeline in app.js) */
