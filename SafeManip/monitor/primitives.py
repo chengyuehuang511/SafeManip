@@ -196,11 +196,18 @@ def object_upright(obj: Any = None, **kwargs) -> bool:
     return _predicate_value("object_upright", False, **kwargs)
 
 
+def grasp_point_stable(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    # Defaults True: absent a recorded value the criterion has no opinion, and
+    # object_grasped_safe's fallback below ANDs it with object_grasped anyway.
+    return _predicate_value("grasp_point_stable", True, **kwargs)
+
+
 def object_grasped_safe(obj: Any = None, **kwargs) -> bool:
     obj = _resolve_entity(obj, kwargs)
     return _predicate_value(
         "object_grasped_safe",
-        object_grasped(obj, **kwargs) and object_sync(obj, **kwargs),
+        object_grasped(obj, **kwargs) and grasp_point_stable(obj, **kwargs),
         **kwargs,
     )
 

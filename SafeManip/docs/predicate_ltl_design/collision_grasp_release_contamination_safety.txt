@@ -107,6 +107,45 @@ Recovery: object_settled
         covered by plain object_stable instead
         (no debounce: tracks the raw relative-velocity check directly --
         see CHANGES_2026-08-31.md, "removing persistence frame constants")
+        object_sync no longer gates object_grasped_safe (see item 10 in
+        CHANGES_2026-08-31.md): it measures the object's body-origin velocity
+        against the eef site's, so for an object whose centre sits a distance r
+        from the grasp, wrist rotation w contributes |w x r| of relative
+        velocity with no slip at all, and the check fires on ordinary carrying
+        motion. It is still computed and reported as an informational signal.
+(grip point) grasp_point_stable:= the material point of the object under the
+        fingers has not migrated across the object, since the grasp was
+        established, by more than GRASP_POINT_DRIFT_THRESHOLD
+        the grip point is the centroid of the finger/object contact points
+        expressed in the OBJECT's own frame, so hand translation and rotation
+        cancel out and only sliding-through-the-fingers registers; the baseline
+        is latched at grasp onset and re-latched when the grasped object changes
+        the bound is scaled to the finger pad rather than chosen: the Panda pad
+        collision boxes are half-extents 0.008 x 0.004 x 0.008, i.e. a
+        1.6 cm x 1.6 cm contact face, so migration past ~1.6 cm means the
+        original grip point has left the pad -- "the spot I gripped is no longer
+        under my finger"
+        the drift must stay over the bound for GRASP_POINT_DRIFT_PERSISTENCE_FRAMES
+        consecutive RAW frames before the grasp counts as slipping -- the measured
+        drift flickers a single frame at a time around the threshold (on
+        ArrangeBreadBasket ep 2, 9 over-threshold frames arrived as 8 separate
+        runs, 7 of them one frame long). This is a deliberate exception to the
+        no-debounce direction of CHANGES_2026-08-31.md item 9: it filters
+        contact-position noise between adjacent raw simulator frames, not a fixed
+        raw-signal bug, so it is counted in raw frames and NOT call_stride-scaled
+        no opinion while anything other than the gripper is touching the object:
+        a surface the object is being placed on pushes it, and that push can
+        shift it in the fingers -- displacement the grasp did not cause. When the
+        external contact clears, the baseline is RE-LATCHED to wherever the grip
+        now sits, so an externally-imposed shift is forgiven rather than carried
+        forward as accumulated drift
+        no opinion when there is no finger/object contact that frame (treated as
+        "not shown to have slipped"; object_grasped already requires bilateral
+        contact, so this only arises in degenerate cases)
+        rolling contact is deliberately OUT OF SCOPE: an object rolled between
+        the fingers migrates its grip point continuously without the grasp
+        degrading, and is flagged here; separating rolling from sliding needs
+        the contact normal, which this predicate does not use
 (position) object_upright: from simulator: check_obj_upright
 
 
@@ -140,18 +179,28 @@ object_grasped:= gripper_bilateral_contact(object) and check_contact(gripper, ob
         contact, so the debounce was removed -- see CHANGES_2026-08-31.md)
         the grasped object becomes the active object
 grasped_object_exists:= active_object exists and object_grasped
-object_grasped_safe:= object_grasped and object_sync
-        object_grasped does NOT itself require object_sync (see above), so this
-        is not a tautology: object_grasped_safe can genuinely be false while
+object_grasped_safe:= object_grasped and grasp_point_stable
+        ~~previously object_grasped and object_sync~~ -- object_sync was
+        replaced by grasp_point_stable (item 10 in CHANGES_2026-08-31.md)
+        because it read wrist rotation of a wide object as slip; it is still
+        computed but no longer gates grasp safety
+        object_grasped does NOT itself require grasp_point_stable, so this is
+        not a tautology: object_grasped_safe can genuinely be false while
         object_grasped stays true (bilateral contact + closed, but the object
-        has stopped moving with the end effector) -- that is the intended
-        "still grasped but no longer safe" signal this LTL property exists to
-        catch; folding object_sync into object_grasped's own definition would
-        make object_grasped_safe logically equal to object_grasped (zero extra
-        information), which was tried and reverted for exactly this reason
-        object_grasped_safe tracks (object_grasped and object_sync) directly,
-        with no grace window (previously required GRASP_SAFE_GRACE_FRAMES
-        consecutive false frames -- removed, see CHANGES_2026-08-31.md)
+        has slid so the originally-gripped point is no longer under the pad) --
+        that is the intended "still grasped but no longer safe" signal this LTL
+        property exists to catch. The same trap applies as before: folding the
+        ongoing condition into object_grasped's own definition would make
+        object_grasped_safe logically equal to object_grasped (zero extra
+        information), which was tried and reverted for exactly this reason.
+        Note the separation is now onset-vs-maintenance: object_grasped is a
+        per-frame contact+closure test, grasp_point_stable is drift measured
+        from the frame the grasp was established.
+        object_grasped_safe tracks (object_grasped and grasp_point_stable)
+        directly, with no grace window (previously required
+        GRASP_SAFE_GRACE_FRAMES consecutive false frames -- removed, see
+        CHANGES_2026-08-31.md); grasp-point drift is cumulative, so it needs
+        no debounce of its own
         object_released still forces object_grasped_safe false on the frame
         it fires
 

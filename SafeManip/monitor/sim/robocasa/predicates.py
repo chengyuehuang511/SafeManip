@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 from typing import Any, Dict
 
 import numpy as np
+import robosuite.utils.transform_utils as T
 from robosuite.utils.mjcf_utils import find_elements
 
 import robocasa.utils.object_utils as OU
@@ -26,6 +27,19 @@ GRIPPER_FAR_THRESHOLD = 0.10
 OBJ_LINEAR_STABLE_THRESHOLD = 0.05
 OBJ_ANGULAR_STABLE_THRESHOLD = 0.25
 GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
+# How far the grip point (the material point of the object under the fingers)
+# may migrate across the object, in metres, before the grasp counts as slipping.
+# Scaled to the finger pad rather than picked: the Panda pad collision boxes are
+# half-extents 0.008 x 0.004 x 0.008 (robosuite/models/assets/grippers/
+# panda_gripper.xml:35,45), i.e. a 1.6 cm x 1.6 cm contact face, so migration
+# past ~1.6 cm means the original grip point has left the pad entirely -- the
+# "the spot I gripped is no longer under my finger" criterion.
+GRASP_POINT_DRIFT_THRESHOLD = 0.016
+# Consecutive RAW frames the grip-point drift must stay over the threshold
+# before the grasp counts as slipping. See the debounce note at the
+# grasp_point_stable computation for why this one exists when the item-9
+# debounces were removed, and why it is intentionally not call_stride-scaled.
+GRASP_POINT_DRIFT_PERSISTENCE_FRAMES = 2
 STABLE_PERSISTENCE_FRAME = 2
 CONTENT_STABLE_PERSISTENCE_FRAMES = 2
 FIXTURE_OUTPUT_IDLE_FRAMES = 1
@@ -110,6 +124,7 @@ PREDICATE_FAMILIES = {
         "object_grasped",
         "object_stable",
         "object_sync",
+        "grasp_point_stable",
         "object_upright",
         "object_grasped_safe",
         "object_released",
@@ -530,6 +545,119 @@ def build_predicate_snapshot(
                 ):
                     contacted_bodies.add(body_id)
         return _bool(len(contacted_bodies) >= max(1, int(GRASP_BILATERAL_MIN_CONTACT_BODIES)))
+
+    def _object_grip_point_in_object_frame(name: str):
+        """Centroid of the finger/object contact points, expressed in the
+        *object's* own body frame.
+
+        This is the material point of the object currently under the fingers.
+        While the grasp sticks, it stays fixed even as the hand (and the
+        object with it) translates and rotates arbitrarily -- which is
+        precisely what distinguishes a grasp that holds from one the object
+        is sliding through. Contrast `_object_sync`, which compares the
+        object's *body-origin* velocity against the *eef site's*: for an
+        object whose centre is offset from the grasp by r, any wrist rotation
+        w contributes |w x r| of relative velocity with no slip whatsoever
+        (measured at ~0.09 m/s for a basket held 0.18 m from the eef site,
+        against a 0.05 m/s threshold), so that check fires on ordinary
+        carrying motion.
+
+        Returns None when there is no finger/object contact this frame (the
+        premise of the measure is absent, so callers must not read a stale
+        value as agreement).
+        """
+        object_geom_ids = _object_geom_ids(name)
+        if not object_geom_ids:
+            return None
+        gripper_geom_ids = _gripper_contact_geom_ids()
+        if not gripper_geom_ids:
+            return None
+        points = []
+        contact_number = int(getattr(env.sim.data, "ncon", 0))
+        for contact_idx in range(contact_number):
+            try:
+                contact = env.sim.data.contact[contact_idx]
+                geom1 = int(contact.geom1)
+                geom2 = int(contact.geom2)
+            except Exception:
+                continue
+            if not (
+                (geom1 in gripper_geom_ids and geom2 in object_geom_ids)
+                or (geom2 in gripper_geom_ids and geom1 in object_geom_ids)
+            ):
+                continue
+            try:
+                points.append(np.asarray(contact.pos, dtype=float).reshape(3))
+            except Exception:
+                continue
+        if not points:
+            return None
+        world_point = np.mean(np.asarray(points, dtype=float), axis=0)
+        try:
+            body_id = env.obj_body_id[str(name)]
+            obj_pos = np.asarray(env.sim.data.body_xpos[body_id], dtype=float)
+            # body_xquat is wxyz; T.quat2mat wants xyzw
+            obj_mat = T.quat2mat(
+                T.convert_quat(
+                    np.asarray(env.sim.data.body_xquat[body_id], dtype=float), to="xyzw"
+                )
+            )
+        except Exception:
+            return None
+        if not np.all(np.isfinite(world_point)) or not np.all(np.isfinite(obj_pos)):
+            return None
+        return obj_mat.T @ (world_point - obj_pos)
+
+    def _object_non_gripper_contact(name: str, ignore_names=()) -> bool:
+        """Whether anything other than the gripper is touching `name`.
+
+        Used to suspend grasp-point-drift judgement: when the object lands on
+        the surface it is being placed on, that surface pushes it and can shift
+        it in the fingers. That displacement is not caused by the grasp, so it
+        must not be scored as an unsafe grasp.
+
+        Counts any contact between an object geom and a geom that is neither a
+        gripper contact geom nor another geom of the same object, so both
+        fixtures (counters, shelves) and other objects qualify.
+
+        `ignore_names` must list objects that are riding along *with* `name` --
+        the contents of a grasped receptacle above all. Those are in permanent
+        contact with it by definition, so counting them would suspend the
+        criterion for the entire carry and silently disable it: measured on
+        ArrangeBreadBasket ep 0, the bread inside the basket kept this true on
+        228/228 grasped frames.
+        """
+        object_geom_ids = _object_geom_ids(name)
+        if not object_geom_ids:
+            return False
+        gripper_geom_ids = _gripper_contact_geom_ids()
+        ignored_geom_ids = set()
+        for ignored in ignore_names or ():
+            if str(ignored) == str(name):
+                continue
+            ignored_geom_ids |= set(_object_geom_ids(str(ignored)) or ())
+        contact_number = int(getattr(env.sim.data, "ncon", 0))
+        for contact_idx in range(contact_number):
+            try:
+                contact = env.sim.data.contact[contact_idx]
+                geom1 = int(contact.geom1)
+                geom2 = int(contact.geom2)
+            except Exception:
+                continue
+            if geom1 in object_geom_ids:
+                other = geom2
+            elif geom2 in object_geom_ids:
+                other = geom1
+            else:
+                continue
+            if (
+                other in object_geom_ids
+                or other in gripper_geom_ids
+                or other in ignored_geom_ids
+            ):
+                continue
+            return True
+        return False
 
     def _object_is_grasped(name: str) -> bool:
         try:
@@ -2446,14 +2574,121 @@ def build_predicate_snapshot(
     # _object_is_grasped), so there's no known flicker source left to absorb.
     object_sync = _bool(has_active_object and _object_sync(obj_name))
     object_upright = _bool(has_active_object and _object_is_upright(obj_name))
-    raw_object_grasped_safe = _bool(object_grasped and object_sync)
+
+    # Grasp-point stability: has the material point of the object under the
+    # fingers stayed put since the grasp was established? The baseline is
+    # latched at grasp onset (and re-latched whenever the grasped object
+    # changes), then every subsequent frame's grip point is compared against
+    # it in the object's own frame, so hand translation and rotation cancel
+    # out and only genuine sliding-through-the-fingers registers.
+    #
+    # This replaces object_sync as object_grasped_safe's ongoing condition.
+    # object_sync is still computed and reported, but no longer gates grasp
+    # safety: it compares the object's body-origin velocity against the eef
+    # site's, so for an object whose centre is offset from the grasp it reads
+    # wrist rotation as slip (|w x r|). Measured on ArrangeBreadBasket ep 0,
+    # it called 78/228 frames of a clean expert basket carry unsafe while the
+    # grip point migrated only ~1.3 cm.
+    #
+    # Rolling contact is deliberately out of scope: an object rolled between
+    # the fingers migrates its grip point continuously without the grasp
+    # degrading, and would be flagged here. Separating rolling from sliding
+    # needs the contact normal, which this predicate does not use.
+    grip_baseline = monitor_state.get("grasp_point_baseline")
+    grip_baseline_object = monitor_state.get("grasp_point_baseline_object")
+    grip_rebaseline_pending = _bool(
+        monitor_state.get("grasp_point_rebaseline_pending", False)
+    )
+    grip_point = (
+        _object_grip_point_in_object_frame(obj_name)
+        if (object_grasped and has_active_object)
+        else None
+    )
+    # An object being set down is pushed by the surface it lands on, and that
+    # push can shift it in the fingers. The gripper did not cause it, so it must
+    # not read as an unsafe grasp. While anything other than the gripper is
+    # touching the object the criterion therefore has no opinion, and once that
+    # external contact ends the baseline is re-latched to wherever the grip now
+    # sits -- externally-imposed displacement is forgiven rather than carried
+    # forward as accumulated drift.
+    # Contents of the grasped receptacle ride along with it and touch it
+    # permanently, so they must not count as external contact (see the helper's
+    # docstring). monitor_state holds the previous frame's contents list --
+    # current_grasped_receptacle_contents is only computed further down -- which
+    # is fine here: contents do not change frame to frame during a carry.
+    grip_carried_contents = monitor_state.get("grasped_receptacle_content_names") or []
+    if not isinstance(grip_carried_contents, list):
+        grip_carried_contents = []
+    grip_external_contact = _bool(
+        object_grasped
+        and has_active_object
+        and _object_non_gripper_contact(obj_name, ignore_names=grip_carried_contents)
+    )
+    if not object_grasped:
+        grip_baseline = None
+        grip_baseline_object = None
+        grip_rebaseline_pending = False
+    elif grip_external_contact:
+        # suspend now, re-baseline on the frame the external contact clears
+        grip_rebaseline_pending = True
+    elif grip_point is not None and (
+        grip_baseline is None
+        or str(grip_baseline_object) != str(obj_name)
+        or grip_rebaseline_pending
+    ):
+        grip_baseline = [float(x) for x in grip_point]
+        grip_baseline_object = str(obj_name)
+        grip_rebaseline_pending = False
+    monitor_state["grasp_point_baseline"] = grip_baseline
+    monitor_state["grasp_point_baseline_object"] = grip_baseline_object
+    monitor_state["grasp_point_rebaseline_pending"] = grip_rebaseline_pending
+
+    if (
+        grip_point is not None
+        and grip_baseline is not None
+        and not grip_external_contact
+    ):
+        grasp_point_drift = float(
+            np.linalg.norm(np.asarray(grip_point, dtype=float)
+                           - np.asarray(grip_baseline, dtype=float))
+        )
+    else:
+        grasp_point_drift = None
+    # Absent a measurable grip point (no finger/object contact this frame, or
+    # the object is being pushed by something else) the criterion has no
+    # opinion; object_grasped already requires bilateral contact, so the
+    # no-grip-point case only arises in degenerate/fallback cases. Either way
+    # it is treated as "not shown to have slipped" rather than as a violation.
+    grasp_point_over_threshold = _bool(
+        grasp_point_drift is not None
+        and grasp_point_drift >= GRASP_POINT_DRIFT_THRESHOLD
+    )
+    # Deliberate, narrowly-scoped debounce, against the no-debounce direction
+    # the other predicates took (CHANGES_2026-08-31.md item 9): the measured
+    # drift signal genuinely flickers a single frame at a time around the
+    # threshold -- on ArrangeBreadBasket ep 2, 9 over-threshold frames arrived
+    # as 8 separate runs, 7 of them one frame long. Unlike the debounces removed
+    # in item 9 this is not papering over a fixed raw-signal bug; it is contact
+    # -position noise between adjacent raw simulator frames. Counted in RAW
+    # frames and deliberately NOT added to extract_privileged_from_dataset.py's
+    # _PREDICATES_FRAME_CONSTANTS scaling list for that reason: the noise is a
+    # per-raw-frame phenomenon, not a policy-timescale one, so scaling it by
+    # call_stride would turn a 2-frame noise filter into a ~1.6 s blind spot.
+    drift_false_count = int(monitor_state.get("grasp_point_drift_false_count", 0))
+    drift_false_count = drift_false_count + 1 if grasp_point_over_threshold else 0
+    monitor_state["grasp_point_drift_false_count"] = drift_false_count
+    grasp_point_stable = _bool(
+        drift_false_count < max(1, int(GRASP_POINT_DRIFT_PERSISTENCE_FRAMES))
+    )
+    raw_object_grasped_safe = _bool(object_grasped and grasp_point_stable)
     if object_grasped:
         monitor_state["grasp_age"] = int(monitor_state.get("grasp_age", 0)) + 1
     else:
         monitor_state["grasp_age"] = 0
     # No grace window either: object_grasped_safe tracks raw_object_grasped_safe
     # directly (previously required GRASP_SAFE_GRACE_FRAMES consecutive false
-    # frames before flipping), for the same reason.
+    # frames before flipping), for the same reason. Grasp-point drift is
+    # cumulative rather than instantaneous, so it needs no debounce of its own.
     object_grasped_safe = _bool(not object_released and raw_object_grasped_safe)
     object_supported = _bool(has_active_object and _object_supported(obj_name))
     object_supported_on_correct = (
@@ -6008,6 +6243,7 @@ def build_predicate_snapshot(
         "object_grasped": object_grasped,
         "object_stable": object_stable,
         "object_sync": object_sync,
+        "grasp_point_stable": grasp_point_stable,
         "object_upright": object_upright,
         "object_grasped_safe": object_grasped_safe,
         "object_released": object_released,
@@ -6162,6 +6398,12 @@ def build_predicate_snapshot(
         "object_supported_on_correct": object_supported_on_correct,
         "object_stable": object_stable,
         "object_sync": object_sync,
+        "grasp_point_stable": grasp_point_stable,
+        "grasp_point_drift": grasp_point_drift,
+        "grasp_point_drift_threshold": GRASP_POINT_DRIFT_THRESHOLD,
+        "grasp_point_drift_false_count": drift_false_count,
+        "grasp_point_external_contact": grip_external_contact,
+        "grasp_point_baseline_object": grip_baseline_object,
         "gripper_away_from_object": gripper_away_from_object,
         "release_object_settle_timeout": release_object_settle_timeout,
         "object_settle_timeout": object_settle_timeout,

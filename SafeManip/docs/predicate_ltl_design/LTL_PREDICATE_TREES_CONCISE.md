@@ -16,7 +16,17 @@ Shared sub-predicates (defined once here, referenced by name below):
 object_stable := obj_linear_speed < OBJ_LINEAR_STABLE_THRESHOLD
                   and obj_angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD
 
-object_sync := object_stable_relative_to_gripper
+grasp_point_stable := the material point of the object under the fingers has not
+                    migrated across the object, since the grasp was established, by
+                    more than a finger-pad-scaled bound, for more than one consecutive
+                    frame. Hand translation and rotation cancel out, so only sliding
+                    through the fingers registers. Suspended while anything other than
+                    the gripper touches the object (a surface being placed onto pushes
+                    it, which the grasp did not cause), with the baseline re-latched
+                    when that contact clears. Rolling contact is out of scope and
+                    would be flagged.
+object_sync := object_stable_relative_to_gripper -- no longer gates grasp safety
+                    (replaced by grasp_point_stable); still reported as informational
                [checks relative linear/angular motion between object and gripper;
                 a tolerance gap against the same thresholds as object_stable, not
                 exact velocity equality]
@@ -35,7 +45,7 @@ object_grasped := gripper_bilateral_contact(object) and check_contact(gripper, o
                     the gripper. object_sync is reserved for object_grasped_safe
                     instead, kept independent so it isn't a tautology (see below)]
 grasped_object_exists := active_object exists and object_grasped
-object_grasped_safe := object_grasped and object_sync
+object_grasped_safe := object_grasped and grasp_point_stable
                    [genuinely independent of object_grasped's own definition:
                     object_grasped_safe can be false while object_grasped stays
                     true (bilateral contact + closed, but no longer moving with

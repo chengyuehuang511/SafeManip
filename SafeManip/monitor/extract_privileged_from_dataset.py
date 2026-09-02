@@ -257,6 +257,13 @@ _PRIVILEGED_ACCUMULATOR_ATTRS = (
 # real-time persistence semantics *and* full per-frame temporal resolution
 # simultaneously (better than the previous skip-based approach, which traded
 # resolution for correctness instead of getting both).
+#
+# DELIBERATELY ABSENT: `GRASP_POINT_DRIFT_PERSISTENCE_FRAMES` (added 2026-09-01,
+# see CHANGES_2026-08-31.md item 11). It is not a policy-timescale persistence
+# window like the ones below -- it filters contact-position noise between
+# *adjacent raw simulator frames*, so it is counted in raw frames and must stay
+# unscaled. Scaling it by call_stride would turn a 2-frame noise filter into a
+# ~1.6 s blind spot at call_stride=16. Please don't "complete" this list with it.
 _PREDICATES_FRAME_CONSTANTS = (
     "STABLE_PERSISTENCE_FRAME",
     "CONTENT_STABLE_PERSISTENCE_FRAMES",

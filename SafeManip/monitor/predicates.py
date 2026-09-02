@@ -57,6 +57,10 @@ def object_sync(entity=None):
     return partial(P.object_sync, entity)
 
 
+def grasp_point_stable(entity=None):
+    return partial(P.grasp_point_stable, entity)
+
+
 def object_upright(entity=None):
     return partial(P.object_upright, entity)
 
