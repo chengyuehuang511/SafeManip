@@ -25,8 +25,8 @@ const reconVideo = el("#recon-video");
 // recorded language instruction). See server.py's api_training_* /
 // replay/official_playback/README.md.
 const tdState = { task: null, episode: null, loaded: false, monitorMethod: null, property: null };
-const tdTaskSelect = el("#td-task-select");
-const tdPropertySelect = el("#td-property-select");
+const tdTaskTree = el("#td-task-tree");
+const tdPropertyTree = el("#td-property-tree");
 const tdEpisodeList = el("#td-episode-list");
 const tdEmptyState = el("#td-empty-state");
 const tdEpisodeView = el("#td-episode-view");
@@ -125,48 +125,155 @@ async function init() {
 // Training Data tab
 // --------------------------------------------------------------------------
 
+// Raw task list (from /api/td_tasks) and property name list (from
+// /api/training_ltl_properties) -- kept around so the Task/LTL trees can be
+// re-rendered (e.g. after a method change re-scopes the violation counts)
+// without re-fetching either list.
+let tdTasksList = [];
+let tdPropertiesList = [];
+// { by_task: {task: {total, by_property: {prop: count}}},
+//   by_property: {prop: {total, by_task: {task: count}}} } for whichever
+// method is currently selected -- see server.py's training_violation_counts.
+let tdViolationCounts = { by_task: {}, by_property: {} };
+
 async function initTrainingData() {
   const data = await fetchJSON("/api/td_tasks");
   roots.training = data.dataset_root;
   el("#root-path").textContent = data.dataset_root;
-  tdTaskSelect.innerHTML = "";
-  for (const t of data.tasks) {
-    const opt = document.createElement("option");
-    opt.value = t.task;
-    opt.textContent = `${t.task} (${t.n_reconstructed} reconstructed)`;
-    tdTaskSelect.appendChild(opt);
-  }
-  tdTaskSelect.addEventListener("change", () => loadTrainingEpisodes(tdTaskSelect.value));
-  await initTrainingLtlPropertyPicker();
-  if (data.tasks.length) {
-    tdTaskSelect.value = data.tasks[0].task;
-    loadTrainingEpisodes(data.tasks[0].task);
+  tdTasksList = data.tasks;
+  await ensureTrainingMonitorMethods();  // need a method selected before the trees can show violation counts
+  await initTrainingLtlPropertyList();
+  await refreshViolationCounts();
+  renderTaskTree();
+  renderPropertyTree();
+  if (tdTasksList.length) {
+    loadTrainingEpisodes(tdTasksList[0].task);
   }
 }
 
-// LTL property picker: scopes both the left-column per-episode violation
+// LTL property list: scopes both the left-column per-episode violation
 // badges (server-side, via /api/td_episodes?property=...) and the main
 // detail panel's violations/satisfied lists (client-side filter in
 // loadTrainingMonitor) to a single named property instead of the
-// whole-episode aggregate / all 19 properties. "All properties" (empty
-// value) restores the unfiltered view in both places. See server.py's
+// whole-episode aggregate / all 19 properties. "All properties" (null)
+// restores the unfiltered view in both places. See server.py's
 // list_training_episodes' property_filter param / _property_status_for.
-async function initTrainingLtlPropertyPicker() {
+async function initTrainingLtlPropertyList() {
   try {
     const data = await fetchJSON("/api/training_ltl_properties");
-    for (const name of data.properties) {
-      const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = name;
-      tdPropertySelect.appendChild(opt);
-    }
+    tdPropertiesList = data.properties;
   } catch (e) {
-    // non-fatal -- "All properties" still works, just no per-property option
+    tdPropertiesList = [];  // non-fatal -- "All properties" still works, just no per-property entries
   }
-  tdPropertySelect.addEventListener("change", () => {
-    tdState.property = tdPropertySelect.value || null;
-    if (tdState.task) loadTrainingEpisodes(tdState.task);
-  });
+}
+
+function selectTrainingProperty(property) {
+  tdState.property = property || null;
+  renderPropertyTree();
+  if (tdState.task) loadTrainingEpisodes(tdState.task);
+}
+
+// Fetches the violation-count breakdown for the currently-selected
+// postprocess method (tdState.monitorMethod) -- called on init and whenever
+// the method picker changes, since counts are scoped to one method at a
+// time (see the "Method scope" decision: currently-selected method only,
+// not summed across methods).
+async function refreshViolationCounts() {
+  if (!tdState.monitorMethod) return;
+  try {
+    tdViolationCounts = await fetchJSON(
+      `/api/training_violation_counts?method=${encodeURIComponent(tdState.monitorMethod)}`
+    );
+  } catch (e) {
+    tdViolationCounts = { by_task: {}, by_property: {} };
+  }
+}
+
+// Generic expandable tree-list row: `label` is the clickable selector text,
+// `total` the badge count shown next to it, `children` an array of
+// {label, count} shown (read-only) in a collapsible nested list, `isActive`
+// highlights it as the current selection, `onSelect` fires on a label/count
+// click (not on the caret, which only toggles the nested breakdown).
+function buildTreeRow(label, total, isActive, onSelect, children) {
+  const wrap = document.createElement("div");
+  wrap.className = "tree-item";
+
+  const row = document.createElement("div");
+  row.className = "tree-row" + (isActive ? " active" : "");
+
+  const hasChildren = children && children.length > 0;
+  const caret = document.createElement("span");
+  caret.className = "tree-caret";
+  caret.textContent = hasChildren ? "▸" : "";
+
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "tree-label";
+  labelSpan.textContent = label;
+  labelSpan.title = label;
+
+  const countSpan = document.createElement("span");
+  countSpan.className = "tree-count" + (total ? " nonzero" : "");
+  countSpan.textContent = total == null ? "" : `${total}`;
+
+  row.append(caret, labelSpan, countSpan);
+  wrap.appendChild(row);
+
+  if (hasChildren) {
+    const childList = document.createElement("div");
+    childList.className = "tree-children hidden";
+    for (const c of children) {
+      const cRow = document.createElement("div");
+      cRow.className = "tree-child-row";
+      cRow.innerHTML = `<span>${c.label}</span><span>${c.count}</span>`;
+      childList.appendChild(cRow);
+    }
+    wrap.appendChild(childList);
+    caret.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const collapsed = childList.classList.toggle("hidden");
+      caret.textContent = collapsed ? "▸" : "▾";
+    });
+  }
+
+  const select = () => onSelect();
+  labelSpan.addEventListener("click", select);
+  countSpan.addEventListener("click", select);
+  return wrap;
+}
+
+function renderTaskTree() {
+  tdTaskTree.innerHTML = "";
+  if (!tdTasksList.length) {
+    tdTaskTree.innerHTML = "<div class='muted'>no tasks found</div>";
+    return;
+  }
+  for (const t of tdTasksList) {
+    const counts = tdViolationCounts.by_task[t.task] || { total: 0, by_property: {} };
+    const children = Object.entries(counts.by_property)
+      .sort((a, b) => b[1] - a[1])
+      .map(([prop, count]) => ({ label: prop, count }));
+    const label = `${t.task} (${t.n_reconstructed} reconstructed)`;
+    tdTaskTree.appendChild(
+      buildTreeRow(label, counts.total, t.task === tdState.task, () => loadTrainingEpisodes(t.task), children)
+    );
+  }
+}
+
+function renderPropertyTree() {
+  tdPropertyTree.innerHTML = "";
+  const allTotal = Object.values(tdViolationCounts.by_property).reduce((s, p) => s + p.total, 0);
+  tdPropertyTree.appendChild(
+    buildTreeRow("All properties", allTotal, tdState.property == null, () => selectTrainingProperty(null), null)
+  );
+  for (const prop of tdPropertiesList) {
+    const counts = tdViolationCounts.by_property[prop] || { total: 0, by_task: {} };
+    const children = Object.entries(counts.by_task)
+      .sort((a, b) => b[1] - a[1])
+      .map(([task, count]) => ({ label: task, count }));
+    tdPropertyTree.appendChild(
+      buildTreeRow(prop, counts.total, prop === tdState.property, () => selectTrainingProperty(prop), children)
+    );
+  }
 }
 
 async function loadTrainingEpisodes(task) {
@@ -176,6 +283,7 @@ async function loadTrainingEpisodes(task) {
   const previousTask = tdState.task;
   const previousEpisode = tdState.episode;
   tdState.task = task;
+  renderTaskTree();  // update active highlighting in the sidebar tree
   tdEpisodeList.innerHTML = "<div class='loading'>loading episodes…</div>";
   await ensureTrainingMonitorMethods();  // so tdMethodLabel() has short labels ready for the badges below
   const propertyParam = tdState.property ? `&property=${encodeURIComponent(tdState.property)}` : "";
@@ -324,8 +432,14 @@ async function ensureTrainingMonitorMethods() {
       if (key === tdState.monitorMethod) opt.selected = true;
       select.appendChild(opt);
     }
-    select.addEventListener("change", () => {
+    select.addEventListener("change", async () => {
       tdState.monitorMethod = select.value;
+      // Violation counts in the Task/LTL trees are scoped to one method at
+      // a time (see refreshViolationCounts) -- re-fetch and re-render both
+      // whenever the selected method changes.
+      await refreshViolationCounts();
+      renderTaskTree();
+      renderPropertyTree();
       if (tdState.task && tdState.episode != null) {
         loadTrainingMonitor(tdState.task, tdState.episode, tdState.monitorMethod);
       }
@@ -672,7 +786,10 @@ function predicateRow(p, indent) {
   const label = document.createElement("div");
   label.className = "predicate-label" + (p.is_decomposed_extra ? " extra" : "");
   label.textContent = (indent ? "└ " : "") + p.label;
-  label.title = p.key;
+  // Hover tooltip: the real key plus its human-readable description (if
+  // any) -- the visible text is always the real key (see server.py's
+  // node_for), the description is supplementary, not a substitute.
+  label.title = p.description ? `${p.key} — ${p.description}` : p.key;
   row.appendChild(label);
 
   const timeline = document.createElement("div");

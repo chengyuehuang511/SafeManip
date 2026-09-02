@@ -37,8 +37,23 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, quote
 
+import predicate_derive
+import spec_derive
+
 STATIC_DIR = Path(__file__).parent / "static"
 REPLAY_OUTPUT_DIR = Path(__file__).parent.parent / "replay" / "privileged_info_reconstruction" / "output"
+
+# Source of truth for every composite predicate's real AND-composition (see
+# predicate_derive.py) -- PROPERTY_META's "children" entries below are
+# derived from this at import time instead of being hand-typed, so they
+# can't silently drift from predicates.py the way several confirmed cases
+# did before (see predicate_derive.py's module docstring for the list).
+PREDICATES_PY_PATH = Path(__file__).parent.parent / "SafeManip" / "monitor" / "sim" / "robocasa" / "predicates.py"
+
+# Source of truth for every property's pattern/trigger/obligation/resolve/
+# guard/check (see spec_derive.py) -- parsed from the real `ltl` strings
+# instead of a hand-typed mirror of them.
+SPECS_PY_PATH = Path(__file__).parent.parent / "SafeManip" / "monitor" / "specs.py"
 
 # "Training Data" tab: ground-truth reconstructions of the official RoboCasa
 # lerobot dataset (see ../replay/official_playback/README.md), not the
@@ -184,170 +199,169 @@ def extract_ltl_atoms(ltl):
 # as their own top-level rows, not nested.
 # --------------------------------------------------------------------------
 
+# Every composite-predicate name that some property below wants a "children"
+# (or "reason_children") breakdown for -- derived once from predicates.py's
+# actual source (see predicate_derive.py) rather than hand-typed per entry.
+# A name with no safe decomposition (an `or`, a single term, a rename, or
+# real components that don't map to a verified exported per-frame key) comes
+# back as None, same as simply omitting a "children" entry did before.
+_DERIVED_CHILDREN = predicate_derive.derive_all(PREDICATES_PY_PATH, [
+    "forbidden_contact",
+    "object_grasped_safe",
+    "object_settled",
+    "liquid_settled",
+    "solid_settled",
+    "reach_in_fixture",
+    "fixture_fully_open",
+    "preconditions_satisfied_pick",
+    "preconditions_satisfied_dump",
+    "preconditions_satisfied_place",
+    "preconditions_satisfied_press",
+    "preconditions_satisfied_turn",
+    "preconditions_satisfied_slide",
+    "preconditions_satisfied_twist",
+    "preconditions_satisfied_open_close",
+    "fixture_open_retracting",
+    "fixture_close_retracting",
+    "microwave_empty",
+])
+
+
+def _children_of(*names):
+    """{name: [...derived children...]} for each name that actually has a
+    safe decomposition -- names with none (see _DERIVED_CHILDREN above) are
+    silently omitted, same effect as never having written a "children" entry
+    for them by hand."""
+    return {n: _DERIVED_CHILDREN[n] for n in names if _DERIVED_CHILDREN.get(n)}
+
+
+# Source of truth for every property's pattern/trigger/obligation/resolve/
+# guard/check -- parsed from specs.py's real `ltl` strings (see
+# spec_derive.py) instead of hand-typed. A property missing here means
+# specs.py grew an LTL shape spec_derive.py doesn't recognize -- fail loudly
+# rather than silently building an incomplete PROPERTY_META.
+_DERIVED_SHAPES = spec_derive.derive_property_shapes(SPECS_PY_PATH)
+
+# Self-check: every trigger/obligation/resolve/guard/check name parsed out
+# of specs.py should also be a real, independently-inspectable key in the
+# saved per-frame dump (predicates.py's exported predicates/violation_evidence
+# dicts) -- if specs.py and predicates.py ever drift (a rename on one side
+# without the other), this surfaces it at startup instead of the viewer
+# silently showing "n/a" bars for a top-level LTL atom.
+_EXPORTED_KEYS = predicate_derive.collect_exported_key_names(PREDICATES_PY_PATH)
+for _prop_name, _shape in _DERIVED_SHAPES.items():
+    for _role in ("trigger", "obligation", "resolve", "guard", "check"):
+        _atom = _shape.get(_role)
+        if _atom is not None and _atom not in _EXPORTED_KEYS:
+            print(
+                f"WARNING: {_prop_name}'s {_role}={_atom!r} (from specs.py) is not an exported "
+                f"predicates.py key -- specs.py and predicates.py may have drifted apart."
+            )
+
 PROPERTY_META = {
     "rc_no_forbidden_contact": {
-        "pattern": "invariant",
-        "guard": "forbidden_contact",
-        "children": {"forbidden_contact": ["forbidden_contact_candidate"]},
+        **_DERIVED_SHAPES["rc_no_forbidden_contact"],
+        "children": _children_of("forbidden_contact"),
     },
     "rc_grasp_remains_safe_until_release": {
-        "pattern": "until",
-        "trigger": "object_grasped",
-        "obligation": "object_grasped_safe",
-        "obligation_kind": "hold_true",  # must stay True until resolve
-        "resolve": "object_released",
-        "children": {"object_grasped_safe": ["object_sync"]},
-        # object_grasped_safe = object_grasped AND object_sync (monitor/primitives.py).
-        # object_grasped is already its own top-level tree row, so it isn't
-        # repeated as a nested "child" row too (that'd just duplicate it) —
-        # but it's still a real AND-component, so violation-reason lookups
-        # check it as well via reason_children, to correctly name a grasp
-        # that silently dropped (no object_released event fired) rather than
-        # only a slipping/desync grasp.
-        "reason_children": {"object_grasped_safe": ["object_grasped", "object_sync"]},
+        **_DERIVED_SHAPES["rc_grasp_remains_safe_until_release"],
+        # object_grasped_safe = (not object_released) and object_grasped and
+        # object_sync -- object_grasped/object_sync are the auto-derived
+        # children; "not object_released" isn't (an unexported negation, and
+        # this property's own resolve condition anyway). object_grasped
+        # duplicating the top-level LTL atom row is harmless -- the
+        # display-key builder below already dedupes.
+        "children": _children_of("object_grasped_safe"),
+        "reason_children": _children_of("object_grasped_safe"),
     },
     "rc_released_object_eventually_settles": {
-        "pattern": "until",
-        "trigger": "object_released",
-        "obligation": "release_object_settle_timeout",
-        "obligation_kind": "guard_false",  # must stay False until resolve
-        "resolve": "object_settled",
-        "children": {
-            # object_stable_relative, not object_stable -- object_settled
-            # checks stability *relative to the object's current support*
-            # (2026-09-02, see predicates.py's _object_settled /
-            # CHANGES_2026-08-31.md item 3), not world-frame object_stable.
-            # object_stable itself can lag well behind (e.g. the object is
-            # already at rest relative to a basket that's still being
-            # carried) -- showing it here was a stale/misleading substitute
-            # from before object_stable_relative existed as its own
-            # exported key.
-            "object_settled": ["object_stable_relative", "object_supported_on_correct", "gripper_away_from_object"],
-        },
+        **_DERIVED_SHAPES["rc_released_object_eventually_settles"],
+        # object_settled's real AND-composition (_object_settled in
+        # predicates.py) evaluates all 4 of its components for
+        # `settle_obj_name` (the object actually awaiting settle), not
+        # `active_object` -- these can differ (e.g. the robot has already
+        # picked up a *different* object while the previous one is still
+        # settling). The exported object_stable_relative/object_supported/
+        # gripper_away_from_object keys are computed for active_object
+        # instead, so they are NOT guaranteed to equal what object_settled
+        # actually used -- the auto-deriver checks for an exact
+        # same-argument match and correctly declines to link them (found
+        # while building this derivation; a hand-written mapping had been
+        # silently assuming they were interchangeable). Until settle_obj_name
+        # -scoped predicate keys are exported separately, this shows no
+        # breakdown at all rather than a not-always-accurate one.
+        "children": _children_of("object_settled"),
     },
     "rc_liquid_transfer_eventually_settles": {
-        "pattern": "until",
-        "trigger": "liquid_transfer_event",
-        "obligation": "object_settle_timeout",
-        "obligation_kind": "guard_false",
-        "resolve": "liquid_settled",
-        # content_stable/content_is_supported/support_type_matches_content --
-        # NOT object_stable/gripper_away_from_object (those are for
-        # object_settled, a different, single-grasped-object predicate;
-        # liquid/solid_settled are built from content_settled instead, see
-        # predicates.py's content_settled definition; this mapping was wrong
-        # both in predicate name and in which components actually matter).
-        "children": {"liquid_settled": ["content_stable", "content_is_supported", "support_type_matches_content"]},
+        **_DERIVED_SHAPES["rc_liquid_transfer_eventually_settles"],
+        # liquid_settled = content_is_liquid and (content_settled or
+        # _fixture_liquid_output_settled()) -- the `or` branch isn't safely
+        # decomposable (see predicate_derive.py), so only content_is_liquid
+        # shows here; content_settled's own components (content_stable/
+        # content_is_supported/support_type_matches_content) aren't listed
+        # because they're only *one* of two ways this can resolve, not an
+        # unconditional requirement.
+        "children": _children_of("liquid_settled"),
     },
     "rc_solid_transfer_eventually_settles": {
-        "pattern": "until",
-        "trigger": "solid_transfer_event",
-        "obligation": "object_settle_timeout",
-        "obligation_kind": "guard_false",
-        "resolve": "solid_settled",
-        "children": {"solid_settled": ["content_stable", "content_is_supported", "support_type_matches_content"]},
-        "extra_top": ["solid_misplacement", "misplaced_solid_removed", "misplaced_solid_recollected"],
+        **_DERIVED_SHAPES["rc_solid_transfer_eventually_settles"],
+        # solid_settled = content_is_solid and content_settled -- no `or`
+        # branch (unlike liquid_settled), so this decomposes cleanly.
+        "children": _children_of("solid_settled"),
+        # "extra_top" (solid_misplacement/misplaced_solid_removed/
+        # misplaced_solid_recollected) is auto-derived below, from
+        # specs.py's own predicate list for this property.
     },
     "rc_reach_in_fixture_only_when_fully_open": {
-        "pattern": "instant",
-        "trigger": "reach_in_fixture",
-        "check": "fixture_fully_open",
-        "children": {
-            "reach_in_fixture": ["access_active_fixture"],
-            "fixture_fully_open": ["access_fixture_fully_open"],
-        },
+        **_DERIVED_SHAPES["rc_reach_in_fixture_only_when_fully_open"],
+        # fixture_fully_open = _fixture_open(...) or access_fixture_fully_open
+        # -- an `or`, not decomposable (a hand-written entry had wrongly
+        # shown just the second branch as if unconditional; found while
+        # building this derivation). reach_in_fixture itself decomposes fine
+        # (drops its own negated term, same as object_grasped_safe above).
+        "children": _children_of("reach_in_fixture", "fixture_fully_open"),
     },
-    # These two were previously missing entirely -- their top-level atom
-    # showed with no decomposition. Sub-predicates confirmed by reading the
-    # actual AND-composition in robocasa/environments/kitchen/predicates.py
-    # (not from specs.py's prose descriptions, which for
-    # preconditions_satisfied_pick turned out to be stale -- it says
-    # "object_region_clear, object_stable, and object_upright_if_receptacle"
-    # but the real code only ANDs object_region_clear and pick_object_stable;
-    # object_upright_if_receptacle is computed but never actually used in
-    # that boolean).
     "rc_pick_preconditions_safe": {
-        "pattern": "instant",
-        "trigger": "skill_pick_onset",
-        "check": "preconditions_satisfied_pick",
-        "children": {
-            "preconditions_satisfied_pick": ["object_region_clear", "pick_object_stable"],
-        },
+        **_DERIVED_SHAPES["rc_pick_preconditions_safe"],
+        "children": _children_of("preconditions_satisfied_pick"),
     },
     "rc_dump_preconditions_safe": {
-        "pattern": "instant",
-        "trigger": "skill_dump_onset",
-        "check": "preconditions_satisfied_dump",
-        "children": {
-            "preconditions_satisfied_dump": [
-                "dump_support_region_clear",
-                "support_stable",
-                "dump_support_geometry_valid",
-                "dump_support_type_matches_content",
-                "dump_support_hygienic_for_content",
-                "dump_support_objects_clean_for_content",
-                "dump_support_not_cluttered_for_fragile_content",
-            ],
-        },
+        **_DERIVED_SHAPES["rc_dump_preconditions_safe"],
+        "children": _children_of("preconditions_satisfied_dump"),
     },
     "rc_place_preconditions_safe": {
-        "pattern": "instant",
-        "trigger": "skill_place_onset",
-        "check": "preconditions_satisfied_place",
-        "children": {
-            "preconditions_satisfied_place": [
-                "support_region_clear",
-                "support_stable",
-                "support_geometry_valid",
-                "support_type_matches_object",
-                "support_hygienic_for_manipulated_object",
-                "support_objects_clean_for_manipulated_object",
-                "support_not_cluttered_for_fragile_manipulated_object",
-            ],
-        },
+        **_DERIVED_SHAPES["rc_place_preconditions_safe"],
+        "children": _children_of("preconditions_satisfied_place"),
     },
-    # rc_{press,turn,slide,twist,open_close}_preconditions_safe: the real
-    # AND-composition (predicates.py) is e.g.
-    # `preconditions_satisfied_press = target_region_clear_press and
-    # _target_stable(press_target) and fixture_ready_for_press` -- but
-    # `target_region_clear_press`/`_target_stable(...)` are NOT what's
-    # actually logged. The logged `target_region_clear`/`target_stable` keys
-    # are shared, OR-combined/reused across all 5 skill types (confirmed by
-    # reading the assignment: `target_region_clear = target_region_clear_press
-    # or target_region_clear_turn or ... or target_region_clear_open_close`),
-    # so they can be True from a *different* skill's check passing even when
-    # e.g. the press-specific one actually failed. Listing them as children
-    # here would silently misattribute the reason a violation happened.
-    # Deliberately NOT decomposed for that reason -- pattern/trigger/check
-    # classification (still needed for occurrence/violation-marker
-    # computation) is added without a "children" key. If per-skill-specific
-    # logging is ever added upstream, revisit this.
+    # rc_{press,turn,slide,twist,open_close}_preconditions_safe: each
+    # preconditions_satisfied_<skill> ANDs 3 terms, but 2 of them
+    # (target_region_clear_<skill>, _target_stable(<skill>_target)) aren't
+    # independently exported -- only an OR-merged-across-all-5-skills
+    # version is (target_region_clear/target_stable), which the auto-deriver
+    # correctly refuses to link (would silently misattribute the reason a
+    # violation happened, since it can read True from a *different* skill's
+    # check passing). fixture_ready_for_<skill> IS genuinely skill-specific
+    # and safe to show, so it's the only child that appears.
     "rc_press_preconditions_safe": {
-        "pattern": "instant",
-        "trigger": "skill_press_onset",
-        "check": "preconditions_satisfied_press",
+        **_DERIVED_SHAPES["rc_press_preconditions_safe"],
+        "children": _children_of("preconditions_satisfied_press"),
     },
     "rc_turn_preconditions_safe": {
-        "pattern": "instant",
-        "trigger": "skill_turn_onset",
-        "check": "preconditions_satisfied_turn",
+        **_DERIVED_SHAPES["rc_turn_preconditions_safe"],
+        "children": _children_of("preconditions_satisfied_turn"),
     },
     "rc_slide_preconditions_safe": {
-        "pattern": "instant",
-        "trigger": "skill_slide_onset",
-        "check": "preconditions_satisfied_slide",
+        **_DERIVED_SHAPES["rc_slide_preconditions_safe"],
+        "children": _children_of("preconditions_satisfied_slide"),
     },
     "rc_twist_preconditions_safe": {
-        "pattern": "instant",
-        "trigger": "skill_twist_onset",
-        "check": "preconditions_satisfied_twist",
+        **_DERIVED_SHAPES["rc_twist_preconditions_safe"],
+        "children": _children_of("preconditions_satisfied_twist"),
     },
     "rc_open_close_preconditions_safe": {
-        "pattern": "instant",
-        "trigger": "skill_open_close_onset",
-        "check": "preconditions_satisfied_open_close",
+        **_DERIVED_SHAPES["rc_open_close_preconditions_safe"],
+        "children": _children_of("preconditions_satisfied_open_close"),
     },
-    # G(robot_contact_raw_contaminated -> (!robot_contact_clean U sanitized)).
     # `sanitized` is hardcoded `sanitized = False` at its one and only
     # assignment in robocasa/environments/kitchen/predicates.py, never
     # reassigned -- expected, not a gap: there's no sanitization action in
@@ -356,58 +370,54 @@ PROPERTY_META = {
     # unresolved for the rest of the episode -- that's accurate, not a
     # display bug.
     "rc_raw_robot_contact_blocks_rte_grasp_until_sanitized": {
-        "pattern": "until",
-        "trigger": "robot_contact_raw_contaminated",
-        "obligation": "robot_contact_clean",
-        "obligation_kind": "guard_false",  # must stay False until resolve
-        "resolve": "sanitized",
+        **_DERIVED_SHAPES["rc_raw_robot_contact_blocks_rte_grasp_until_sanitized"],
     },
-    # G(fixture_open_obstacle_hit -> (fixture_open_retracting U fixture_fully_closed)).
-    # fixture_open_retracting = (not continue_fixture_open) and
-    # fixture_open_retract_path_clear and (not fixture_open_obstacle_hit) --
-    # 2 of its 3 real components are negated, and the existing
-    # children/reason_children mechanism (false_children(): checks
-    # `dict(trace).get(frame) is False`) has no prior-art path for
-    # negated components elsewhere in this file, so wiring it in here
-    # untested would risk showing an inverted (backwards) reason. Left
-    # undecomposed rather than guessed.
+    # fixture_open_retracting's 2 of 3 real components are negated
+    # (`not continue_fixture_open`, `not fixture_open_obstacle_hit`) -- the
+    # auto-deriver (like the hand-written version before it) doesn't map
+    # negated leaves to an exported key at all (false_children() has no
+    # prior-art path for inverted reasons), so only the one non-negated
+    # component (fixture_open_retract_path_clear) would show here; still
+    # omitted via "no children" for now since a single-child breakdown for
+    # a 3-term AND could look like the whole story when it isn't. Revisit
+    # if that turns out to be more confusing than not showing it at all.
     "rc_fixture_open_obstacle_retract": {
-        "pattern": "until",
-        "trigger": "fixture_open_obstacle_hit",
-        "obligation": "fixture_open_retracting",
-        "obligation_kind": "hold_true",
-        "resolve": "fixture_fully_closed",
+        **_DERIVED_SHAPES["rc_fixture_open_obstacle_retract"],
     },
     "rc_fixture_close_obstacle_retract": {
-        "pattern": "until",
-        "trigger": "fixture_close_obstacle_hit",
-        "obligation": "fixture_close_retracting",
-        "obligation_kind": "hold_true",
-        "resolve": "fixture_fully_open",
+        **_DERIVED_SHAPES["rc_fixture_close_obstacle_retract"],
     },
-    # G(object_reach_in_fixture -> microwave_empty) -- instant shape (no U),
-    # despite the prose description mentioning a two-object recovery
-    # condition; microwave_empty is itself a persistence-counter leaf (no
-    # further AND-decomposition), so no "children" -- but
-    # two_or_more_objects_in_microwave is a real, separately-logged evidence
-    # atom named in specs.py's predicate list, shown as its own row via
-    # extra_top (same convention as rc_solid_transfer_eventually_settles's
-    # extra_top).
+    # instant shape (no U), despite the prose description mentioning a
+    # two-object recovery condition; microwave_empty is itself a
+    # persistence-counter leaf (no further AND-decomposition), so no
+    # "children" -- "extra_top" (two_or_more_objects_in_microwave) is
+    # auto-derived below.
     "rc_microwave_single_object_until_empty": {
-        "pattern": "instant",
-        "trigger": "object_reach_in_fixture",
-        "check": "microwave_empty",
-        "extra_top": ["two_or_more_objects_in_microwave"],
+        **_DERIVED_SHAPES["rc_microwave_single_object_until_empty"],
     },
-    # G(object_reach_in_fixture -> (!object_released U object_in_same_fixture)).
     "rc_fixture_placement_release_after_internal_support": {
-        "pattern": "until",
-        "trigger": "object_reach_in_fixture",
-        "obligation": "object_released",
-        "obligation_kind": "guard_false",
-        "resolve": "object_in_same_fixture",
+        **_DERIVED_SHAPES["rc_fixture_placement_release_after_internal_support"],
     },
 }
+
+# Auto-derive "extra_top" for every property: specs.py's own predicate list
+# for that property (see spec_derive.collect_predicate_lists), minus
+# whatever's already shown via trigger/obligation/resolve/guard/check and
+# their own auto-derived children -- whatever's left over is a recovery/
+# evidence atom specs.py names but nothing else already surfaces (e.g.
+# solid_misplacement, two_or_more_objects_in_microwave). Replaces
+# hand-picking this list per property.
+_SPEC_PREDICATE_LISTS = spec_derive.collect_predicate_lists(SPECS_PY_PATH)
+for _prop_name, _entry in PROPERTY_META.items():
+    _covered = {_entry.get(role) for role in ("trigger", "obligation", "resolve", "guard", "check")}
+    _covered.discard(None)
+    for _role in ("obligation", "resolve", "check"):
+        _composite_name = _entry.get(_role)
+        if _composite_name:
+            _covered.update(_DERIVED_CHILDREN.get(_composite_name) or [])
+    _extra = [p for p in _SPEC_PREDICATE_LISTS.get(_prop_name, []) if p not in _covered]
+    if _extra:
+        _entry["extra_top"] = _extra
 
 PATTERN_BLURB = {
     "invariant": "Always monitored (from frame 0). Violated the instant the guard predicate goes true.",
@@ -418,38 +428,14 @@ PATTERN_BLURB = {
                 "only, there's no ongoing window.",
 }
 
-# human labels for implementation-level sub-predicates / evidence atoms not in COMMON_PREDICATES'
-# LTL strings (see predicates.violation_evidence in the raw dump)
-_SUBPREDICATE_LABELS = {
-    "object_grasped": "still detected as grasped (didn't silently drop without a release event)",
-    "object_sync": "gripper/object velocity in sync (grasp not slipping)",
-    "object_stable": "object velocity below stability threshold (world-frame/absolute)",
-    "object_stable_relative": "object velocity below stability threshold, relative to its current "
-                               "support (not world-frame -- e.g. already at rest inside a basket "
-                               "that's still being carried counts as stable here, unlike object_stable)",
-    "content_stable": "contained/dumped content's velocity below stability threshold, relative to "
-                       "its current support (same relative-not-absolute check as object_stable_relative)",
-    "content_is_supported": "contained/dumped content is resting on a support surface",
-    "support_type_matches_content": "the support surface's type is compatible with the content "
-                                     "(e.g. not a raw food item on a structural fixture body)",
-    "object_supported_on_correct": "resting on a correct support",
-    "gripper_away_from_object": "gripper >=0.10m from the object",
-    "access_fixture_fully_open": "the specific fixture the gripper entered is fully open",
-    "access_active_fixture": "which fixture the gripper is currently reaching into",
-    "forbidden_contact_candidate": "specific contact pair currently outside the allowed set",
-    "solid_misplacement": "transferred solid detected outside the intended receiving support region",
-    "misplaced_solid_removed": "misplaced solid no longer detected outside that region",
-    "misplaced_solid_recollected": "misplaced solid collected back into the source/target support",
-    "object_region_clear": "gripper's path to the object isn't blocked by surrounding clutter",
-    "pick_object_stable": "the object about to be picked is at rest, not still moving",
-    "dump_support_region_clear": "the receiving support isn't blocked by surrounding clutter",
-    "support_stable": "the receiving support itself isn't moving",
-    "dump_support_geometry_valid": "receiving support's geometry (flat/large enough) fits the dumped contents",
-    "dump_support_type_matches_content": "receiving support type is compatible with the dumped contents",
-    "dump_support_hygienic_for_content": "receiving support is clean enough for the dumped contents",
-    "dump_support_objects_clean_for_content": "no contamination-risk objects present on the receiving support",
-    "dump_support_not_cluttered_for_fragile_content": "receiving support isn't too cluttered for fragile dumped contents",
-}
+# Hover-tooltip "how this is computed" text for every predicate the
+# breakdown UI can show -- the literal predicates.py source expression for
+# each name's assignment (see predicate_derive.derive_all_formulas), not a
+# hand-written paraphrase. A name with no assignment found (e.g. it's a
+# monitor_state-tracked value with no single `name = ...` line) simply has
+# no tooltip text; the raw key name is always shown regardless (see
+# node_for below).
+_PREDICATE_FORMULAS = predicate_derive.derive_all_formulas(PREDICATES_PY_PATH)
 
 _raw_info_cache = {}
 _raw_info_lock = threading.Lock()
@@ -728,6 +714,56 @@ def list_training_episodes(task, property_filter=None):
         episodes.append(entry)
     episodes.sort(key=lambda e: e["episode"])
     return episodes
+
+
+def training_violation_counts(method):
+    """Aggregate, for one postprocess method, how many episodes violated each
+    LTL property -- broken down both by task (with a per-property breakdown
+    nested inside) and by property (with a per-task breakdown nested inside),
+    for the sidebar's expandable Task/LTL-property trees. Counts *episodes*,
+    not raw violation-instance counts: a property appears at most once in a
+    given episode's "violations" list (see _property_status_for), so this is
+    just tallying how many episodes each (task, property) pair shows up
+    violated in, for that one method. Scoped to a single method because
+    different methods (different predicate-code versions) can disagree on
+    the same episode -- see monitor/output/CHANGELOG.md."""
+    by_task = {}
+    by_property = {}
+    method_info = TRAINING_MONITOR_METHODS.get(method)
+    if method_info is None:
+        return {"by_task": by_task, "by_property": by_property}
+    base_dir = method_info["dir"]
+    for task_entry in list_training_tasks():
+        task = task_entry["task"]
+        task_dir = base_dir / task
+        out_dir = TRAINING_OUTPUT_DIR / task
+        if not task_dir.is_dir() or not out_dir.is_dir():
+            continue
+        task_by_property = {}
+        task_total = 0
+        for p in sorted(out_dir.glob("episode_*_reconstructed.mp4")):
+            m = re.match(r"episode_(\d+)_reconstructed\.mp4$", p.name)
+            if not m:
+                continue
+            ep = int(m.group(1))
+            monitor_path = task_dir / f"privileged_information_{ep}_monitor.json"
+            if not monitor_path.is_file():
+                continue
+            try:
+                mon = json.loads(monitor_path.read_text())
+            except Exception:
+                continue
+            for v in mon.get("violations") or []:
+                prop = v.get("property_name")
+                if not prop:
+                    continue
+                task_by_property[prop] = task_by_property.get(prop, 0) + 1
+                task_total += 1
+                prop_entry = by_property.setdefault(prop, {"total": 0, "by_task": {}})
+                prop_entry["total"] += 1
+                prop_entry["by_task"][task] = prop_entry["by_task"].get(task, 0) + 1
+        by_task[task] = {"total": task_total, "by_property": task_by_property}
+    return {"by_task": by_task, "by_property": by_property}
 
 
 def api_training_tasks():
@@ -1299,7 +1335,7 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
                     occ["activation"]["marker"] = to_video_time(occ["activation"]["frame"])
                 for v in occ.get("violated_frames", []):
                     v["marker"] = to_video_time(v["frame"])
-                    v["reason_labels"] = [_SUBPREDICATE_LABELS.get(r, r.replace("_", " ")) for r in v["reasons"]]
+                    v["reason_labels"] = [r.replace("_", " ") for r in v["reasons"]]
                 if occ.get("end") and occ["end"].get("frame") is not None:
                     occ["end"]["marker"] = to_video_time(occ["end"]["frame"])
             marks = _occurrence_marks(occurrences)
@@ -1327,8 +1363,23 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
             for r in runs:
                 r["start"] = to_video_time(r["start_frame"])
                 r["end"] = to_video_time(r["end_frame"])
-            label = key.replace("_", " ") if is_top else _SUBPREDICATE_LABELS.get(key, key.replace("_", " "))
-            return {"key": key, "label": label, "is_decomposed_extra": not is_top, "runs": runs}
+            # Visible label is always the real predicates.py key (spaced for
+            # readability) -- top-level LTL atoms already worked this way;
+            # sub-predicates used to show a hand-written prose paraphrase
+            # instead, which could describe something other than what the
+            # key actually is (and, being hand-typed, could go stale the
+            # same way PROPERTY_META's "children" did). The tooltip now
+            # shows the literal predicates.py source expression instead
+            # (see _PREDICATE_FORMULAS) -- always in sync by construction,
+            # nothing hand-authored to drift.
+            label = key.replace("_", " ")
+            return {
+                "key": key,
+                "label": label,
+                "description": _PREDICATE_FORMULAS.get(key),
+                "is_decomposed_extra": not is_top,
+                "runs": runs,
+            }
 
         tree = []
         # the synthetic "whole LTL" bar goes first: green everywhere except
@@ -1781,6 +1832,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if parsed.path == "/api/training_ltl_properties":
             return self._send_json({"properties": sorted(PROPERTY_META.keys())})
+
+        if parsed.path == "/api/training_violation_counts":
+            method = qs.get("method", [DEFAULT_TRAINING_MONITOR_METHOD])[0]
+            return self._send_json(training_violation_counts(method))
 
         if parsed.path == "/api/training_monitor":
             task = qs.get("task", [None])[0]

@@ -86,13 +86,23 @@
 
   <div class="layout hidden" id="screen-training">
     <aside class="sidebar">
-      <div class="picker">
-        <label>Task</label>
-        <select id="td-task-select"><option>loading…</option></select>
+      <!-- Two independently-computed postprocess methods, kept side by
+           side for comparison (neither replaces the other) -- see
+           SafeManip/monitor/extract_privileged_from_dataset.py vs
+           extract_privileged_from_dataset_sampled.py. Selecting a method
+           here also rescopes the violation counts in the Task/LTL trees
+           below (see /api/training_violation_counts). -->
+      <div class="picker" id="td-method-picker">
+        <label>Postprocess method</label>
+        <select id="td-method-select"><option>loading…</option></select>
       </div>
       <div class="picker">
-        <label>LTL property</label>
-        <select id="td-property-select"><option value="">All properties</option></select>
+        <label>Task <span class="tree-hint">(violation count for selected method)</span></label>
+        <div class="tree" id="td-task-tree"><div class="loading">loading…</div></div>
+      </div>
+      <div class="picker">
+        <label>LTL property <span class="tree-hint">(violation count for selected method)</span></label>
+        <div class="tree" id="td-property-tree"><div class="loading">loading…</div></div>
       </div>
       <div class="episode-list" id="td-episode-list"></div>
     </aside>
@@ -130,14 +140,9 @@
              analysis pass -- see that script's docstring). Hidden/replaced with
              a hint if that pipeline hasn't been run for this episode yet. -->
         <section id="td-monitor-section" class="monitor-section">
-          <!-- Two independently-computed postprocess methods, kept side by
-               side for comparison (neither replaces the other) -- see
-               SafeManip/monitor/extract_privileged_from_dataset.py vs
-               extract_privileged_from_dataset_sampled.py. -->
-          <div class="picker" id="td-method-picker">
-            <label>Postprocess method</label>
-            <select id="td-method-select"><option>loading…</option></select>
-          </div>
+          <!-- Postprocess method picker now lives in the sidebar (see
+               #td-method-picker above the Task tree) so it can also scope
+               the violation-count trees, not just this panel. -->
           <div id="td-monitor-missing" class="card-hint hidden"></div>
           <div id="td-monitor-body" class="hidden">
             <div id="td-monitor-meta" class="ep-meta"></div>
