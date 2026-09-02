@@ -281,15 +281,17 @@ PROPERTY_META = {
         # `settle_obj_name` (the object actually awaiting settle), not
         # `active_object` -- these can differ (e.g. the robot has already
         # picked up a *different* object while the previous one is still
-        # settling). The exported object_stable_relative/object_supported/
-        # gripper_away_from_object keys are computed for active_object
-        # instead, so they are NOT guaranteed to equal what object_settled
-        # actually used -- the auto-deriver checks for an exact
-        # same-argument match and correctly declines to link them (found
-        # while building this derivation; a hand-written mapping had been
-        # silently assuming they were interchangeable). Until settle_obj_name
-        # -scoped predicate keys are exported separately, this shows no
-        # breakdown at all rather than a not-always-accurate one.
+        # settling). Of the 4, only gripper_away_from_object is itself
+        # already computed for settle_obj_name (confirmed by the
+        # auto-deriver matching the exact same call+argument), so it's the
+        # only one shown here. object_stable_relative/object_supported are
+        # exported for active_object instead -- NOT guaranteed to equal
+        # what object_settled actually used -- so the deriver correctly
+        # declines to link them (a hand-written mapping had been silently
+        # assuming they were interchangeable). object_support_type_matches_any
+        # has no exported key at all yet, for either object. Until those are
+        # exported for settle_obj_name specifically, this stays a partial
+        # (1-of-4) breakdown.
         "children": _children_of("object_settled"),
     },
     "rc_liquid_transfer_eventually_settles": {
@@ -374,18 +376,18 @@ PROPERTY_META = {
     },
     # fixture_open_retracting's 2 of 3 real components are negated
     # (`not continue_fixture_open`, `not fixture_open_obstacle_hit`) -- the
-    # auto-deriver (like the hand-written version before it) doesn't map
-    # negated leaves to an exported key at all (false_children() has no
-    # prior-art path for inverted reasons), so only the one non-negated
-    # component (fixture_open_retract_path_clear) would show here; still
-    # omitted via "no children" for now since a single-child breakdown for
-    # a 3-term AND could look like the whole story when it isn't. Revisit
-    # if that turns out to be more confusing than not showing it at all.
+    # auto-deriver correctly declines to map either negated leaf to an
+    # exported key (false_children() has no prior-art path for inverted
+    # reasons), so only the one non-negated component
+    # (fixture_open_retract_path_clear) shows here -- a real, safe, partial
+    # decomposition, not the whole story but not misleading either.
     "rc_fixture_open_obstacle_retract": {
         **_DERIVED_SHAPES["rc_fixture_open_obstacle_retract"],
+        "children": _children_of("fixture_open_retracting"),
     },
     "rc_fixture_close_obstacle_retract": {
         **_DERIVED_SHAPES["rc_fixture_close_obstacle_retract"],
+        "children": _children_of("fixture_close_retracting"),
     },
     # instant shape (no U), despite the prose description mentioning a
     # two-object recovery condition; microwave_empty is itself a
@@ -873,6 +875,31 @@ def boolean_trace(dynamic_frames, key, start_frame, end_frame):
     hi = min(len(dynamic_frames) - 1, end_frame)
     for i in range(lo, hi + 1):
         out.append((i, _frame_predicate_value(dynamic_frames[i], key)))
+    return out
+
+
+def _frame_evidence_value(frame, key):
+    """Like _frame_predicate_value, but returns the raw violation_evidence
+    value uncoerced (no bool()) -- for categorical fields like active_object/
+    settle_obj_name (the object *name*, not whether one exists), not just
+    booleans. None if the key isn't present in this frame's dump at all."""
+    preds = (frame.get("data") or {}).get("predicates") or {}
+    ve = preds.get("violation_evidence") or {}
+    return ve.get(key)
+
+
+def categorical_trace(dynamic_frames, key, start_frame, end_frame):
+    """Same shape as boolean_trace, but for a categorical (e.g. object-name)
+    field instead of a boolean one -- used to show which object is
+    active_object/settle_obj_name at each frame, since predicates like
+    object_settled depend on *which* object is being tracked, not just a
+    true/false signal (see rc_released_object_eventually_settles's
+    settle_obj_name-vs-active_object distinction)."""
+    out = []
+    lo = max(0, start_frame)
+    hi = min(len(dynamic_frames) - 1, end_frame)
+    for i in range(lo, hi + 1):
+        out.append((i, _frame_evidence_value(dynamic_frames[i], key)))
     return out
 
 
@@ -1395,6 +1422,36 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
             tree.append({
                 "key": "__ltl__", "label": "LTL (overall)", "is_decomposed_extra": False,
                 "is_ltl_summary": True, "runs": ltl_runs, "subs": [],
+            })
+        # Categorical rows: which object each predicate above is actually
+        # about, at each frame -- not a boolean, the object's *name* (e.g.
+        # "bread" vs "basket"). active_object is shown for every property;
+        # settle_obj_name only where it's genuinely a different concept
+        # (rc_released_object_eventually_settles -- see object_settled's
+        # settle_obj_name-vs-active_object distinction in PROPERTY_META).
+        # No breakdown for older saved episodes that predate the
+        # settle_obj_name export -- categorical_trace/node_for below just
+        # come back empty for those, same "not present" handling as any
+        # other missing key.
+        categorical_keys = ["active_object"]
+        if property_name == "rc_released_object_eventually_settles":
+            categorical_keys.append("settle_obj_name")
+        for cat_key in categorical_keys:
+            cat_trace = categorical_trace(raw_frames, cat_key, start, end)
+            if all(v is None for _, v in cat_trace):
+                continue  # not present in this episode's raw dump at all
+            cat_runs = compress_runs(cat_trace)
+            for r in cat_runs:
+                r["start"] = to_video_time(r["start_frame"])
+                r["end"] = to_video_time(r["end_frame"])
+            tree.append({
+                "key": cat_key,
+                "label": cat_key.replace("_", " "),
+                "description": _PREDICATE_FORMULAS.get(cat_key),
+                "is_categorical": True,
+                "is_decomposed_extra": False,
+                "runs": cat_runs,
+                "subs": [],
             })
         for atom in top_atoms:
             node = node_for(atom, True)

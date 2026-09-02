@@ -122,6 +122,9 @@ PREDICATE_FAMILIES = {
         "object_supported",
         "object_supported_on_correct",
         "gripper_away_from_object",
+        "object_supported_settle",
+        "object_support_type_matches_any_settle",
+        "object_stable_relative_settle",
         "object_settled",
         "release_object_settle_timeout",
         "object_settle_timeout",
@@ -2785,6 +2788,28 @@ def build_predicate_snapshot(
     )
     gripper_away_from_object = _bool(
         settle_obj_name is not None and _gripper_far_from_object(settle_obj_name)
+    )
+    # _object_settled's real AND-composition (below) evaluates all 4 of its
+    # components for settle_obj_name, not obj_name/active_object --
+    # object_supported/object_stable_relative above are exported for
+    # active_object instead, so they're NOT guaranteed to equal what
+    # object_settled actually used whenever the robot has already picked up
+    # a *different* object while the previous one is still awaiting settle
+    # (gripper_away_from_object already happened to be settle_obj_name
+    # -scoped, which is why it isn't duplicated here). Exported separately
+    # (2026-09-02) so the viewer's predicate-breakdown for
+    # rc_released_object_eventually_settles can show object_settled's real
+    # components instead of a sometimes-wrong substitute -- see
+    # viewer/predicate_derive.py and docs/predicate_ltl_design/
+    # CHANGES_2026-08-31.md.
+    object_supported_settle = _bool(
+        settle_obj_name is not None and _object_supported(settle_obj_name)
+    )
+    object_support_type_matches_any_settle = _bool(
+        settle_obj_name is not None and _object_support_type_matches_any(settle_obj_name)
+    )
+    object_stable_relative_settle = _bool(
+        settle_obj_name is not None and _object_stable_relative(settle_obj_name)
     )
     object_settled = _bool(
         settle_obj_name is not None
@@ -6329,6 +6354,9 @@ def build_predicate_snapshot(
         "object_supported": object_supported,
         "object_supported_on_correct": object_supported_on_correct,
         "gripper_away_from_object": gripper_away_from_object,
+        "object_supported_settle": object_supported_settle,
+        "object_support_type_matches_any_settle": object_support_type_matches_any_settle,
+        "object_stable_relative_settle": object_stable_relative_settle,
         "object_settled": object_settled,
         "release_object_settle_timeout": release_object_settle_timeout,
         "object_settle_timeout": object_settle_timeout,
@@ -6475,11 +6503,15 @@ def build_predicate_snapshot(
         "object_release_frame": evidence_release_frame,
         "object_settle_timeout_frame": evidence_timeout_frame,
         "active_object": active_object,
+        "settle_obj_name": settle_obj_name,
         "object_supported_on_correct": object_supported_on_correct,
         "object_stable": object_stable,
         "object_stable_relative": object_stable_relative,
         "object_sync": object_sync,
         "gripper_away_from_object": gripper_away_from_object,
+        "object_supported_settle": object_supported_settle,
+        "object_support_type_matches_any_settle": object_support_type_matches_any_settle,
+        "object_stable_relative_settle": object_stable_relative_settle,
         "release_object_settle_timeout": release_object_settle_timeout,
         "object_settle_timeout": object_settle_timeout,
         "forbidden_contact_candidate": forbidden_candidate,

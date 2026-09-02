@@ -151,12 +151,37 @@ def _derive_one(name, assigns, exported, funcdefs):
         mapped_key = None
         if isinstance(leaf, ast.Name):
             for key, vexpr in exported.items():
+                if key == name:
+                    continue  # a predicate can't be its own child
                 if isinstance(vexpr, ast.Name) and vexpr.id == leaf.id:
                     mapped_key = key
                     break
         else:
-            for key, vexpr in exported.items():
-                if _unparse(vexpr) == raw:
+            # An exported key's own definition sometimes wraps the exact
+            # same call this leaf is with an extra None/existence guard --
+            # e.g. gripper_away_from_object = `_bool(settle_obj_name is not
+            # None and _gripper_far_from_object(settle_obj_name))`, which is
+            # the same call object_settled's own formula uses. Only strip
+            # *guard-shaped* leaves (a bare `Compare`, e.g. "X is not None"
+            # or "X >= N") before comparing, and only accept the match if
+            # exactly ONE substantive (non-guard) leaf remains and it's
+            # this exact leaf -- NOT "this leaf appears anywhere among that
+            # key's leaves", which would also match e.g. skill_dump_onset
+            # (a 7-term AND that happens to also include `not
+            # object_released` as one of its unrelated terms, purely
+            # coincidentally). Starts from assigns[key] (the key's own
+            # local-variable assignment), not exported[key] (the
+            # dict-literal's value expression, almost always just a bare
+            # `Name(key)` pointing back at that same local variable, which
+            # would make _flatten_and treat it as trivially "already
+            # exported" and refuse to unfold it any further).
+            for key in exported:
+                if key == name:
+                    continue  # a predicate can't be its own child
+                formula_node = assigns.get(key, exported[key])
+                exported_leaves = _flatten_and(formula_node, funcdefs, assigns, exported)
+                substantive = [l for l in exported_leaves if not isinstance(l, ast.Compare)]
+                if len(substantive) == 1 and _unparse(substantive[0]) == raw:
                     mapped_key = key
                     break
         if mapped_key is not None and mapped_key not in seen:

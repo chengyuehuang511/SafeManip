@@ -798,14 +798,39 @@ function predicateRow(p, indent) {
   return { row, timeline };
 }
 
+// One stable color per distinct categorical value (e.g. object name), not
+// tied to true/false -- picked from a fixed palette by a simple string
+// hash so the same object always gets the same color within one episode
+// (and typically across episodes too, though that's not guaranteed).
+const _CATEGORICAL_COLORS = [
+  "#5b7fff", "#3bb273", "#e0a13a", "#d64545", "#9b6bd6", "#3ab0c9", "#c9843a", "#7a9e3b",
+];
+function _categoricalColor(value) {
+  if (value == null) return "var(--bg-alt2)";
+  let h = 0;
+  for (let i = 0; i < value.length; i++) h = (h * 31 + value.charCodeAt(i)) >>> 0;
+  return _CATEGORICAL_COLORS[h % _CATEGORICAL_COLORS.length];
+}
+
 function fillTimeline(timeline, p, span) {
   for (const r of p.runs) {
     const width = ((r.end_frame - r.start_frame + 1) / span) * 100;
     const seg = document.createElement("button");
-    seg.className =
-      "predicate-run " +
-      (r.value === true ? "run-true" : r.value === false ? "run-false" : "run-unknown");
-    seg.style.width = `${width}%`;
+    if (p.is_categorical) {
+      // Which object (e.g. "bread" vs "basket") a predicate was actually
+      // about at each frame -- object identity, not a boolean -- so shown
+      // as a colored-by-value segment with the name itself as visible
+      // text (not just true/false coloring) whenever there's room.
+      seg.className = "predicate-run run-categorical";
+      seg.style.width = `${width}%`;
+      seg.style.background = _categoricalColor(r.value);
+      seg.textContent = r.value || "";
+    } else {
+      seg.className =
+        "predicate-run " +
+        (r.value === true ? "run-true" : r.value === false ? "run-false" : "run-unknown");
+      seg.style.width = `${width}%`;
+    }
     seg.title =
       `${p.label}: ${r.value === null ? "n/a" : r.value} · ` +
       `monitor frames ${r.start_frame}-${r.end_frame} · t=${fmtTime(r.start.time_s)}-${fmtTime(r.end.time_s)}`;
@@ -1024,7 +1049,11 @@ function predicateBreakdown(pb) {
       markTimeline(timeline, marks, start_frame, end_frame, span, bottoms);
     } else {
       row.style.marginTop = `${OWN_TRANSITION_MARGIN_TOP}px`;
-      markOwnTransitions(timeline, p, span, start_frame);
+      // Categorical rows (active_object/settle_obj_name) already show their
+      // value as visible text on each segment (see fillTimeline) -- skip
+      // the true/false/n/a transition ticks, which only make sense for
+      // boolean predicates.
+      if (!p.is_categorical) markOwnTransitions(timeline, p, span, start_frame);
     }
     wrap.appendChild(row);
     for (const sub of p.subs || []) {

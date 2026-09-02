@@ -425,6 +425,15 @@ video {
 .predicate-run.run-true { background: var(--ok-text); }
 .predicate-run.run-false { background: var(--fail-text); }
 .predicate-run.run-unknown { background: var(--border-alt); }
+.predicate-run.run-categorical {
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
 
 /* start/violated/end ticks, shared across every bar so they line up like a
    common time axis: a short glyph + frame number sitting above the bar, with
