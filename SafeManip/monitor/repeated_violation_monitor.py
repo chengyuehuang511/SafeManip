@@ -1050,7 +1050,20 @@ def _generic_precondition_failure_messages(
     failed = []
     for name in INTENDED_SAFETY_PRECONDITION_SPECS[action]:
         if name in predicate_values and not predicate_values.get(name):
-            text = name.replace("_", " ")
+            # Fixed 2026-09-03 (found via systematic corpus-wide failure
+            # clustering): was just name.replace("_", " ") with no
+            # negation -- for a positively-named predicate (e.g.
+            # dump_support_type_matches_content, meaning True = compatible),
+            # the failure-reason text read as "dump support type matches
+            # content", which sounds like a *success* statement even though
+            # it's listed specifically because this predicate is False.
+            # Doesn't affect any violated/satisfied verdict (the boolean
+            # check above already correctly identifies failures) -- purely
+            # a misleading-explanation-text bug, same class as the
+            # SETTLE_TIMEOUT_FRAMES drift fix earlier today. "not " is
+            # always grammatically valid here even if slightly awkward for
+            # some names, and never misleading, unlike the bare name alone.
+            text = f"not {name.replace('_', ' ')}"
             if name == f"fixture_ready_for_{action}":
                 reason = _fixture_ready_reason_from_evidence(evidence, action)
                 if reason:
