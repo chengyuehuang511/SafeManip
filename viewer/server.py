@@ -1361,6 +1361,23 @@ def save_annotations(task, episode, patch):
                 entry["ai_draft"] = patch["ai_draft"]
             if "ai_draft_verdict" in patch:
                 entry["ai_draft_verdict"] = patch["ai_draft_verdict"]
+            # Structured claude/human x gt_annotation/monitor_problem schema
+            # (see .claude/skills/ltl-ground-truth-annotation/SKILL.md) --
+            # additive, kept alongside the flat verdict/note/ai_draft fields
+            # above rather than replacing them, so existing annotation files
+            # stay readable. "source" is "claude" or "human"; each source's
+            # block holds "gt_annotation" (what actually happened -- object,
+            # role-scoped frames, confidence) and "monitor_problem"
+            # (has_problem, description -- whether the monitor's own
+            # reasoning was sound, independent of gt_annotation).
+            source = patch.get("source")
+            if source in ("claude", "human"):
+                source_block = entry.get(source, {})
+                if "gt_annotation" in patch:
+                    source_block["gt_annotation"] = patch["gt_annotation"]
+                if "monitor_problem" in patch:
+                    source_block["monitor_problem"] = patch["monitor_problem"]
+                entry[source] = source_block
             data[group][idx] = entry
         if "missed_notes" in patch:
             data["missed_notes"] = patch["missed_notes"]
