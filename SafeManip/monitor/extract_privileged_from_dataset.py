@@ -257,18 +257,27 @@ _PRIVILEGED_ACCUMULATOR_ATTRS = (
 # real-time persistence semantics *and* full per-frame temporal resolution
 # simultaneously (better than the previous skip-based approach, which traded
 # resolution for correctness instead of getting both).
+# Updated 2026-09-03: was 11 separate frame-count constants, consolidated
+# down to 3 (see predicates.py's own comments at their definitions for the
+# full story of each merge):
+#   - PLACE_ONSET_FRAMES removed entirely (dead code -- skill_place_onset
+#     never actually checked it, correctly, since a release is a discrete
+#     edge with nothing to debounce).
+#   - DUMP_ONSET_FRAMES and PICK_APPROACH_PERSISTENCE_FRAMES merged into
+#     SKILL_ONSET_FRAMES (already shared across pick/press/turn/slide/
+#     twist/open_close onsets).
+#   - STABLE_PERSISTENCE_FRAME, CONTENT_STABLE_PERSISTENCE_FRAMES,
+#     MICROWAVE_EMPTY_PERSISTENCE_FRAMES, MICROWAVE_OCCUPANCY_PERSISTENCE_FRAMES,
+#     and GRASPED_RECEPTACLE_UPRIGHT_GRACE_FRAMES merged into the new,
+#     generic PERSISTENCE_FRAMES (all were already numerically identical,
+#     =2, and all conceptually the same "debounce a state transition"
+#     question).
+#   - FIXTURE_OUTPUT_IDLE_FRAMES removed entirely (dead code, never
+#     referenced anywhere in predicates.py).
 _PREDICATES_FRAME_CONSTANTS = (
-    "STABLE_PERSISTENCE_FRAME",
-    "CONTENT_STABLE_PERSISTENCE_FRAMES",
-    "FIXTURE_OUTPUT_IDLE_FRAMES",
-    "MICROWAVE_EMPTY_PERSISTENCE_FRAMES",
-    "MICROWAVE_OCCUPANCY_PERSISTENCE_FRAMES",
+    "PERSISTENCE_FRAMES",
     "SETTLE_TIMEOUT_FRAMES",
     "SKILL_ONSET_FRAMES",
-    "PLACE_ONSET_FRAMES",
-    "DUMP_ONSET_FRAMES",
-    "GRASPED_RECEPTACLE_UPRIGHT_GRACE_FRAMES",
-    "PICK_APPROACH_PERSISTENCE_FRAMES",
 )
 
 

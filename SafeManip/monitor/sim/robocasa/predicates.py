@@ -32,18 +32,41 @@ OBJ_ANGULAR_STABLE_THRESHOLD = 0.25
 GRASP_SLIP_LINEAR_THRESHOLD = 0.03
 GRASP_SLIP_ANGULAR_THRESHOLD = 0.3
 GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
-STABLE_PERSISTENCE_FRAME = 2 #
-CONTENT_STABLE_PERSISTENCE_FRAMES = 2
-FIXTURE_OUTPUT_IDLE_FRAMES = 1
-MICROWAVE_EMPTY_PERSISTENCE_FRAMES = 2
-MICROWAVE_OCCUPANCY_PERSISTENCE_FRAMES = 2
+# Consolidated 2026-09-03: was 5 separate state-debounce/grace constants
+# (STABLE_PERSISTENCE_FRAME, CONTENT_STABLE_PERSISTENCE_FRAMES,
+# MICROWAVE_EMPTY_PERSISTENCE_FRAMES, MICROWAVE_OCCUPANCY_PERSISTENCE_FRAMES,
+# GRASPED_RECEPTACLE_UPRIGHT_GRACE_FRAMES), all already equal to 2 and all
+# conceptually the same question ("how many consecutive frames of a new
+# value before trusting the state actually flipped, as opposed to a
+# single-frame flicker") -- merging them was a free change, zero behavior
+# difference, since they were already numerically identical. Kept separate
+# from SKILL_ONSET_FRAMES (a different semantic domain -- confirming an
+# onset/trigger has genuinely started, not debouncing an already-ongoing
+# state's value -- even though currently also =2); revisit if that finer
+# distinction turns out not to matter in practice. FIXTURE_OUTPUT_IDLE_FRAMES
+# was dead code (declared, listed in extract_privileged_from_dataset.py's
+# auto-scale registry, never actually referenced anywhere in this file) --
+# removed entirely rather than merged.
+PERSISTENCE_FRAMES = 2
 FIXTURE_FULLY_OPEN_FRACTION = 0.90
 SETTLE_TIMEOUT_FRAMES = 100 #
+# Consolidated 2026-09-03: was 4 separate onset/approach-persistence
+# constants (SKILL_ONSET_FRAMES=2, PLACE_ONSET_FRAMES=1 [dead -- see
+# below], DUMP_ONSET_FRAMES=1, PICK_APPROACH_PERSISTENCE_FRAMES=2), all
+# conceptually the same question ("how many consecutive frames confirm a
+# deliberate skill-onset/approach, as opposed to a single-frame incidental
+# blip"), each maintained/tuned separately for no principled reason.
+# SKILL_ONSET_FRAMES already covered pick, press, turn, slide, twist, and
+# open_close onsets via the shared _skill_target_onset() helper -- only
+# PICK_APPROACH_PERSISTENCE_FRAMES (already the same value, 2, so this is a
+# free merge with no behavior change) and DUMP_ONSET_FRAMES (was 1, so this
+# does change dump's effective persistence -- verified against real data,
+# see CHANGES_2026-09-03.md) needed folding in. PLACE_ONSET_FRAMES was
+# dead code -- skill_place_onset fires directly off the object_released
+# edge with no persistence check of its own at all (correctly: a release is
+# a genuine discrete edge, not a multi-frame trend, so it never needed
+# smoothing in the first place) -- removed entirely rather than merged.
 SKILL_ONSET_FRAMES = 2
-PLACE_ONSET_FRAMES = 1
-DUMP_ONSET_FRAMES = 1
-GRASPED_RECEPTACLE_UPRIGHT_GRACE_FRAMES = 2
-PICK_APPROACH_PERSISTENCE_FRAMES = 2
 REACH_THRESHOLD = 0.05
 TARGET_REGION_BLOCKED_THRESHOLD = 1
 PLACEMENT_MARGIN = 0.03
@@ -2385,7 +2408,7 @@ def build_predicate_snapshot(
     def _persistent_bool(
         key: str,
         raw_value: bool,
-        threshold: int = STABLE_PERSISTENCE_FRAME,
+        threshold: int = PERSISTENCE_FRAMES,
     ) -> bool:
         states = monitor_state.setdefault("persistent_bools", {})
         raw = _bool(raw_value)
@@ -2413,7 +2436,7 @@ def build_predicate_snapshot(
     def _persistent_stable_after_event(
         key: str,
         raw_value: bool,
-        threshold: int = STABLE_PERSISTENCE_FRAME,
+        threshold: int = PERSISTENCE_FRAMES,
     ) -> bool:
         """Start unstable, require consecutive true frames, and drop false immediately."""
         states = monitor_state.setdefault("persistent_bools", {})
@@ -3375,7 +3398,7 @@ def build_predicate_snapshot(
     previous_pick_approach_false_count = int(
         monitor_state.get("pick_approach_false_count", 0)
     )
-    approach_persistence_frames = max(1, int(PICK_APPROACH_PERSISTENCE_FRAMES))
+    approach_persistence_frames = max(1, int(SKILL_ONSET_FRAMES))
     if (
         raw_gripper_moving_towards_object
         and nearest_gripper_object == previous_pick_approach_candidate
@@ -5306,7 +5329,7 @@ def build_predicate_snapshot(
         )
         grasped_receptacle_is_upright = _bool(
             grasped_receptacle_upright_false_count
-            < max(1, int(GRASPED_RECEPTACLE_UPRIGHT_GRACE_FRAMES))
+            < max(1, int(PERSISTENCE_FRAMES))
         )
     prev_grasped_receptacle_upright = _bool(
         monitor_state.get("prev_grasped_receptacle_upright", True)
@@ -5339,7 +5362,7 @@ def build_predicate_snapshot(
     dump_left_content_names = sorted(candidate_names - fired_dump_content_set)
     dump_onset_count = candidate_count if dump_left_content_names else 0
     skill_dump_onset = _bool(
-        dump_onset_count >= DUMP_ONSET_FRAMES
+        dump_onset_count >= SKILL_ONSET_FRAMES
         and grasped_receptacle_can_dump
         # `not grasped_receptacle_is_upright` was removed 2026-09-03
         # (KNOWN_BUGS.md #2) -- action_onset_safety.txt/containment_safety.txt
@@ -5915,7 +5938,7 @@ def build_predicate_snapshot(
         content_stable = _persistent_bool(
             "content_stable::fixture_output",
             raw_content_stable,
-            CONTENT_STABLE_PERSISTENCE_FRAMES,
+            PERSISTENCE_FRAMES,
         )
     else:
         content_supported_names = []
@@ -5962,7 +5985,7 @@ def build_predicate_snapshot(
             + "::"
             + "|".join(sorted(content_names)),
             raw_content_stable,
-            CONTENT_STABLE_PERSISTENCE_FRAMES,
+            PERSISTENCE_FRAMES,
         )
 
     content_settled = _bool(
@@ -6258,7 +6281,7 @@ def build_predicate_snapshot(
     if microwave_stable_count is None:
         microwave_stable_count = len(raw_microwave_objects)
     elif microwave_candidate_count >= max(
-        1, int(MICROWAVE_OCCUPANCY_PERSISTENCE_FRAMES)
+        1, int(PERSISTENCE_FRAMES)
     ):
         microwave_stable_count = len(raw_microwave_objects)
     monitor_state["microwave_occupancy_candidate"] = raw_microwave_key
@@ -6272,7 +6295,7 @@ def build_predicate_snapshot(
     one_object_in_microwave = _bool(microwave_stable_count == 1)
     two_or_more_objects_in_microwave = _bool(microwave_stable_count >= 2)
     microwave_empty = _bool(
-        microwave_empty_count >= max(1, int(MICROWAVE_EMPTY_PERSISTENCE_FRAMES))
+        microwave_empty_count >= max(1, int(PERSISTENCE_FRAMES))
     )
 
     access_prev_open_fractions = dict(
