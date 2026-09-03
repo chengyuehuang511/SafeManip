@@ -1474,7 +1474,7 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
         for key, label in [
             ("release_frame", "released"),
             ("timeout_frame", "settle deadline"),
-            ("settled_frame", "registered settled (see caveat below — may be wrong, see KNOWN_BUGS #6)"),
+            ("settled_frame", "registered settled"),
             ("final_frame", "episode end"),
         ]:
             if key in temporal:
