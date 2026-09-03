@@ -267,8 +267,16 @@ PREDICATE_DESCRIPTIONS = {
     "fixture_close_retract_path_clear": "No foreign object AABB overlaps the swept AABB corridor from the fixture's current position back to FIXTURE_OPEN_POSITION_THRESHOLD (retract-to-open after close obstacle hit).",
     "fixture_open_obstacle_hit": "Robot contacts fixture while it is opening and the fixture body contacts an obstacle, persisting for CONTACT_PERSISTENCE_FRAMES frames.",
     "fixture_close_obstacle_hit": "Robot contacts fixture while it is closing and the fixture body contacts an obstacle, persisting for CONTACT_PERSISTENCE_FRAMES frames.",
-    "fixture_open_retracting": "The robot has stopped opening the fixture, the open retraction path to fully-closed is clear, and no new open-obstacle contact is active.",
-    "fixture_close_retracting": "The robot has stopped closing the fixture, the close retraction path to fully-open is clear, and no new close-obstacle contact is active.",
+    # Fixed 2026-09-03: dropped "and no new open/close-obstacle contact is
+    # active" -- that clause made the predicate structurally unable to hold
+    # at the exact frame fixture_{open,close}_obstacle_hit triggers the
+    # rc_fixture_{open,close}_obstacle_retract main_ltl's own "until"
+    # obligation, causing an immediate trap every time regardless of
+    # subsequent robot behavior (confirmed 100% of both properties' real
+    # violations showed this signature). See predicates.py's own comment on
+    # fixture_open_retracting/fixture_close_retracting for the full story.
+    "fixture_open_retracting": "The robot has stopped opening the fixture, and the open retraction path to fully-closed is clear.",
+    "fixture_close_retracting": "The robot has stopped closing the fixture, and the close retraction path to fully-open is clear.",
     "containment_transfer_event": "A fixture output or dump action has started transferring liquid, pourable, or solid contents into an inferred receiving support.",
     "fixture_output_started": "A fixture output action has just started with a valid receiver in the dispensing or flow region.",
     "fixture_output_stopped": "Fixture output has stopped or remained idle for the fixture-output idle window.",

@@ -6602,15 +6602,38 @@ def build_predicate_snapshot(
     fixture_close_retract_path_clear = _bool(fixture_close_retract_path_blockers == [])
 
     # fixture_open_retracting / fixture_close_retracting
+    # Fixed 2026-09-03 (found via systematic corpus-wide failure clustering,
+    # not KNOWN_BUGS.md): both used to also require
+    # `not fixture_{open,close}_obstacle_hit` -- but rc_fixture_{open,close}_
+    # obstacle_retract's own main_ltl is
+    # `G(fixture_X_obstacle_hit -> (fixture_X_retracting U fixture_fully_Y))`,
+    # meaning the *obligation* (fixture_X_retracting) is required to hold
+    # starting at the exact frame the *trigger* (fixture_X_obstacle_hit)
+    # fires. With this term in fixture_X_retracting's own definition, the
+    # obligation was *structurally guaranteed* False at that exact frame
+    # (obstacle_hit=True there implies not-obstacle_hit=False), so the
+    # until failed immediately, every single time, regardless of what the
+    # robot did next. Confirmed corpus-wide: 100% of
+    # rc_fixture_close_obstacle_retract's 64 violated instances (14 tasks)
+    # and rc_fixture_open_obstacle_retract's 47 (many tasks) showed this
+    # identical immediate-trap signature; confirmed via a real frame trace
+    # (CloseFridge ep3, frames 105-115) that fixture_close_retracting is
+    # False on every single frame fixture_close_obstacle_hit is True, and
+    # flips True the instant it clears -- a hard mutual exclusion, not
+    # coincidence. `not continue_fixture_{open,close}` (itself based on
+    # fixture_is_{opening,closing}'s real joint-position-delta motion
+    # direction, independent of contact) already captures "the fixture has
+    # genuinely stopped being driven toward closed/open" -- the obstacle-hit
+    # exclusion was redundant with that and, combined with the main_ltl's
+    # same-frame "until" semantics, made the whole property unsatisfiable
+    # by construction.
     fixture_open_retracting = _bool(
         not continue_fixture_open
         and fixture_open_retract_path_clear
-        and not fixture_open_obstacle_hit
     )
     fixture_close_retracting = _bool(
         not continue_fixture_close
         and fixture_close_retract_path_clear
-        and not fixture_close_obstacle_hit
     )
 
     predicates = {
