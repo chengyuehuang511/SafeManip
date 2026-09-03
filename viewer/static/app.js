@@ -1181,6 +1181,104 @@ function repeatedViolationsBlock(rep, window) {
   return details;
 }
 
+// Renders the claude/human x gt_annotation/monitor_problem structured
+// annotation schema (.claude/skills/ltl-ground-truth-annotation/SKILL.md) --
+// separate from the existing free-text aiDraftBlock/verdictControls/noteBox
+// (the reviewer's own running verdict), this shows the *structured* record:
+// what actually happened (gt_annotation's per-occurrence trigger/resolve
+// frames, reusing the same occurrence shape predicateBreakdown already
+// renders) and whether the monitor's own reasoning was sound
+// (monitor_problem), kept as two separate questions per that skill's design.
+// Currently only "claude" is ever populated (via
+// SafeManip/monitor/populate_claude_annotations.py); "human" renders
+// identically whenever/if a human reviewer's own gt_annotation gets added
+// through the same save_annotations "source" patch mechanism.
+function groundTruthAnnotationSection(current, source, label) {
+  const block = current && current[source];
+  if (!block || (!block.gt_annotation && !block.monitor_problem)) return null;
+  const details = document.createElement("details");
+  details.className = "gt-annotation gt-annotation-" + source;
+  const summary = document.createElement("summary");
+  const problem = block.monitor_problem && block.monitor_problem.has_problem;
+  summary.textContent = `${label} annotation` + (problem ? " — ⚠ monitor problem flagged" : "");
+  details.appendChild(summary);
+
+  const ann = block.gt_annotation;
+  if (ann) {
+    if (ann.source_note) {
+      const note = document.createElement("div");
+      note.className = "card-hint";
+      note.textContent = ann.source_note;
+      details.appendChild(note);
+    }
+    if (ann.confidence) {
+      const conf = document.createElement("div");
+      conf.className = "card-hint";
+      conf.textContent = `confidence: ${ann.confidence}`;
+      details.appendChild(conf);
+    }
+    if (ann.occurrences && ann.occurrences.length) {
+      const list = document.createElement("div");
+      list.className = "repeated-episode-list";
+      for (const occ of ann.occurrences) {
+        const row = document.createElement("div");
+        row.className = "repeated-episode-row";
+        if (occ.object) {
+          const objChip = document.createElement("span");
+          objChip.className = "chip";
+          objChip.textContent = occ.object;
+          row.appendChild(objChip);
+        }
+        if (occ.activation && occ.activation.frame != null) {
+          const startBtn = document.createElement("button");
+          startBtn.className = "chip";
+          startBtn.textContent = `trigger f${occ.activation.frame}`;
+          startBtn.addEventListener("click", () => seekTo(occ.activation.marker));
+          row.appendChild(startBtn);
+        }
+        if (occ.end && occ.end.frame != null) {
+          const endBtn = document.createElement("button");
+          endBtn.className = "chip";
+          endBtn.textContent = `end f${occ.end.frame}`;
+          endBtn.addEventListener("click", () => seekTo(occ.end.marker));
+          row.appendChild(endBtn);
+        }
+        const badge = document.createElement("span");
+        const resolved = occ.end && occ.end.resolved;
+        badge.className = "badge " + (resolved ? "badge-ok" : "badge-fail");
+        badge.textContent = resolved ? "resolved" : "unresolved";
+        row.appendChild(badge);
+        list.appendChild(row);
+      }
+      details.appendChild(list);
+    }
+  }
+
+  if (block.monitor_problem) {
+    const warn = document.createElement("div");
+    warn.className = "card-hint" + (problem ? " warn" : "");
+    warn.textContent = problem
+      ? `monitor_problem: ${block.monitor_problem.description || "(no description)"}`
+      : "monitor_problem: none flagged";
+    details.appendChild(warn);
+  }
+  return details;
+}
+
+function groundTruthAnnotationBlock(current) {
+  const wrap = document.createElement("div");
+  wrap.className = "gt-annotation-wrap";
+  let any = false;
+  for (const [source, label] of [["claude", "Claude"], ["human", "Human"]]) {
+    const section = groundTruthAnnotationSection(current, source, label);
+    if (section) {
+      wrap.appendChild(section);
+      any = true;
+    }
+  }
+  return any ? wrap : null;
+}
+
 function ltlLine(ltl) {
   if (!ltl) return null;
   const line = document.createElement("div");
@@ -1234,6 +1332,9 @@ function renderViolation(v, ann) {
   const draft = aiDraftBlock(current);
   if (draft) card.appendChild(draft);
 
+  const gt = groundTruthAnnotationBlock(current);
+  if (gt) card.appendChild(gt);
+
   card.appendChild(verdictControls("violations", v.index, current));
   card.appendChild(noteBox("violations", v.index, current));
   return card;
@@ -1272,6 +1373,9 @@ function renderSatisfied(s, ann) {
 
   const draft = aiDraftBlock(current);
   if (draft) card.appendChild(draft);
+
+  const gt = groundTruthAnnotationBlock(current);
+  if (gt) card.appendChild(gt);
 
   card.appendChild(verdictControls("satisfied", s.index, current));
   card.appendChild(noteBox("satisfied", s.index, current));

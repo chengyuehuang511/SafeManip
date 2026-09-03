@@ -333,6 +333,17 @@ video {
 .repeated-episode-duration { color: var(--text-muted); font-size: 11px; }
 .card-hint.warn { color: var(--warn, #c0392b); }
 
+.gt-annotation-wrap { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.gt-annotation { margin: 0; }
+.gt-annotation summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  user-select: none;
+}
+.gt-annotation summary:hover { color: var(--text-dim); }
+.gt-annotation-claude summary { color: var(--accent-text, #6a8fc9); }
+
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .chip {
   display: flex;
