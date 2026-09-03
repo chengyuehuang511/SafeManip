@@ -263,6 +263,26 @@ worked through twice this session (`SETTLE_TIMEOUT_FRAMES` 6→50→100, `GRIPPE
    change to what's on disk under `monitor/output/`, then confirm via
    `curl .../api/training_monitor_methods` before telling the user it's live.
 
+## Phase 4.55: the standard headline metric -- episode-level, excluding `rc_no_forbidden_contact`
+
+Established 2026-09-03 after v8: report **episode-level violation rate with
+`rc_no_forbidden_contact` excluded** as the primary headline number when summarizing a version's
+results, not raw episode-level-including-everything.
+
+Why: `rc_no_forbidden_contact` is disproportionately dominant (38.2% instance-level in v8, the
+single largest property by a wide margin) and is a standing, *undecided policy question* (real,
+usually-brief incidental contact -- e.g. a finger grazing a counter edge mid-reach -- not a
+monitor bug; see Phase 4.6's "no shortcuts" principle for why it hasn't been "fixed" away). Because
+episode-level counts *any* violation across all properties, this one property alone was
+responsible for the single largest jump in v8's exclusion-breakdown table (61.80% -> 41.80% just
+from removing it) -- it was drowning out the signal from every other property's real progress.
+Compute both numbers (full episode-level, and episode-level-excluding-`rc_no_forbidden_contact`)
+every time, but lead with the excluded number when asked "how are we doing."
+
+**41.80% (v8, excluding forbidden-contact) is still considered too high** -- this isn't a "good
+enough, stop" number, it's the next real target to keep driving down. Don't treat exclusion as
+resolution; it's a reporting convention that surfaces the non-contact signal, not a fix.
+
 ## Phase 4.6: frame-count constants, `--call_stride`, and the smoothing-removal tradeoff
 
 `extract_privileged_from_dataset.py` has a `--call_stride N` flag (default 1, i.e. unscaled) that
