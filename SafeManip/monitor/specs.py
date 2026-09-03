@@ -13,7 +13,20 @@ SOURCE_LOCAL_PREDICATES = "local_code:robocasa/predicates.py"
 SOURCE_SIM_PREDICATES = "local_code:robocasa_sim/robocasa/environments/kitchen/predicates.py"
 
 
-SETTLE_TIMEOUT_FRAMES = 6
+# Fixed 2026-09-03: was a separate hardcoded local constant (=6), never
+# updated when monitor/sim/robocasa/predicates.py's own SETTLE_TIMEOUT_FRAMES
+# was changed to 50 then 100 -- two independent copies of "the same"
+# constant drifting apart. run_monitor_on_privileged.py imports this copy
+# for its explanation-text arithmetic ("timeout at frame X") and a
+# has_release_timeout-gated backfill computation, both of which were silently
+# using the stale value (visible as e.g. "object_settled never became true
+# within 6 frames afterward (timeout at frame 351)" even when the real,
+# correctly-computed-at-extraction-time trap didn't confirm until ~99 frames
+# later) -- confirmed via real data (SteamInMicrowave ep2). Now a single
+# source of truth: imported directly from the real predicates.py instead of
+# a second hardcoded number that has to be remembered and kept in sync by
+# hand.
+from monitor.sim.robocasa.predicates import SETTLE_TIMEOUT_FRAMES  # noqa: F401
 
 
 def _spec_intended_safety(name: str, ltl: str, predicates: List[str], description: str) -> Dict[str, object]:

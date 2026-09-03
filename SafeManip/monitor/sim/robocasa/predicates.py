@@ -3782,6 +3782,28 @@ def build_predicate_snapshot(
             return _bool(str(sup_name) in object_targets)
         if not bool(manip_attrs & FOOD_TYPE_NAMES):
             return True
+        # Fixed 2026-09-03: was an unconditional `return False` for any food
+        # object resting on any fixture support at all -- but the spec's own
+        # `support_is_fixture` (action_onset_safety.txt:486-487) specifically
+        # means "the *structural body* of a fixture (fridge door, cabinet
+        # frame, drawer body, oven door)", not a fixture's interior storage
+        # surface (a shelf/rack/interior floor). The code never made that
+        # distinction, so placing a condiment on a cabinet's own shelf --
+        # exactly what CategorizeCondiments' successful demos do, every
+        # single episode -- was misclassified as "food object on structural
+        # fixture body" 100% of the time. _fixture_interior_support_aabb
+        # already exists (used elsewhere for containment/placement geometry)
+        # and reads robocasa's own real interior-region metadata
+        # (fixture.get_reset_region_names()/get_int_sites()), not anything
+        # invented -- reuse it here: if the object's position matches a real
+        # interior support region of this fixture, it's resting on/in a
+        # proper storage surface, not the structural body, so food is fine.
+        if sup_name is not None:
+            obj_pos = _object_position(str(obj_name))
+            if obj_pos is not None and _fixture_interior_support_aabb(
+                str(sup_name), obj_pos=obj_pos
+            ) is not None:
+                return True
         return False
 
     def _support_hygienic() -> bool:
