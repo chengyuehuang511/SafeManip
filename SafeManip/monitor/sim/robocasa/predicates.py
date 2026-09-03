@@ -47,7 +47,16 @@ GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
 # was dead code (declared, listed in extract_privileged_from_dataset.py's
 # auto-scale registry, never actually referenced anywhere in this file) --
 # removed entirely rather than merged.
-PERSISTENCE_FRAMES = 2
+# Raised 2026-09-03 (was 2) after checking a real raw stability trace
+# (ArrangeBreadBasket ep0, object_stable_relative's true-run lengths) against
+# the naive --call_stride=16-equivalent (2 * 16 = 32). Real data showed a
+# clean bimodal split, not a reason to go anywhere near 32: genuine noise/
+# flicker runs were 1-2 frames, and every genuine stability period was 7+
+# frames, with nothing observed in between. 5 sits cleanly in that gap --
+# well above the noise cluster's max (2), well below the real-signal
+# cluster's min (7) -- an evidence-grounded choice, not half of the naive
+# 16x value.
+PERSISTENCE_FRAMES = 5
 FIXTURE_FULLY_OPEN_FRACTION = 0.90
 SETTLE_TIMEOUT_FRAMES = 100 #
 # Consolidated 2026-09-03: was 4 separate onset/approach-persistence
@@ -66,7 +75,20 @@ SETTLE_TIMEOUT_FRAMES = 100 #
 # edge with no persistence check of its own at all (correctly: a release is
 # a genuine discrete edge, not a multi-frame trend, so it never needed
 # smoothing in the first place) -- removed entirely rather than merged.
-SKILL_ONSET_FRAMES = 2
+# Raised 2026-09-03 (was 2) after checking real data against the naive
+# --call_stride=16-equivalent (2 * 16 = 32): 32 turned out to be far more
+# conservative than actually needed. A genuine, sustained pick approach
+# (ArrangeBreadBasket ep0, frame 309's onset) already had
+# pick_approach_candidate_count at 55+ by the time "near + moving towards"
+# first held long enough to fire onset -- the low threshold was never what
+# gated *real* approaches at all (they clear any reasonable threshold long
+# before onset actually needs to fire); it only mattered for filtering
+# brief, spurious near-passes. 8 is comfortably above a 1-2 frame noise
+# blip (4x the old value) and comfortably below the point where it could
+# ever interfere with a real reach (nothing observed anywhere close to 8
+# frames for a genuine approach that then aborted) -- not simply half of
+# the naive 16x value, a distinct evidence-grounded choice.
+SKILL_ONSET_FRAMES = 8
 REACH_THRESHOLD = 0.05
 TARGET_REGION_BLOCKED_THRESHOLD = 1
 PLACEMENT_MARGIN = 0.03
