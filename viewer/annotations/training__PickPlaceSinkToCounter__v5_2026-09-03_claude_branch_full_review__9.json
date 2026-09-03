@@ -1,0 +1,609 @@
+{
+  "violations": {},
+  "satisfied": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "food",
+              "activation": {
+                "frame": 119,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 119,
+                  "video_frame": 952,
+                  "time_s": 95.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 120,
+                "resolved": true,
+                "reason": "object_grasped became true before object_left_gripper did \u2014 recovered",
+                "marker": {
+                  "monitor_frame": 120,
+                  "video_frame": 960,
+                  "time_s": 96.0
+                }
+              },
+              "eventual_separation": {
+                "frame": 276,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 276,
+                  "video_frame": 2208,
+                  "time_s": 220.8
+                }
+              }
+            },
+            {
+              "object": "food",
+              "activation": {
+                "frame": 264,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 264,
+                  "video_frame": 2112,
+                  "time_s": 211.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 264,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 264,
+                  "video_frame": 2112,
+                  "time_s": 211.2
+                }
+              },
+              "eventual_separation": {
+                "frame": 276,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 276,
+                  "video_frame": 2208,
+                  "time_s": 220.8
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "2": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "3": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "4": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "food",
+              "activation": {
+                "frame": 258,
+                "reason": "object_reach_in_fixture became true",
+                "marker": {
+                  "monitor_frame": 258,
+                  "video_frame": 2064,
+                  "time_s": 206.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 258,
+                "resolved": true,
+                "reason": "object_in_same_fixture became true",
+                "marker": {
+                  "monitor_frame": 258,
+                  "video_frame": 2064,
+                  "time_s": 206.4
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "5": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "food",
+              "activation": {
+                "frame": 118,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 118,
+                  "video_frame": 944,
+                  "time_s": 94.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 119,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 119,
+                  "video_frame": 952,
+                  "time_s": 95.2
+                }
+              }
+            },
+            {
+              "object": "food",
+              "activation": {
+                "frame": 120,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 120,
+                  "video_frame": 960,
+                  "time_s": 96.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 264,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 264,
+                  "video_frame": 2112,
+                  "time_s": 211.2
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "6": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "7": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "food",
+              "activation": {
+                "frame": 258,
+                "reason": "object_reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 258,
+                  "video_frame": 2064,
+                  "time_s": 206.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 258,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 258,
+                  "video_frame": 2064,
+                  "time_s": 206.4
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "8": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "invariant",
+          "occurrences": [
+            {
+              "object": "food",
+              "activation": null,
+              "violated_frames": [
+                {
+                  "frame": 116,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 116,
+                    "video_frame": 928,
+                    "time_s": 92.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 117,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 117,
+                    "video_frame": 936,
+                    "time_s": 93.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 118,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 118,
+                    "video_frame": 944,
+                    "time_s": 94.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 119,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 119,
+                    "video_frame": 952,
+                    "time_s": 95.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 120,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 120,
+                    "video_frame": 960,
+                    "time_s": 96.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 121,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 121,
+                    "video_frame": 968,
+                    "time_s": 96.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 122,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 122,
+                    "video_frame": 976,
+                    "time_s": 97.6
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 122,
+                "resolved": true,
+                "reason": "forbidden_contact returned to false",
+                "marker": {
+                  "monitor_frame": 122,
+                  "video_frame": 976,
+                  "time_s": 97.6
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "9": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "10": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 92,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 92,
+                  "video_frame": 736,
+                  "time_s": 73.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 92,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 92,
+                  "video_frame": 736,
+                  "time_s": 73.6
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "11": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "food",
+              "activation": {
+                "frame": 264,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 264,
+                  "video_frame": 2112,
+                  "time_s": 211.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 264,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 264,
+                  "video_frame": 2112,
+                  "time_s": 211.2
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "12": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "13": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "14": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "15": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "food",
+              "activation": {
+                "frame": 264,
+                "reason": "object_released became true",
+                "marker": {
+                  "monitor_frame": 264,
+                  "video_frame": 2112,
+                  "time_s": 211.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 278,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 278,
+                  "video_frame": 2224,
+                  "time_s": 222.4
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "16": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "17": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "18": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "19": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "missed_notes": "",
+  "overall_verdict": null
+}
