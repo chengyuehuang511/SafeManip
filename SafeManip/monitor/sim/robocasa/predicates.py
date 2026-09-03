@@ -1444,6 +1444,40 @@ def build_predicate_snapshot(
         type_hints.update(meta_info.get("groups_containing_sampled_obj") or ())
         return infer_object_attributes(str(info.get("category") or ""), type_hints)
 
+    def _object_is_manipulable(name: str) -> bool:
+        # Added 2026-09-03 (KNOWN_BUGS.md #1). Deliberately NOT based on
+        # attributes.py's "graspable" attribute -- that's added unconditionally
+        # to every single object category (object_category_attribute_defaults's
+        # last line, `attrs.add("graspable")`, runs for every row with no
+        # gating condition), so it can never distinguish a genuinely
+        # manipulable object from anything else; using it here would be a
+        # no-op, not a fix. Grounded in real MuJoCo joint structure instead
+        # (the same kind of "check what the sim itself actually represents"
+        # approach as the mj_geomDistance mesh-distance upgrade): an object
+        # whose body has a free (6-DoF) joint can genuinely be picked up and
+        # moved; a body with no joint at all (welded rigidly to its parent/
+        # the world) structurally cannot be manipulated regardless of what
+        # attribute a category-lookup table claims. Confidence: medium --
+        # physically well-grounded, but not yet spot-checked against a
+        # confirmed real non-manipulable object in this corpus (env_object_names
+        # already only contains entries from env.objects, so it's unclear how
+        # often a genuinely non-free-jointed object shows up there in
+        # practice; this defends against it if/when one does).
+        try:
+            body_id = env.obj_body_id[str(name)]
+            jnt_num = int(env.sim.model.body_jntnum[body_id])
+            if jnt_num == 0:
+                return False
+            jnt_adr = int(env.sim.model.body_jntadr[body_id])
+            jnt_type = int(env.sim.model.jnt_type[jnt_adr])
+            return jnt_type == int(mujoco.mjtJoint.mjJNT_FREE)
+        except Exception:
+            # If joint info can't be resolved for some reason, don't let this
+            # new check silently break every pick onset for that object --
+            # fail open (manipulable), same conservatism as the rest of this
+            # file's try/except-guarded geometry helpers.
+            return True
+
     def _object_category(name: str) -> str | None:
         objects = ((static_info or {}).get("scene_layout") or {}).get("objects") or {}
         info = objects.get(str(name)) or {}
@@ -1518,9 +1552,35 @@ def build_predicate_snapshot(
         return pos + lower[:3], pos + upper[:3]
 
     def _object_aabb(name: str) -> tuple[np.ndarray, np.ndarray] | None:
+        # Fallback order deliberately changed (2026-09-03, KNOWN_BUGS.md #11)
+        # from [_object_ou_bbox_aabb, _object_contact_aabb, _object_bbox_aabb]
+        # to this: _object_ou_bbox_aabb (upstream robocasa's
+        # env.objects[name].get_bbox_points(trans=body_xpos, rot=body_xquat))
+        # was tried first and, whenever it returned anything at all, that's
+        # what every one of _object_aabb()'s ~25 callers got -- confirmed via
+        # frame-by-frame debugging (ArrangeBreadBasket ep7, frames 710-718,
+        # basket actively grasped) that it returns a stale/offset box that
+        # doesn't track the object's real current extent while held (Z-range
+        # sat at a near-constant ~[0.75, 0.93] the whole time, well below the
+        # object's own real position and the gripper's own AABB) --
+        # get_bbox_points() composing a canonical/rest-pose box with the
+        # current body transform doesn't correctly follow genuinely
+        # lifted/moving objects. _object_contact_aabb (built from the
+        # object's own live contact-geom positions, the same primitive
+        # object_left_gripper and the mesh-distance gripper-far tiering
+        # already trust) tracked correctly in the same window. Since this is
+        # upstream robocasa's own get_bbox_points(), not something SafeManip
+        # can fix directly (same rule as never touching robocasa/ itself),
+        # the fix is to prefer the already-reliable contact-geom-based AABB
+        # here instead, keeping _object_ou_bbox_aabb only as a last-resort
+        # fallback for the rare object with zero contact geoms (spot-checked
+        # for basket only -- not yet re-verified for every object/task, but
+        # the underlying bug (a static rest-pose box, not a per-object mesh
+        # issue) is architectural, not basket-specific -- see KNOWN_BUGS.md
+        # #11 and CHANGES_2026-09-03.md).
         return (
-            _object_ou_bbox_aabb(str(name))
-            or _object_contact_aabb(str(name))
+            _object_contact_aabb(str(name))
+            or _object_ou_bbox_aabb(str(name))
             or _object_bbox_aabb(str(name))
         )
 
@@ -3332,6 +3392,15 @@ def build_predicate_snapshot(
         and gripper_moving_towards_object
         and gripper_near_object
         and not object_grasped
+        # Added 2026-09-03 (KNOWN_BUGS.md #1) -- action_onset_safety.txt's
+        # skill_pick_onset spec requires object_is_manipulable; the code
+        # never checked it before. See _object_is_manipulable's own docstring
+        # for why it's grounded in the object's real MuJoCo joint type rather
+        # than attributes.py's always-True "graspable".
+        and (
+            pick_approach_candidate_object is None
+            or _object_is_manipulable(pick_approach_candidate_object)
+        )
     )
     prev_pick_count = int(monitor_state.get("skill_pick_onset_candidate_count", 0))
     pick_onset_count = prev_pick_count + 1 if pick_onset_cond else 0
@@ -3625,8 +3694,18 @@ def build_predicate_snapshot(
         return sorted(blockers)
 
     def _support_stable() -> bool:
+        # Uses _object_stable_relative, not the plain world-frame
+        # _object_stable (2026-09-03, KNOWN_BUGS.md #9) -- same false-positive
+        # shape already fixed for object_settled (CHANGES_2026-08-31.md item
+        # 3): a support/receptacle currently being carried has nonzero
+        # world-frame velocity even while genuinely at rest relative to
+        # whatever's carrying it, so _object_stable alone reads it as
+        # "unstable" purely from being in motion, not from anything actually
+        # rattling/sliding. _object_stable_relative(name) auto-detects the
+        # support's own current support reference and is a drop-in
+        # replacement here.
         if sup_kind == "object" and sup_name is not None:
-            return _object_stable(sup_name)
+            return _object_stable_relative(sup_name)
         return True
 
     def _support_geometry_valid() -> bool:
@@ -4555,9 +4634,15 @@ def build_predicate_snapshot(
     )
 
     def _target_stable(target_id: str | None) -> bool:
+        # Uses _object_stable_relative, not persistent_object_stable_by_name
+        # (the debounced world-frame object_stable) -- same fix and reasoning
+        # as _support_stable above (2026-09-03, KNOWN_BUGS.md #9). Feeds the
+        # preconditions_satisfied_{press,turn,slide,twist,open_close} family,
+        # where the same "target object is currently being carried" false
+        # positive shape applies.
         kind, name = _split_target_id(target_id)
         if kind == "object" and name is not None:
-            return _bool(persistent_object_stable_by_name.get(str(name), False))
+            return _bool(_object_stable_relative(str(name)))
         return True
 
     target_stable = _bool(_target_stable(approach_target or nearest_gripper_target))
@@ -5203,7 +5288,25 @@ def build_predicate_snapshot(
     skill_dump_onset = _bool(
         dump_onset_count >= DUMP_ONSET_FRAMES
         and grasped_receptacle_can_dump
-        and not grasped_receptacle_is_upright
+        # `not grasped_receptacle_is_upright` was removed 2026-09-03
+        # (KNOWN_BUGS.md #2) -- action_onset_safety.txt/containment_safety.txt
+        # both explicitly say dump onset must not be gated on receptacle tilt
+        # or loss of uprightness "alone" (i.e. uprightness should be neither
+        # necessary nor sufficient -- only "content left the grasped
+        # receptacle" matters). Requiring persistent tilt as a hard AND term
+        # made every non-tilt dump (scooped out with a utensil, poured
+        # through a spout without ever tilting past the grace threshold)
+        # silently un-monitored: dump_left_content_names would be genuinely
+        # non-empty, but skill_dump_onset would never fire, so
+        # preconditions_satisfied_dump/rc_dump_preconditions_safe never got
+        # evaluated for that transfer at all. dump_onset_count/
+        # dump_left_content_names (built from raw_dump_left_content_set's
+        # actual content-membership diffing, not from tilt) already are the
+        # real "content left the grasped receptacle" signal the spec wants --
+        # grasped_receptacle_is_upright's computation is left intact and
+        # still exported (raw_grasped_receptacle_is_upright/
+        # grasped_receptacle_is_upright in violation_evidence) as diagnostic
+        # context, just no longer gates onset.
         and not object_released
         and not skill_place_onset
         and active_object is not None

@@ -1616,7 +1616,25 @@ def build_repeated_fixture_open_obstacle_monitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_fixture_open_obstacle_retract",
             main_ltl="G(fixture_open_obstacle_hit -> (fixture_open_retracting U fixture_fully_closed))",
-            recovery_ltl="fixture_fully_closed",
+            # Fixed 2026-09-03 (KNOWN_BUGS.md #10): was the bare atom
+            # "fixture_fully_closed", which under LTLf finite-trace semantics
+            # means "holds at the *current* (first) position recovery
+            # evaluates" -- not "eventually holds". Since recovery starts
+            # evaluating at the exact frame the trap is confirmed (an
+            # until-obligation failure, meaning fixture_fully_closed is
+            # necessarily still False there -- if it were already True the
+            # until would have resolved, not trapped), the bare atom read
+            # False on its very first observation, every time, permanently
+            # trapping recovery with 0% ever recovering corpus-wide. Wrapped
+            # in F(...) instead. Verified (isolated LTLfDFA test, see
+            # CHANGES_2026-09-03.md): fixture_fully_closed is never
+            # tautologically True at the trap-confirmation frame (it's the
+            # main formula's own genuine resolve atom, not a decoy escape
+            # term), so no Bug B risk here -- unlike
+            # rc_dropped_object_was_released/rc_released_object_eventually_settles,
+            # this one didn't need a "resume, not recovery" redesign, a plain
+            # F(...) wrap is correct as-is.
+            recovery_ltl="F(fixture_fully_closed)",
             property_description=property_description,
             binding={},
             explanation_builder=_fixture_open_obstacle_explanation,
@@ -1632,7 +1650,11 @@ def build_repeated_fixture_close_obstacle_monitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_fixture_close_obstacle_retract",
             main_ltl="G(fixture_close_obstacle_hit -> (fixture_close_retracting U fixture_fully_open))",
-            recovery_ltl="fixture_fully_open",
+            # Fixed 2026-09-03 (KNOWN_BUGS.md #10) -- symmetric to
+            # rc_fixture_open_obstacle_retract above; same bare-atom bug, same
+            # verification (fixture_fully_open is never already True at the
+            # trap-confirmation frame), same fix.
+            recovery_ltl="F(fixture_fully_open)",
             property_description=property_description,
             binding={},
             explanation_builder=_fixture_close_obstacle_explanation,
@@ -1692,7 +1714,24 @@ def build_repeated_microwave_single_object_monitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_microwave_single_object_until_empty",
             main_ltl="G(object_reach_in_fixture -> microwave_empty)",
-            recovery_ltl="!two_or_more_objects_in_microwave",
+            # Fixed 2026-09-03 (KNOWN_BUGS.md #10). Two separate bugs, not
+            # just the bare-atom one: (1) same bare-atom-under-LTLf-finite-
+            # trace-semantics issue as the fixture properties above -- fixed
+            # by wrapping in F(...); (2) the original atom
+            # (!two_or_more_objects_in_microwave) was also a genuine
+            # tautological-escape-term bug (Bug B, see recovery-ltl-design)
+            # in the specific case where the trap fires with exactly 1 object
+            # present (a real violation -- reach_in while non-empty -- but
+            # !two_or_more_objects_in_microwave is already True there, since
+            # 1 < 2), so recovery would resolve instantly for that violation
+            # shape regardless of whether the microwave was ever actually
+            # emptied. Fixed by targeting microwave_empty instead --
+            # main_ltl's own genuine resolve atom, matching the pattern used
+            # for the fixture properties above, not a weaker/different
+            # condition. Verified (isolated LTLfDFA test): F(microwave_empty)
+            # is never tautologically True at the trap frame in either
+            # violation shape (1 object or 2+ objects present).
+            recovery_ltl="F(microwave_empty)",
             property_description=property_description,
             binding={},
             explanation_builder=lambda episodes: _access_explanation("microwave", episodes),
