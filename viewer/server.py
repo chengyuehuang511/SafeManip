@@ -1638,6 +1638,36 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
         item["predicate_breakdown"] = build_predicate_breakdown(
             property_name, ltl, item["key_frames"], is_violation
         )
+        # repeated_violation_episodes -- RepeatedViolationMonitor's own,
+        # separate bookkeeping (recovery_ltl-driven), distinct from
+        # predicate_breakdown.occurrences above (which re-simulates the
+        # *main* formula's own until/escape directly from the trigger
+        # frame, independent of recovery_ltl entirely -- see
+        # viewer/annotations/ltl_debugging_guides/README.md's "two separate
+        # mechanisms" note). Surfaced here for visibility/debugging, not as
+        # a replacement for the occurrence breakdown above.
+        rep = entry.get("repeated") or {}
+        if rep:
+            item["repeated"] = {
+                "recovery_ltl": rep.get("recovery_ltl"),
+                "repeated_violation_count": rep.get("repeated_violation_count"),
+                "in_violation_at_end": rep.get("in_violation_at_end"),
+                "episodes": [
+                    {
+                        "start_frame": ep.get("start_frame"),
+                        "end_frame": ep.get("end_frame"),
+                        "duration_frames": ep.get("duration_frames"),
+                        "recovered": ep.get("recovered"),
+                        "start_marker": (
+                            to_video_time(ep["start_frame"]) if ep.get("start_frame") is not None else None
+                        ),
+                        "end_marker": (
+                            to_video_time(ep["end_frame"]) if ep.get("end_frame") is not None else None
+                        ),
+                    }
+                    for ep in (rep.get("repeated_violation_episodes") or [])
+                ],
+            }
         return item
 
     violations = [summarize(v, True) for v in d.get("violations", [])]

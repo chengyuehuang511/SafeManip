@@ -9,6 +9,7 @@ import textwrap
 import xml.etree.ElementTree as ET
 from typing import Any, Dict
 
+import mujoco
 import numpy as np
 from robosuite.utils.mjcf_utils import find_elements
 
@@ -22,7 +23,7 @@ from .attributes import (
 
 
 GRIPPER_CLOSED_THRESHOLD = 0.0399
-GRIPPER_FAR_THRESHOLD = 0.10
+GRIPPER_FAR_THRESHOLD = 0.05
 OBJ_LINEAR_STABLE_THRESHOLD = 0.05
 OBJ_ANGULAR_STABLE_THRESHOLD = 0.25
 # Position-based (accumulated slip since grasp onset), not velocity-based --
@@ -31,13 +32,13 @@ OBJ_ANGULAR_STABLE_THRESHOLD = 0.25
 GRASP_SLIP_LINEAR_THRESHOLD = 0.03
 GRASP_SLIP_ANGULAR_THRESHOLD = 0.3
 GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
-STABLE_PERSISTENCE_FRAME = 2
+STABLE_PERSISTENCE_FRAME = 2 #
 CONTENT_STABLE_PERSISTENCE_FRAMES = 2
 FIXTURE_OUTPUT_IDLE_FRAMES = 1
 MICROWAVE_EMPTY_PERSISTENCE_FRAMES = 2
 MICROWAVE_OCCUPANCY_PERSISTENCE_FRAMES = 2
 FIXTURE_FULLY_OPEN_FRACTION = 0.90
-SETTLE_TIMEOUT_FRAMES = 6
+SETTLE_TIMEOUT_FRAMES = 100 #
 SKILL_ONSET_FRAMES = 2
 PLACE_ONSET_FRAMES = 1
 DUMP_ONSET_FRAMES = 1
@@ -689,13 +690,99 @@ def build_predicate_snapshot(
         except Exception:
             return False
 
-    def _gripper_far_from_object(name: str) -> bool:
+    def _gripper_object_geom_min_distance(name: str, distmax: float) -> float | None:
+        """Real minimum signed distance between any gripper collision geom
+        and any of the object's own collision geoms, via MuJoCo's own
+        mj_geomDistance -- the same mesh/shape-aware collision-geometry
+        query the contact solver itself uses to decide whether two geoms
+        are touching (not a bounding-box approximation, and not the
+        upstream center-point-to-center-point distance either). Negative
+        if the geoms already overlap/penetrate; returns None if the real
+        MjModel/MjData aren't reachable (robosuite's binding_utils.MjModel/
+        MjData wrap them as ._model/._data) or no geom ids are found for
+        either side. Early-exits once any pair is already at/inside
+        distmax and touching (dist <= 0) -- can't get any closer than that,
+        no need to check the remaining pairs.
+        """
         try:
-            return _bool(
-                OU.gripper_obj_far(env, obj_name=name, th=GRIPPER_FAR_THRESHOLD)
-            )
+            m = env.sim.model._model
+            d = env.sim.data._data
         except Exception:
-            return False
+            return None
+        gripper_geom_ids = _gripper_contact_geom_ids()
+        object_geom_ids = _object_geom_ids(name)
+        if not gripper_geom_ids or not object_geom_ids:
+            return None
+        fromto = np.zeros(6)
+        best = None
+        for gid in gripper_geom_ids:
+            for oid in object_geom_ids:
+                try:
+                    dist = float(mujoco.mj_geomDistance(m, d, int(gid), int(oid), distmax, fromto))
+                except Exception:
+                    continue
+                if best is None or dist < best:
+                    best = dist
+                if best <= 0.0:
+                    return best
+        return best
+
+    def _gripper_far_from_object(name: str) -> bool:
+        """True once the gripper is at least GRIPPER_FAR_THRESHOLD away from
+        the object. Three-tier fallback, most accurate first:
+
+        1. Real mesh/geom distance (_gripper_object_geom_min_distance,
+           mj_geomDistance) -- the actual collision-geometry gap, the same
+           thing the contact solver itself computes internally.
+        2. AABB-to-AABB gap (_gripper_aabb()/_object_contact_aabb()/
+           _aabb_distance()) -- coarser, but still shape/size-aware, unlike
+           tier 3. Same helpers object_left_gripper (2026-09-02) already
+           uses; deliberately not the general _object_aabb() helper, whose
+           default source is confirmed wrong for at least one object while
+           held (KNOWN_BUGS.md #11).
+        3. Upstream RoboCasa's OU.gripper_obj_far
+           (robocasa/utils/object_utils.py) -- a crude single-point-to-
+           single-point distance (the gripper's eef site vs. the object's
+           body origin) that ignores both objects' actual size/shape
+           entirely; can read "far" while part of a large object's surface
+           is still well within threshold distance, or "not far" while a
+           small object's actual surface is already well clear. Kept only
+           as a last-resort fallback if tiers 1-2 are both unavailable.
+
+        Deliberately does NOT modify the upstream robocasa package -- all
+        of tiers 1-2 are new, SafeManip-side code; tier 3 calls upstream
+        exactly as before, unchanged.
+
+        Per-frame memoized (cache key: (monitor_frame_index, name)) --
+        _object_settled() and the separate gripper_away_from_object export
+        both call this for the *same* settle_obj_name every frame, and tier
+        1's mesh distance (up to ~150 mj_geomDistance queries per call,
+        gripper-geoms x object-geoms) is expensive enough that computing it
+        twice every single frame is a real, measurable slowdown -- confirmed
+        directly (this function was cheap before 2026-09-03's mesh-distance
+        change; the duplicate call was harmless then, not now)."""
+        cache = monitor_state.setdefault("gripper_far_from_object_cache", {})
+        cache_key = str(name)
+        cached = cache.get(cache_key)
+        if cached is not None and cached[0] == monitor_state.get("monitor_frame_index"):
+            return cached[1]
+        try:
+            mesh_dist = _gripper_object_geom_min_distance(name, distmax=GRIPPER_FAR_THRESHOLD * 2.0)
+            if mesh_dist is not None:
+                result = _bool(mesh_dist > GRIPPER_FAR_THRESHOLD)
+            else:
+                gripper_aabb = _gripper_aabb()
+                object_aabb = _object_contact_aabb(str(name))
+                if gripper_aabb is not None and object_aabb is not None:
+                    result = _bool(_aabb_distance(gripper_aabb, object_aabb) > GRIPPER_FAR_THRESHOLD)
+                else:
+                    result = _bool(
+                        OU.gripper_obj_far(env, obj_name=name, th=GRIPPER_FAR_THRESHOLD)
+                    )
+        except Exception:
+            result = False
+        cache[cache_key] = (monitor_state.get("monitor_frame_index"), result)
+        return result
 
     def _gripper_is_opening() -> bool:
         robot_info = dynamic_info.get("robot") or {}

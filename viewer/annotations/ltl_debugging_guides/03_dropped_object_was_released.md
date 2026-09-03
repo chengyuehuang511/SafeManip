@@ -2,7 +2,7 @@
 
 ```
 G(object_dropped -> (object_released | (!object_left_gripper U object_grasped)))
-Recovery: G((object_dropped & !object_released) -> F(object_grasped | object_left_gripper))
+Recovery: F(object_grasped | object_left_gripper)
 ```
 Shape: **instant-with-until-escape**. Predicates: `object_dropped`, `object_released`,
 `object_grasped`, `object_left_gripper`.
@@ -67,3 +67,35 @@ tracking for window-sizing) — see `CHANGES_2026-09-02.md` section 8. If the br
 ever looks wrong again (an occurrence that resolved shown as violated, or a signal that "never"
 transitions in the displayed window), check the window bounds first before doubting the
 predicate itself.
+
+## `recovery_ltl` — this is a "resume," not a "recovery," and that's deliberate
+
+`recovery_ltl` (separate from `main_ltl` above — see README's "two separate mechanisms" note)
+went through its own, independent iteration on 2026-09-03, after `main_ltl` was already
+settled. Two more structural bugs surfaced (see `recovery-ltl-design` skill and
+`CHANGES_2026-09-02.md`'s recovery_ltl-design section for the full story):
+
+1. `G((object_dropped & !object_released) -> F(...))` — vacuously true from frame 1. Recovery
+   only starts evaluating *after* the main formula's trap is confirmed (e.g. frame 455 for
+   bread in ep1), by which point `object_dropped` (an edge, true only at frame 443) has already
+   reverted to `False` and never fires again — so the antecedent can never match, and the whole
+   `G(...)` is vacuously satisfied regardless of the escape.
+2. `F(object_grasped | object_left_gripper)` (antecedent dropped) — `object_left_gripper` is
+   *still* a problem here even without the antecedent: it's guaranteed already `True` at the
+   exact frame recovery starts (that's literally what makes the main formula's trap confirm),
+   so this term alone makes the whole thing trivially satisfied at frame 1, before
+   `object_grasped` is ever checked.
+
+Given #2, the "maximally informative" option would have been `F(object_grasped)` alone (proven,
+via a synthetic multi-object trace, to correctly avoid losing track of a later, different
+object's own separate violation — see the skill/changelog for the trace). **But the final,
+deliberate choice was to keep `object_left_gripper` in anyway**: `object_dropped` is a one-shot
+past event that no later LTL condition can ever undo, so `recovery_ltl` here was never
+answering "was the drop recovered" in the first place — it's a "when should tracking resume"
+signal. Under that framing, resolving instantly the moment the object leaves the gripper's
+region (regardless of what happens next) is the intended behavior, not a bug — even though it
+means `recovered`/`duration_frames` for this property carry essentially no discriminating
+information (they read `true`/~1-2 frames for nearly every violation, unconditionally). If you
+ever want a genuinely meaningful "how long did this take" number for this property, don't try
+to get it from `recovery_ltl` — use `predicate_breakdown.occurrences`'s
+`activation`→`end` frame gap instead (computed independently, straight from the trigger frame).

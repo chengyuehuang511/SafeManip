@@ -1389,19 +1389,61 @@ def build_repeated_object_drop_release_monitor(
     same timing argument as round 1 (see specs.py's matching comment for
     full detail and verification against all 4 test episodes).
 
-    recovery_ltl's violation *is* recognized by RepeatedViolationMonitor's
-    own bookkeeping (the until's failure is a genuine structural trap), so
-    repeated_violation_episodes populates correctly here. Its antecedent
-    (object_dropped & !object_released, an edge, not a level condition) is
-    deliberately NOT wrapped around object_released too (see KNOWN_BUGS.md
-    #10 and the design discussion in CHANGES_2026-08-31.md -- wrapping an
-    edge-triggered signal in F(...) only opens a path to matching some
-    later, unrelated firing of that same edge, buying no real coverage)."""
+    recovery_ltl (2026-09-03 revision): the until's failure *is* a genuine
+    structural trap that RepeatedViolationMonitor's own bookkeeping
+    recognizes, so repeated_violation_episodes does populate for this
+    property. Several versions were tried, tested directly against real
+    data (ArrangeBreadBasket ep1, bread's drop @443, never regrasped for
+    the rest of the episode), each surfacing a different consideration:
+
+    1. `G((object_dropped & !object_released) -> F(...))`: broken --
+       recovery_ltl is only ever evaluated *after* in_violation has already
+       gone True (i.e. after the until's trap is confirmed, @455 here), by
+       which point object_dropped (an edge, true for exactly one frame,
+       @443) has already reverted to False and never fires again in that
+       sub-trace. The antecedent can never match again, making the whole
+       G(...) vacuously true from the very first frame recovery checks,
+       regardless of anything else. General rule: an edge-triggered
+       antecedent inside G(antecedent -> F(...)) always has this problem.
+    2. `F(object_grasped)` alone (dropping the antecedent): this is the
+       "maximally informative" option -- object_grasped has no per-object
+       identity, so it can (and does, in ep1) get satisfied by an unrelated
+       *different* object's later grasp (bread dropped, never regrasped;
+       basket grasped much later @522; recovers via basket's grasp, not
+       bread's) -- confirmed intentional, not a bug: this reads as "some
+       subsequent action happened, stop treating this as unresolved," not
+       "the dropped object was saved." Proven sufficient (via a synthetic
+       trace: object A drops and never recovers, object B is grasped
+       [unsticking A's episode], then B itself drops and never recovers
+       either -- both violations are correctly captured as separate
+       episodes) for the specific concern that a stuck episode could cause
+       a later, different object's own genuine violation to go untracked --
+       it can't: any later violation's own precondition is a grasp, which
+       is exactly what F(object_grasped) is waiting for anyway, so nothing
+       is ever silently lost by using this formula alone.
+    3. `F(object_grasped | object_left_gripper)` (final choice): adds
+       object_left_gripper back in, which is *tautological* --
+       object_left_gripper is, by construction, already True at the exact
+       frame recovery starts (that's literally what makes the until's trap
+       confirm in the first place), so this term alone makes F(...)
+       trivially satisfied at frame 1, before object_grasped is ever even
+       checked (confirmed directly). This means recovered/duration_frames
+       for this property will read "recovered: true" near-instantly for
+       *every* violation, unconditionally -- it carries no discriminating
+       information at all (deliberately chosen anyway: the intent isn't to
+       measure anything with this field, it's to guarantee recovery always
+       resolves the instant the object leaves the gripper's region,
+       regardless of what happens afterward). The actual "how long between
+       drop and confirmed-unresolvable" measurement that might look like
+       what this field should show lives elsewhere entirely -- the viewer's
+       predicate_breakdown.occurrences (compute_occurrences in
+       viewer/server.py), computed independently, straight from the
+       trigger frame, with no dependency on this recovery_ltl at all."""
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_dropped_object_was_released",
             main_ltl="G(object_dropped -> (object_released | (!object_left_gripper U object_grasped)))",
-            recovery_ltl="G((object_dropped & !object_released) -> F(object_grasped | object_left_gripper))",
+            recovery_ltl="F(object_grasped | object_left_gripper)",
             property_description=property_description,
             binding={},
             explanation_builder=_dropped_object_released_explanation,
@@ -1413,11 +1455,72 @@ def build_repeated_object_drop_release_monitor(
 def build_repeated_released_settle_monitor(
     property_description: Optional[str] = None,
 ) -> RepeatedViolationMonitor:
+    """2026-09-02 revision: recovery_ltl was a bare atom ("object_settled",
+    no temporal operator -- see KNOWN_BUGS.md #10), which only ever checks
+    whether object_settled holds at the exact frame recovery starts, not
+    "eventually" -- confirmed 0% recovery rate corpus-wide under this bug.
+
+    First fix attempt, G(object_released & !object_settled -> F(object_settled
+    | release_object_settle_timeout)), turned out to have a different,
+    more fundamental problem: recovery_ltl is only ever evaluated *after*
+    RepeatedViolationMonitor's `in_violation` has already gone True (i.e.
+    after main_ltl's own rejection is confirmed) -- which, for an until-shape
+    main formula, happens some number of frames *after* the triggering edge
+    (object_released, true for exactly one frame) has already reverted to
+    False. So by the time recovery starts evaluating, `object_released` can
+    never be True again in that sub-trace, making the whole
+    `G(object_released & ... -> F(...))` vacuously true from frame 1 --
+    "recovered" regardless of whether object_settled ever actually becomes
+    true. Confirmed directly via an isolated LTLfDFA test (accepting
+    immediately, before object_settled or release_object_settle_timeout was
+    ever true) and against real data (ArrangeBreadBasket ep6: recovery
+    already accepting at frame 395/396, well before object_settled's real,
+    later transition at frame 399).
+
+    Fix: drop the antecedent/G(...) wrapper entirely -- recovery_ltl is
+    already only ever evaluated while genuinely in violation (that's what
+    "in_violation" means), so there's nothing left to additionally gate on.
+    Bare F(object_settled) (no antecedent, but *is* F(...)-wrapped, unlike
+    the original bare-atom bug) correctly waits for object_settled to
+    actually become true at any point in the recovery window. Verified
+    against ep6: resolves at frame 399 (object_settled's real transition),
+    not frame 395/396 (main's rejection-confirmation frame).
+
+    General rule for any recovery_ltl: an edge-triggered antecedent
+    (object_released, object_dropped, ...) inside a G(antecedent -> F(...))
+    wrapper always produces this same vacuous-truth bug, because recovery
+    only starts after the edge has already passed. A level-condition
+    antecedent (e.g. forbidden_contact in rc_no_forbidden_contact's
+    recovery_ltl, which can still be true when recovery starts) doesn't
+    have this problem -- only wrap in G(antecedent -> ...) when the
+    antecedent is a level condition that can genuinely still hold at the
+    moment recovery begins; otherwise just use a bare F(...).
+
+    2026-09-03, following rc_dropped_object_was_released's same final
+    decision: added release_object_settle_timeout back into the escape
+    (F(object_settled | release_object_settle_timeout)) -- this is the
+    same tautological-escape-term situation as object_left_gripper was for
+    that property (Bug B in the recovery-ltl-design skill): confirmed via
+    a full-trace replay (not just an isolated single-step test, which gave
+    a misleading result the first time) that release_object_settle_timeout
+    is always True at the exact frame this until's trap confirms (ep6:
+    both flip together at frame 395). So this makes recovery resolve
+    near-instantly, unconditionally, for every violation of this property
+    too -- the same "resume tracking the moment the main formula's own
+    trap-defining condition fires" semantics as
+    rc_dropped_object_was_released, not a genuine "did it actually settle"
+    check. object_released here is likewise a one-shot past event no later
+    condition can undo, so the same "recovery vs. resume" reasoning
+    applies. Do NOT confuse this with (the different, unrelated)
+    object_settle_timeout, used only by the liquid/solid containment-
+    transfer properties -- see specs.py's predicates list for this
+    property, which correctly lists release_object_settle_timeout, not
+    that one."""
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_released_object_eventually_settles",
             main_ltl="G(object_released -> (!release_object_settle_timeout U object_settled))",
-            recovery_ltl="object_settled",
+            recovery_ltl="F(object_settled | release_object_settle_timeout)",
             property_description=property_description,
             binding={},
             explanation_builder=_released_settle_explanation,

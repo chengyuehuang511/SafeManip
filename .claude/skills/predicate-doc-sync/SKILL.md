@@ -9,6 +9,17 @@ Keeps four things in lockstep whenever `SafeManip/monitor/sim/robocasa/predicate
 the `.txt` design specs, the two grounded predicate-tree references, a running changelog, and
 (when results are regenerated) a versioned snapshot under `monitor/output/`.
 
+If the change specifically touches a `recovery_ltl` (in `repeated_violation_monitor.py`'s
+`build_repeated_*_monitor` functions) rather than a `main_ltl`/predicate definition, use the
+dedicated `recovery-ltl-design` skill first -- it covers structural bugs specific to
+`recovery_ltl` (vacuous antecedents, tautological escape terms, the "recovery vs. resume"
+distinction) that this skill's general workflow doesn't cover.
+
+This skill assumes the design/implementation/verification work is already done and you're just
+recording it. For the design -> implement -> verify -> refine -> scale cycle itself (before
+there's anything settled enough to document), use `predicate-design-cycle` instead -- it's what
+this skill's changelog format is meant to capture the *output* of.
+
 Do **not** touch `robocasa/robocasa/environments/kitchen/predicates.py` (the upstream vendor
 copy) — all predicate work lives in `SafeManip/monitor/sim/robocasa/predicates.py` only. If a
 change needs to reach training-data extraction, `SafeManip/monitor/extract_privileged_from_dataset.py`
@@ -139,6 +150,15 @@ When predicates.py changes and you regenerate results:
 2. Never overwrite an existing `vN_.../` directory's results in place if the *code* producing them
    changed — cut a new `v(N+1)_.../` directory instead, so old results stay diffable. Only
    overwrite within the *same* version (e.g. filling in episodes that hadn't finished yet).
+   **Exception:** while still actively iterating on the same in-progress batch of changes (e.g.
+   tuning a threshold constant through several values before settling on one) and the user
+   explicitly says they're not ready to freeze a new version yet, it's fine to keep overwriting
+   the *current* version's files in place across multiple code changes — see
+   `predicate-design-cycle`'s Phase 4.5 for the concrete recipe. Confirm which mode you're in
+   with the user rather than assuming; once you do this, that version's directory name may no
+   longer describe everything it now contains (e.g. `v4_..._grasp_ltl_split_recovery_fix` ended
+   up also containing unrelated settle-timeout/gripper-distance changes) — say so rather than
+   letting a stale name look authoritative.
 3. Build `violation_summary.json`/`VIOLATION_SUMMARY.md` for the new version the same way as the
    existing ones (aggregate violated-property counts, per-episode violated-property lists, overall
    violation rate) so it's diffable against the previous version at a glance.

@@ -315,6 +315,24 @@ video {
 }
 .raw-explanation summary:hover { color: var(--text-dim); }
 
+.repeated-violations { margin: 8px 0; }
+.repeated-violations summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  user-select: none;
+}
+.repeated-violations summary:hover { color: var(--text-dim); }
+.repeated-episode-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.repeated-episode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.repeated-episode-duration { color: var(--text-muted); font-size: 11px; }
+.card-hint.warn { color: var(--warn, #c0392b); }
+
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .chip {
   display: flex;

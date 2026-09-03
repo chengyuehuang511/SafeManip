@@ -178,6 +178,24 @@ These are the actual bugs found this session, in the order they tend to surface:
    `monitor/primitives.py` breaks *every* property's import, not just the one you're touching.
    The traceback will just say `NameError: name 'X' is not defined` deep inside module load; if
    you just added a predicate, that's almost certainly why.
+8. **`recovery_ltl` vacuous antecedent.** `G(edge_condition -> F(...))` is always broken as a
+   `recovery_ltl` shape when `edge_condition` is an edge (true for exactly one frame) — recovery
+   only starts evaluating *after* the main formula's rejection is already confirmed, by which
+   point the edge has necessarily already reverted to `False` and never fires again in that
+   sub-trace, making the whole `G(...)` vacuously true from frame 1, regardless of the `F(...)`
+   part. Only safe when the antecedent is a level condition that can genuinely still hold when
+   recovery starts (e.g. `forbidden_contact`). If your antecedent is an edge, just drop it —
+   recovery is already only evaluated while genuinely in violation.
+9. **`recovery_ltl` tautological escape term.** Never include, in a recovery escape (`F(a | b |
+   ...)`), whatever atom's becoming-true is what defines the *main* formula's own trap — it's
+   guaranteed already `True` at the exact frame recovery starts, by construction, making the
+   whole escape trivially satisfied at frame 1 before any other term is ever checked. See the
+   dedicated `recovery-ltl-design` skill (`.claude/skills/recovery-ltl-design/SKILL.md`) for the
+   full checklist covering both this and #8, plus how to decide whether `recovery_ltl` should
+   even mean "recovery" at all for a one-shot/edge-triggered bad event (vs. a "resume tracking"
+   signal instead) — worked out in full via `rc_dropped_object_was_released` and
+   `rc_released_object_eventually_settles`, see `CHANGES_2026-09-02.md`'s recovery_ltl-design
+   section.
 
 ## Step 7: check the viewer's occurrence breakdown against the same raw trace
 
@@ -192,6 +210,22 @@ before showing a signal's real eventual transition). If the breakdown looks wron
 top-level violated/satisfied verdict looks right, the bug is probably in
 `compute_occurrences()`/`spec_derive.py`'s shape-parsing, not the underlying formula.
 
+**Don't confuse this with `repeated_violation_episodes` (`recovery_ltl`'s own bookkeeping,
+surfaced separately in the viewer as a collapsible "repeated_violation_episodes" section under
+each property card).** These are two genuinely independent mechanisms that happen to look at
+similar atoms and can legitimately disagree:
+- `predicate_breakdown.occurrences` re-simulates the *main* formula's own until/escape,
+  starting from the trigger frame, with no dependency on `recovery_ltl` at all.
+- `repeated_violation_episodes` comes from a completely separate DFA (`recovery_ltl`), which
+  only starts evaluating once `RepeatedViolationMonitor`'s own `in_violation` flag goes `True`
+  (the main formula's *confirmed trap* frame, which can be later than the trigger frame).
+
+Conflating the two caused real, repeated confusion while designing
+`rc_dropped_object_was_released`'s recovery formula (see `CHANGES_2026-09-02.md`'s
+recovery_ltl-design section) — if something described as "recovery" looks like it's working
+fine, double check which of these two you're actually looking at before drawing conclusions
+about the other one.
+
 ## Quick reference: what "looks wrong" usually means
 
 | Symptom | Likely cause | Where to look |
@@ -199,6 +233,7 @@ top-level violated/satisfied verdict looks right, the bug is probably in
 | Property never shows *any* `repeated_violation_episodes` even though it's marked violated | `main_ltl` has a deferred/pending state (`F(...)`/`until` with no structural trap reachable per-frame) that `_is_rejecting_main_state` doesn't recognize until it's a confirmed trap | `repeated_violation_monitor.py`'s `_is_rejecting_main_state`; compare with the primary per-frame `accepting` trace directly via Step 5 |
 | A property is satisfied/violated differently than a quick formula-read suggests | Escape/until clause resolving (or failing to resolve) somewhere later than the trigger frame | Step 5's isolated DFA trace, frame by frame |
 | Recovery rate is suspiciously 0% for a property | Bare-atom `recovery_ltl` (see #1 above) | `repeated_violation_monitor.py`'s matching `build_repeated_*_monitor()` |
+| Recovery rate is suspiciously 100%, resolving in ~1-2 frames every time | Vacuous antecedent or tautological escape term (see #8/#9 above) | Isolated `LTLfDFA` test fed the exact trap-confirmation frame's `predicate_values`; see the `recovery-ltl-design` skill |
 | A violation seems to involve the wrong object | Cross-object misattribution (see #2 above) | `active_object`/`settle_obj_name` trace at both ends of the window |
 | A one-frame blip causes a violation that "shouldn't" have happened | Undebounced signal (see #3/#4 above) | Check whether the offending atom has a `_persistent_bool`/debounce wrapper; if not, that's probably it |
 | Viewer timeline shows a signal "never" transitioning when you expect it to | Display-window cropping, not a predicate bug | Check the API's `predicate_breakdown.window` bounds vs. where the transition actually happens in the raw trace |

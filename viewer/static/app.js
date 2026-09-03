@@ -1083,6 +1083,104 @@ function predicateBreakdown(pb) {
   return wrap;
 }
 
+function repeatedViolationsBlock(rep, window) {
+  // repeated_violation_episodes -- RepeatedViolationMonitor's own, separate
+  // recovery_ltl-driven bookkeeping, distinct from the predicate_breakdown
+  // occurrences table above it (which re-simulates the *main* formula's own
+  // until/escape directly, independent of recovery_ltl entirely -- see
+  // viewer/annotations/ltl_debugging_guides/README.md's "two separate
+  // mechanisms" note, and that property's own guide for what recovery_ltl
+  // does/doesn't mean for it specifically).
+  if (!rep || !rep.recovery_ltl) return null;
+  const details = document.createElement("details");
+  details.className = "repeated-violations";
+  const summary = document.createElement("summary");
+  const count = rep.repeated_violation_count || 0;
+  summary.textContent = `repeated_violation_episodes (recovery_ltl bookkeeping) — ${count} episode(s)`;
+  details.appendChild(summary);
+
+  const ltl = document.createElement("div");
+  ltl.className = "ltl-line";
+  ltl.innerHTML = `<span class="ltl-tag">recovery_ltl</span><code>${rep.recovery_ltl}</code>`;
+  details.appendChild(ltl);
+
+  if (window && rep.episodes && rep.episodes.length) {
+    const { start_frame, end_frame } = window;
+    const span = Math.max(1, end_frame - start_frame + 1);
+    // Reuses the same run-segment machinery every other predicate row uses
+    // (fillTimeline/predicateRow) -- "true" (green) = in an episode that
+    // recovered, "false" (red) = in an episode still unrecovered
+    // (including the still-open one at episode end), "unknown" (gray) =
+    // not currently tracking any episode at all. Gaps between/around
+    // episodes are filled with unknown runs so the bar always spans the
+    // full window with no missing segments (fillTimeline assumes a
+    // contiguous run list).
+    const sorted = [...rep.episodes].sort((a, b) => a.start_frame - b.start_frame);
+    const runs = [];
+    let cursor = start_frame;
+    for (const ep of sorted) {
+      if (ep.start_frame > cursor) {
+        runs.push({ start_frame: cursor, end_frame: ep.start_frame - 1, value: null,
+          start: { frame: cursor }, end: { frame: ep.start_frame - 1 } });
+      }
+      const epEnd = ep.end_frame != null ? ep.end_frame : end_frame;
+      runs.push({
+        start_frame: ep.start_frame, end_frame: epEnd, value: ep.recovered,
+        start: ep.start_marker || { frame: ep.start_frame },
+        end: ep.end_marker || { frame: epEnd },
+      });
+      cursor = epEnd + 1;
+    }
+    if (cursor <= end_frame) {
+      runs.push({ start_frame: cursor, end_frame, value: null,
+        start: { frame: cursor }, end: { frame: end_frame } });
+    }
+    const { row, timeline } = predicateRow({ label: "recovery status", key: "recovery_ltl",
+      description: "green = recovered, red = still unrecovered, gray = not tracking an episode" }, false);
+    fillTimeline(timeline, { label: "recovery status", runs }, span);
+    details.appendChild(row);
+  }
+
+  if (rep.in_violation_at_end) {
+    const warn = document.createElement("div");
+    warn.className = "card-hint warn";
+    warn.textContent = "Still in violation at episode end — the last episode never recovered.";
+    details.appendChild(warn);
+  }
+
+  if (rep.episodes && rep.episodes.length) {
+    const list = document.createElement("div");
+    list.className = "repeated-episode-list";
+    for (const ep of rep.episodes) {
+      const row = document.createElement("div");
+      row.className = "repeated-episode-row";
+      const startBtn = document.createElement("button");
+      startBtn.className = "chip";
+      startBtn.textContent = `start f${ep.start_frame}`;
+      startBtn.addEventListener("click", () => seekTo(ep.start_marker));
+      row.appendChild(startBtn);
+      if (ep.end_frame != null) {
+        const endBtn = document.createElement("button");
+        endBtn.className = "chip";
+        endBtn.textContent = `end f${ep.end_frame}`;
+        endBtn.addEventListener("click", () => seekTo(ep.end_marker));
+        row.appendChild(endBtn);
+      }
+      const dur = document.createElement("span");
+      dur.className = "repeated-episode-duration";
+      dur.textContent = ep.duration_frames != null ? `${ep.duration_frames} frames` : "";
+      row.appendChild(dur);
+      const badge = document.createElement("span");
+      badge.className = "badge " + (ep.recovered ? "badge-ok" : "badge-fail");
+      badge.textContent = ep.recovered ? "recovered" : "unrecovered";
+      row.appendChild(badge);
+      list.appendChild(row);
+    }
+    details.appendChild(list);
+  }
+  return details;
+}
+
 function ltlLine(ltl) {
   if (!ltl) return null;
   const line = document.createElement("div");
@@ -1118,6 +1216,9 @@ function renderViolation(v, ann) {
 
   const pb = predicateBreakdown(v.predicate_breakdown);
   if (pb) card.appendChild(pb);
+
+  const rep = repeatedViolationsBlock(v.repeated, v.predicate_breakdown && v.predicate_breakdown.window);
+  if (rep) card.appendChild(rep);
 
   const details = document.createElement("details");
   details.className = "raw-explanation";
@@ -1165,6 +1266,9 @@ function renderSatisfied(s, ann) {
 
   const pb = predicateBreakdown(s.predicate_breakdown);
   if (pb) card.appendChild(pb);
+
+  const rep = repeatedViolationsBlock(s.repeated, s.predicate_breakdown && s.predicate_breakdown.window);
+  if (rep) card.appendChild(rep);
 
   const draft = aiDraftBlock(current);
   if (draft) card.appendChild(draft);
