@@ -1416,18 +1416,49 @@ def build_predicate_snapshot(
             if _fixture_rack_contact(str(fixture_name), str(name)):
                 fixture_contacts.add(str(fixture_name))
                 continue
+        def _other_name_is_below(other_name: str) -> bool:
+            # Fixed 2026-09-03 (found via systematic corpus-wide failure
+            # clustering): neither OU.check_obj_in_receptacle (contact +
+            # horizontal-distance only, no Z-axis check at all -- returns
+            # True symmetrically regardless of which object is "really" the
+            # receptacle) nor the plain env.check_contact fallback (no
+            # directional awareness whatsoever) verify which of the two
+            # touching objects is actually above/supporting the other. An
+            # object freshly placed ONTO/INTO `name` (e.g. a place onset's
+            # content landing in a container) was getting added as if *it*
+            # were `name`'s own support (backwards) the instant contact
+            # registered -- confirmed via real data (ArrangeTea ep0, frame
+            # 204: container's own _object_stable_relative spuriously read
+            # unstable right when obj2 was released into it, because
+            # _object_support_reference("container") picked up the
+            # freshly-released, still-spinning obj2 as if it supported
+            # container, computing container's "relative" angular velocity
+            # against obj2's own ~0.29 rad/s rotation instead of correctly
+            # finding no real object support -- container's own real
+            # angular velocity was negligible, ~0.0006, the whole time).
+            # Only count other_name as a genuine support if it's actually
+            # positioned at/below name's own bottom (within
+            # SUPPORT_CLUTTER_Z_TOLERANCE) -- if AABBs aren't available for
+            # either, fall back to the old (undirected) behavior rather
+            # than silently dropping a real support relationship.
+            name_aabb = _object_aabb(str(name))
+            other_aabb = _object_aabb(str(other_name))
+            if name_aabb is None or other_aabb is None:
+                return True
+            return float(other_aabb[1][2]) <= float(name_aabb[0][2]) + SUPPORT_CLUTTER_Z_TOLERANCE
+
         for other_name in getattr(env, "objects", {}).keys():
             other_name = str(other_name)
             if other_name == str(name):
                 continue
             try:
-                if OU.check_obj_in_receptacle(env, name, other_name):
+                if OU.check_obj_in_receptacle(env, name, other_name) and _other_name_is_below(other_name):
                     object_contacts.add(other_name)
                     continue
             except Exception:
                 pass
             try:
-                if env.check_contact(env.objects[name], env.objects[other_name]):
+                if env.check_contact(env.objects[name], env.objects[other_name]) and _other_name_is_below(other_name):
                     object_contacts.add(other_name)
             except Exception:
                 continue
