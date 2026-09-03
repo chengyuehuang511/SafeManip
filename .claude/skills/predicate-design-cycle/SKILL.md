@@ -133,6 +133,23 @@ single-step test can give a misleading answer if the formula's state depends on 
 happened at least twice: `release_object_settle_timeout` looked non-trap-triggering in a
 single-step test, but genuinely was, once the full 389->395 trace was replayed).
 
+**Don't trust raw `LTLfDFA` state numbers as meaningful signal by themselves -- only
+`is_accepting()`/`is_trap_state()`, or a full continued-replay comparison.** Confirmed this
+session on `rc_released_object_eventually_settles` (`ArrangeBreadBasket` ep7, frames 911-939):
+watching the raw state id across a re-trigger (`object_released` firing again at frame 926 while
+an earlier obligation from frame 911 was still pending) showed the state number change (`1 -> 2`)
+right at that frame -- which looks like evidence the re-trigger did something. It didn't:
+replaying the *same* stretch with that one frame's `object_released` observation forced back to
+`False` reached the exact same state 2 anyway, and both branches stayed state-for-state identical
+for the rest of the episode. The state numbering isn't necessarily minimal or semantically
+meaningful on its own -- `LTLfDFA`'s tableau/automaton construction can reach the "same" logical
+situation via different raw state ids depending on path, and a state number differing (or
+matching) between two branches doesn't by itself tell you whether an observation mattered. To
+check whether a specific frame's value of an atom actually affects anything, run two branches
+side by side -- one with the real trace, one with that one frame's value flipped -- and compare
+`is_accepting()`/`is_trap_state()` (or, more rigorously, replay both to the end of the episode
+and confirm they never diverge) rather than comparing raw state numbers.
+
 ## Phase 4: verify against real data (the step that actually catches bugs)
 
 Every wrong conclusion this session came from trusting isolated reasoning instead of checking a
@@ -180,6 +197,26 @@ skip the check — e.g. for `object_grasped`, the false-positive question is "is
 where this is `True` but no contact/grasp geometry actually supports it"; for `recovery_ltl`,
 it's "is `recovered=True` reported at a frame where nothing the formula's own text describes
 actually happened yet" (exactly the tautological-escape-term bug).
+
+**Cheap first check: does the predicate hold at a frame where it structurally has to, before
+digging into any specific violation?** Some predicates have a boundary/invariant that must hold
+regardless of which episode you're looking at, independent of the specific formula being
+debugged — e.g. `object_left_gripper` for the last object the robot ever held: by the final
+frame of *any* episode, the gripper is open and the arm has retracted (the episode is over), so
+this must read `True` there. This is a much cheaper check than picking a specific frame and
+reasoning about it: just look at the last frame's value. Confirmed this session — checking
+`object_left_gripper` at episode-end surfaced that it was reading `False` when it structurally
+had to be `True`, which traced back to `_gripper_far_from_object`'s distance computation being
+wrong (the crude center-to-center distance upstream provides, later replaced with the mesh-based
+`mj_geomDistance` tiering) — a bug in the *geometry signal itself*, not in the formula built on
+top of it. When an invariant like this fails, suspect the underlying signal computation before
+suspecting the LTL formula's logic — a formula-level bug (vacuous antecedent, wrong operator)
+usually shows up as *inconsistent* behavior across episodes, while a signal-level bug (wrong
+distance calc, wrong geom ids) tends to fail the *same* structural invariant every time,
+regardless of which formula reads that signal. Look for other natural invariants the same way
+before assuming a bug is formula-specific: e.g. `object_grasped` must be `False` at frame 0
+(nothing is pre-grasped at episode start), `object_supported` must eventually be `True` for any
+object that ends the episode sitting on a surface, etc.
 
 ## Phase 4.5: adjusting a threshold constant end to end
 
@@ -241,6 +278,38 @@ worked through twice this session (`SETTLE_TIMEOUT_FRAMES` 6→50→100, `GRIPPE
   understand."** The `recovery_ltl` discussions repeatedly turned out to hinge on what the field
   was actually *for* (recovery vs. resume) rather than a bug -- clarify intent before assuming a
   result is broken.
+- **The viewer's per-object occurrence timeline (`compute_occurrences()` in `viewer/server.py`)
+  is a separate, non-authoritative re-derivation of "start/end" boundaries -- not the real DFA.**
+  Confirmed this session on `rc_released_object_eventually_settles` (`ArrangeBreadBasket` ep7):
+  the real single `LTLfDFA` only tracks the three raw atoms (`object_released`,
+  `release_object_settle_timeout`, `object_settled`) with no notion of "which object" or
+  "occurrence boundary" at all -- there's exactly one continuous pending-or-resolved state the
+  whole episode. `compute_occurrences()`, by contrast, does its own scan for `trigger` edges
+  (`_rising_edges`) and artificially caps each occurrence's search window at
+  `next_start - 1` (the frame right before the *next* trigger edge) purely so consecutive display
+  boxes don't overlap. When a trigger flickers twice for the same real event (here: a 3-frame
+  `object_grasped` contact dropout causing `object_released` to fire at both 911 and 926 for the
+  same basket, both ultimately resolved by the one real settle event at 939), this produces a
+  phantom "unresolved" occurrence for the earlier trigger, even though the real DFA never
+  actually failed anything -- always verify a suspicious "unresolved"/"violated" occurrence
+  against the real DFA replay (Phase 3's technique) before trusting the viewer's segmentation as
+  ground truth.
+- **Design direction (not yet implemented): stop tracking per-object identity in properties/
+  displays where the underlying predicate already collapses to a single tracked slot.** The
+  `object_grasped`/`object_released` redesign already avoids needing per-object bookkeeping in
+  the formula itself -- both are bare, identity-less atoms describing "is *something* currently
+  grasped/being released," not "is object X grasped." `rc_released_object_eventually_settles`
+  should follow the same template: `predicates.py` already maintains a single global
+  `settle_watch_object`/`settle_obj_name` slot (only one object can be "awaiting settle" at a
+  time -- see `awaiting_settle`/`settle_watch_age` around predicates.py:2562), so there's no real
+  need for the viewer's occurrence logic to independently re-derive "which object" per edge via
+  `active_object_by_frame` at all. The fix direction is to have `compute_occurrences()` follow
+  `settle_obj_name`'s own real identity/continuity directly (segment occurrences on
+  `settle_obj_name` *changing*, not on raw `trigger` edges) instead of re-deriving object
+  identity from scratch and re-triggering a new box on every edge regardless of whether the
+  underlying slot actually changed. This directly eliminates the phantom-occurrence bug above,
+  rather than just papering over its symptom. Confirm this is still the right approach before
+  implementing -- it hasn't been built yet.
 
 ## Phase 6: check performance before scaling up
 
