@@ -378,6 +378,31 @@ coarser, smoothed sampling rate) turns out to be too trigger-happy at native res
    articulable reason ("this was a genuine flicker/bug, confirmed via real frames") is exactly
    the kind of shortcut to avoid, no matter how good the resulting number looks.
 
+7. **Use the `--call_stride`-equivalent value as a reference ceiling to sanity-check against, not
+   a value to actually adopt.** For each frame-count constant, compute what it would be if scaled
+   by the "real" `n_action_steps` (commonly 16): `current_value * 16`. This is genuinely useful as
+   an upper bound / order-of-magnitude check, but confirmed twice this session that the naive
+   16x-scaled number is far more conservative than real data supports for onset/debounce-style
+   constants specifically (as opposed to genuinely multi-second concepts like settling, where the
+   16x estimate landed almost exactly right -- `SETTLE_TIMEOUT_FRAMES`'s base 6 * 16 = 96, matching
+   the independently real-data-tuned 100 almost exactly). Always find the *actual* right value from
+   real data before adopting the 16x number, using whichever of these fits the constant's role:
+   - **For an onset/trigger-confirmation constant:** find a genuine, real trigger event and check
+     how far past the threshold its own build-up counter already was by the time it actually
+     fired (e.g. `pick_approach_candidate_count`). If real triggers build up to values far past
+     even a generous threshold before the *geometric* precondition (e.g. "near enough") is what
+     actually gates them, the frame-count threshold was never the real bottleneck for genuine
+     events at all -- it only matters for suppressing short noise, so it can be small (confirmed:
+     `SKILL_ONSET_FRAMES` 2 -> 8, real approaches were already at 55+ frames of build-up by the
+     time onset fired, nowhere near needing 32).
+   - **For a state-value debounce constant:** pull a real raw boolean trace for the underlying
+     signal and compute the length of every contiguous True-run (a rising-edge/falling-edge scan
+     over the whole episode, not just one region). Real physical noise and real physical state
+     durations are usually cleanly bimodal -- a handful of very short runs (flicker) and a cluster
+     of much longer ones (genuine) with a real gap between them. Pick a value in that gap, not
+     the naive 16x number (confirmed: `PERSISTENCE_FRAMES` 2 -> 5, `object_stable_relative`'s real
+     true-run lengths were 1-2 frames [noise] or 7+ frames [genuine], nothing in between).
+
 **A living-document instruction, standing for the rest of this effort:** update this skill file
 with new methodology *as it's established*, not just in a batch at the end of a session. If the
 user states a new principle, corrects an approach, or gives a piece of reusable direction (e.g.
