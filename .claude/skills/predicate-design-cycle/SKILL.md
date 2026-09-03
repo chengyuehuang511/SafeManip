@@ -263,6 +263,129 @@ worked through twice this session (`SETTLE_TIMEOUT_FRAMES` 6→50→100, `GRIPPE
    change to what's on disk under `monitor/output/`, then confirm via
    `curl .../api/training_monitor_methods` before telling the user it's live.
 
+## Phase 4.6: frame-count constants, `--call_stride`, and the smoothing-removal tradeoff
+
+`extract_privileged_from_dataset.py` has a `--call_stride N` flag (default 1, i.e. unscaled) that
+auto-multiplies every frame-count constant in `predicates.py` (`_PREDICATES_FRAME_CONSTANTS`,
+currently 11: `STABLE_PERSISTENCE_FRAME`, `CONTENT_STABLE_PERSISTENCE_FRAMES`,
+`FIXTURE_OUTPUT_IDLE_FRAMES`, `MICROWAVE_EMPTY_PERSISTENCE_FRAMES`,
+`MICROWAVE_OCCUPANCY_PERSISTENCE_FRAMES`, `SETTLE_TIMEOUT_FRAMES`, `SKILL_ONSET_FRAMES`,
+`PLACE_ONSET_FRAMES`, `DUMP_ONSET_FRAMES`, `GRASPED_RECEPTACLE_UPRIGHT_GRACE_FRAMES`,
+`PICK_APPROACH_PERSISTENCE_FRAMES`) by `N` at extraction time -- its own module docstring
+explains this exists because live rollouts call the privileged-info snapshot once per
+`n_action_steps` (commonly 16) raw frames, so "N persistence-frames" means a very different real
+duration depending on how densely the snapshot is sampled.
+
+**Important, session-specific decision: this project deliberately runs at `--call_stride 1`
+(the native, finest-grained resolution), not 16, even though 16 would restore parity with an
+older, coarser-sampled baseline "for free."** The reason: coarse sampling (`call_stride 16`)
+functioned as a *hidden* debounce/smoothing mechanism -- a genuinely bad multi-frame event only
+had a chance to register if it happened to survive being sampled by a snapshot taken every 16th
+frame. Going to `call_stride 1` deliberately removes that hidden smoothing so every predicate's
+real behavior can be seen and judged on its own terms, then fixed *explicitly and visibly* --
+either by raising the specific constant that actually needs a multi-frame window, or by
+redesigning the formula so it doesn't need one at all. Silently opting back into `call_stride 16`
+would just reinstate the same hidden smoothing everywhere at once, undoing that goal -- **do not
+reach for `--call_stride` to fix an inflated violation rate on this project; tune the specific
+constant instead**, the same way `SETTLE_TIMEOUT_FRAMES` was (confirmed the hard way this
+session: proposing `--call_stride 16` and even briefly reverting a constant to lean on it was
+explicitly rejected -- "I deliberately want to use 1, and if you want to change the
+hyperparameter itself just like what I did with settletimeoutframes").
+
+**Workflow for deciding what to do with each frame-count constant, once its default (tuned for a
+coarser, smoothed sampling rate) turns out to be too trigger-happy at native resolution:**
+
+1. **Get a real before/after comparison, not a guess.** Compare a pre-existing older-version
+   scaled result (e.g. `v0`, the original upstream-predicates baseline, still recoverable from
+   the nested `monitor/output/` git repo's history even after its working-directory copy is
+   deleted -- `git log --all -- v0_.../` then `git show <commit>:v0_.../VIOLATION_SUMMARY.md`)
+   against the current version's real per-property violation counts. A property whose rate barely
+   moved between the two didn't get more sensitive from the resolution change; one whose rate
+   jumped sharply is a real candidate.
+2. **For each property with a real jump, classify it into exactly one of three buckets** before
+   touching anything:
+   - **Explained by an already-fixed logic bug, unrelated to smoothing at all.** Confirmed this
+     session for `rc_dump_preconditions_safe` (2 -> 69 violated episodes) -- entirely explained by
+     fixing an incorrect tilt-gate that had been silently suppressing real detections; nothing to
+     do with frame counts. Don't tune a constant to "fix" a jump that's actually a bug fix
+     working correctly.
+   - **Smoothing is genuinely necessary here -- raise the specific constant.** True for
+     inherently multi-frame concepts: "has this object come to rest" (`SETTLE_TIMEOUT_FRAMES`,
+     already raised 6 -> 100 this session, confirmed against real settle durations), "is the
+     gripper *approaching* an object" (`PICK_APPROACH_PERSISTENCE_FRAMES`,
+     `SKILL_ONSET_FRAMES` -- a single frame can't tell you a trend is happening). Raise only the
+     specific constant that's actually gating the behavior in question, and re-verify against
+     real data the same way as any other threshold change (Phase 4.5's recipe).
+   - **Smoothing was never really necessary -- it was a crutch for a poorly-structured formula.
+     Redesign instead of raising the number.** The template for this is the pre-session
+     `rc_grasp_remains_safe_until_release` fix: rather than adding/raising a persistence-frame
+     debounce to paper over a flickering contact signal, the real fix was restructuring the
+     formula (splitting into `rc_grasp_remains_synced_until_dropped` +
+     `rc_dropped_object_was_released`, built on `object_sync`'s bilateral-contact check) so the
+     underlying flicker stopped mattering at all. See Phase 1's "prefer fixing the formula's
+     structure over adding a frame-smoothing/debounce constant" for the general version of this
+     principle -- this phase is the concrete "how do I tell which bucket a real, measured jump
+     falls into" companion to it.
+3. **A property's jump can be a mix of more than one bucket at once.** `rc_fixture_close/open_
+   obstacle_retract` (37 -> 111 violated episodes this session) had *both* a genuine logic bug
+   (the self-contradicting `fixture_{open,close}_retracting` definition, bucket 1) *and* a
+   plausible smoothing-removal contribution (obstacle-contact detection lost its debounce
+   entirely, `CONTACT_PERSISTENCE_FRAMES` deprecated to 1, so a momentary graze while swinging
+   past now counts the same as a sustained blocking collision) -- don't stop investigating once
+   the first, easier-to-find bug is fixed if the post-fix rate is still elevated; re-measure and
+   check whether a real bucket-2/3 issue remains underneath.
+4. **A worked bucket-3 result, to calibrate expectations for how much redesign can buy:**
+   comparing v0 (upstream baseline) to the current branch's equivalent, the single original
+   `rc_grasp_remains_safe_until_release` (132/500 episodes violated, 26.4%) vs. its post-redesign
+   split (`rc_grasp_remains_synced_until_dropped` + `rc_dropped_object_was_released`, counting an
+   episode as violated if *either* fires -- the fair like-for-like comparison across a property
+   split) dropped to 30/500 (6.0%), an ~80% reduction. This is the reference point for "what a
+   genuine structural redesign can achieve" vs. bucket-2 constant-raising, which typically buys a
+   much smaller improvement -- **when a property is this far off target, look hard for a bucket-3
+   redesign opportunity before settling for bucket-2 tuning.**
+5. **Minimize the number of distinct frame-count constants, not just their values.** Once several
+   constants turn out to gate conceptually the same question, merge them into one shared name
+   even if verifying the merge takes real-data checks -- don't leave near-duplicate constants
+   around just because no single one of them is technically wrong. Concretely this session: 11
+   frame-count constants in `predicates.py` were consolidated to 3
+   (`_PREDICATES_FRAME_CONSTANTS`, the `--call_stride` auto-scale registry, is the authoritative
+   enumeration to check against). Two were dead code found *only* by grepping for real usage, not
+   assumed from the name (`PLACE_ONSET_FRAMES` -- `skill_place_onset` fires directly off the
+   `object_released` edge with no persistence check at all, correctly, since a release is a
+   genuine discrete edge with nothing to debounce; `FIXTURE_OUTPUT_IDLE_FRAMES` -- declared,
+   listed in the scale registry, never referenced anywhere else) -- remove these outright, don't
+   merge them into something they were never actually gating. The rest merged into two
+   semantically-distinct groups: `SKILL_ONSET_FRAMES` (trigger/onset confirmation --
+   absorbed `DUMP_ONSET_FRAMES` and `PICK_APPROACH_PERSISTENCE_FRAMES`) and the new, generic
+   `PERSISTENCE_FRAMES` (debouncing an already-ongoing state's value -- absorbed
+   `STABLE_PERSISTENCE_FRAME`, `CONTENT_STABLE_PERSISTENCE_FRAMES`,
+   `MICROWAVE_EMPTY_PERSISTENCE_FRAMES`, `MICROWAVE_OCCUPANCY_PERSISTENCE_FRAMES`,
+   `GRASPED_RECEPTACLE_UPRIGHT_GRACE_FRAMES`) -- kept as two names, not one, because "confirming a
+   trigger has genuinely started" and "not flip-flopping on an already-established state's value"
+   are different questions even when they happen to share the same current numeric value; don't
+   force a merge across a real semantic boundary just because the numbers currently coincide.
+   **A merge that changes a constant's actual value (not just its name) needs the same real-data
+   verification as any other threshold change (Phase 4.5's recipe)** -- confirmed this session:
+   merging `DUMP_ONSET_FRAMES` (was 1) into `SKILL_ONSET_FRAMES` (2) changed real behavior, and
+   turned out to be a genuine correctness improvement (resolved a real single-frame-noise false
+   positive on `rc_dump_preconditions_safe`), not assumed safe just because it was "only" a
+   1-frame difference.
+6. **"Get the violation rate down" is not license to loosen thresholds without evidence.**
+   Explicitly stated this session after the grasp-redesign result looked promising: the goal is a
+   low rate *because every predicate is genuinely computed correctly*, not a low rate achieved by
+   shortcuts. Every constant change or merge in this phase still requires the same real-data
+   verification discipline as Phase 4.5/4 -- a change that lowers the count without a verified,
+   articulable reason ("this was a genuine flicker/bug, confirmed via real frames") is exactly
+   the kind of shortcut to avoid, no matter how good the resulting number looks.
+
+**A living-document instruction, standing for the rest of this effort:** update this skill file
+with new methodology *as it's established*, not just in a batch at the end of a session. If the
+user states a new principle, corrects an approach, or gives a piece of reusable direction (e.g.
+"don't use `--call_stride`, tune the constant directly", "merge onset hyperparameters as much as
+possible", "target the grasp-redesign's rate, but no shortcuts"), write it into the relevant
+phase here in the same turn, before moving on to the next task -- don't wait for a natural
+stopping point.
+
 ## Phase 5: refine (when the user proposes a candidate, or you find a bug)
 
 - **Verify every new candidate the same way, from scratch** -- don't assume a variant "should"
