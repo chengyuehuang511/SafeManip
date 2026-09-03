@@ -86,9 +86,12 @@ COMMON_PREDICATES = [
     ("grasped_object_exists", R.grasped_object_exists(R.OBJECT)),
     ("object_grasped", R.object_grasped(R.OBJECT)),
     ("object_stable", R.object_stable(R.OBJECT)),
+    ("object_stable_relative", R.object_stable_relative(R.OBJECT)),
     ("object_sync", R.object_sync(R.OBJECT)),
     ("object_upright", R.object_upright(R.OBJECT)),
     ("object_grasped_safe", R.object_grasped_safe(R.OBJECT)),
+    ("object_dropped", R.object_dropped(R.OBJECT)),
+    ("object_left_gripper", R.object_left_gripper(R.OBJECT)),
     ("object_released", R.object_released(R.OBJECT)),
     ("object_supported", R.object_supported(R.OBJECT, R.SUPPORT)),
     ("object_supported_on_correct", R.object_supported_on_correct(R.OBJECT, R.SUPPORT)),
@@ -200,9 +203,12 @@ PREDICATE_DESCRIPTIONS = {
     "grasped_object_exists": "There is a currently tracked grasped object for contact-policy checks.",
     "object_grasped": "The simulator reports gripper-object contact with closed gripper.",
     "object_stable": "Object linear and angular speeds are below stability thresholds.",
+    "object_stable_relative": "Object linear and angular speeds relative to its current support are below stability thresholds (not world-frame -- e.g. already at rest inside a basket that's still being carried counts as stable here).",
     "object_sync": "The grasped object moves in sync with the gripper under relative linear and angular thresholds.",
     "object_upright": "Object orientation passes the simulator upright check.",
     "object_grasped_safe": "The object is grasped and synchronized with the gripper.",
+    "object_dropped": "The grasp just ended (was grasped, now isn't), for any reason -- a deliberate release, an accidental drop, or a one-frame contact-detection flicker.",
+    "object_left_gripper": "The object's mesh is no longer in contact with the gripper at all -- a raw contact check, not a distance threshold (contrast gripper_away_from_object).",
     "object_released": "The object was previously grasped, is no longer grasped, and the gripper is opening.",
     "object_supported": "The object is supported by some fixture/object support.",
     "object_supported_on_correct": "The current settle-check object is supported by the correct target fixture or target object; retained as evidence, but object_settled no longer requires target-correct support.",
@@ -292,9 +298,12 @@ PREDICATE_FAMILIES = {
     "grasp_release_settle": [
         "object_grasped",
         "object_stable",
+        "object_stable_relative",
         "object_sync",
         "object_upright",
         "object_grasped_safe",
+        "object_dropped",
+        "object_left_gripper",
         "object_released",
         "object_supported",
         "object_supported_on_correct",
@@ -386,11 +395,126 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
         ["forbidden_contact"],
         "No simulator contact pair may fall outside the allowed contact classes.",
     ),
+    # 2026-09-02: split from the single rc_grasp_remains_safe_until_release
+    # (G(object_grasped -> (object_grasped_safe U object_released))) into
+    # two properties -- see CHANGES_2026-08-31.md. That single formula
+    # conflated two different concerns: (1) did the grasp stay synced with
+    # the gripper while held, and (2) was the eventual end-of-grasp actually
+    # a deliberate release. Using object_released (which requires
+    # gripper-opening/settled evidence, not just "no longer grasped") as the
+    # resolve for (1) meant a momentary bilateral-contact detection flicker
+    # (object_grasped/object_sync both drop for exactly one frame, then
+    # immediately recover) permanently violated the "until", since
+    # object_released's stricter check essentially never fires on that same
+    # flicker frame -- confirmed via docs/predicate_ltl_design/
+    # BILATERAL_CONTACT_FLICKER_BUG.md. object_dropped (the raw
+    # grasp-ended edge, no gripper-opening/settled requirement) resolves (1)
+    # cleanly on the flicker frame itself, leaving (2) to its own property.
+    # recovery_ltl (not representable in this plain `ltl` field -- see
+    # repeated_violation_monitor.py's build_repeated_grasp_sync_monitor) is
+    # G(object_grasped & !object_sync -> F(object_sync | object_dropped)):
+    # covers *both* ways a desync episode can honestly end (resynced, or the
+    # grasp itself ended) -- covering only "resynced" left a desync-then-
+    # dropped-without-resyncing-first case with no path back to recovery.
     _spec(
-        "rc_grasp_remains_safe_until_release",
-        "G(object_grasped -> (object_grasped_safe U object_released))",
-        ["object_grasped", "object_grasped_safe", "object_released"],
-        "Once the object is grasped, the grasp must remain safe until release.",
+        "rc_grasp_remains_synced_until_dropped",
+        "G(object_grasped -> (object_sync U object_dropped))",
+        ["object_grasped", "object_sync", "object_dropped"],
+        "Once grasped, the object must stay synced with the gripper (not slipping) until the grasp ends.",
+    ),
+    # IMPORTANT: this `ltl` field is NOT just documentation -- symbolic_properties.py's
+    # _materialize_property() compiles a real LTLfDFA from it directly
+    # (SymbolicProperty(spec["name"], spec["ltl"], ...)), and RoboCasaSymbolicMonitor.step()
+    # uses THAT DFA's accepting/trap status to build `history`, which is what
+    # the actual violations/satisfied classification in run_monitor_on_privileged.py
+    # is based on (see the `if final_event["accepting"]: satisfied.append(...)`
+    # split). A first attempt at this entry left this field as the OLD,
+    # simpler "G(object_dropped -> object_released)" string (for
+    # spec_derive.py's regex-based shape parser, which doesn't recognize
+    # this compound shape) -- that was a real bug: it silently kept the
+    # PRIMARY classification pathway on the old, flicker-sensitive formula,
+    # completely independent from repeated_violation_monitor.py's separate,
+    # correct one (which only feeds the *secondary* "repeated_violation_episodes"
+    # detail, not the primary satisfied/violated call at all). Confirmed by
+    # a direct isolated LTLfDFA test against the real ArrangeBreadBasket ep6
+    # flicker trace (dropped@445, regrasped@447): the compiled DFA for the
+    # *correct* formula below returns to an accepting state at frame 447 and
+    # stays accepting through the end of the trace -- but with the stale
+    # simpler string still in this field, the primary classification still
+    # reported it as violated. This field and repeated_violation_monitor.py's
+    # main_ltl must always be kept textually identical -- there is no
+    # automatic check enforcing that today.
+    #
+    # 2026-09-02 revision (round 2): the `| F(object_grasped)` escape had a
+    # confirmed cross-object misattribution bug (object_grasped is a
+    # global, object-identity-less boolean -- a drop of object A could be
+    # wrongly "resolved" by an unrelated later grasp of object B; confirmed
+    # on ArrangeBreadBasket ep1). Round 1 replaced it with
+    # `!(object_stable_relative & object_supported) U object_grasped`,
+    # which correctly stays scoped to the same object via timing, but
+    # introduced a new false-positive: object_stable_relative/
+    # object_supported are raw, undebounced physics checks (unlike
+    # object_stable, which already gets STABLE_PERSISTENCE_FRAME
+    # treatment), so a single noisy contact-detection frame could
+    # incorrectly break the until (confirmed on ep7: a fast open-then-
+    # reclose recatch @716-718 has one solitary
+    # stable_relative&supported=True frame @717 sandwiched in between,
+    # wrongly flagged as violated).
+    #
+    # Round 2 (this one) replaces the escape condition with
+    # object_left_gripper (predicates.py, 2026-09-02): true once the
+    # object's mesh is no longer in contact with the gripper at all -- a
+    # raw contact check, not a distance threshold or a physics/settle
+    # check. This fixes the round-1 regression because contact/no-contact
+    # doesn't depend on the object having "come to rest" anywhere -- while
+    # the gripper still overlaps the object at all, even open, even
+    # mid-recatch, it hasn't really "left" yet, so
+    # !object_left_gripper stays True continuously through a fast
+    # open-then-reclose (the gripper mesh never actually separates from
+    # the object in between), correctly keeping the until unbroken. It
+    # keeps round 1's fix for the *original* cross-object misattribution
+    # bug too, via the same timing argument (active_object doesn't switch
+    # away from the just-dropped object until the robot moves on to touch
+    # something else, and a genuinely-dropped object's gripper actually
+    # separates from it before that switch happens, if nothing recatches
+    # it first).
+    # Verified against ArrangeBreadBasket ep1 (real drop, correctly
+    # violated), ep4 (dropped @412, regrasped @434 before gripper ever
+    # separated, correctly satisfied), ep6/ep7's first flicker (correctly
+    # satisfied), ep7's second drop @716 (fast recatch, correctly
+    # satisfied now -- the round-1 regression).
+    #
+    # recovery_ltl (repeated_violation_monitor.py's
+    # build_repeated_object_drop_release_monitor; not representable in this
+    # plain `ltl` field, which only carries main_ltl) is
+    # G((object_dropped & !object_released) -> F(object_grasped |
+    # object_left_gripper)) -- its violation *is* recognized by
+    # RepeatedViolationMonitor's own bookkeeping (the until's failure is a
+    # genuine structural trap, not a merely-pending state), so
+    # repeated_violation_episodes populates correctly for this property.
+    #
+    # spec_derive.py's regex-based shape parser (viewer-only, for
+    # pattern/trigger/obligation/resolve classification) doesn't recognize
+    # this compound shape -- see its fallback there, which uses a manual
+    # PROPERTY_META override instead of a derived one for this property.
+    _spec(
+        "rc_dropped_object_was_released",
+        "G(object_dropped -> (object_released | (!object_left_gripper U object_grasped)))",
+        # object_grasped/object_left_gripper aren't in the simplified `ltl`
+        # string above -- they're referenced by the *real* enforced
+        # formulas in repeated_violation_monitor.py's
+        # build_repeated_object_drop_release_monitor (main_ltl's until
+        # escape, recovery_ltl's F(...) escape). Still need to be listed
+        # here regardless: RoboCasaSymbolicMonitor.alpha() only computes
+        # values for symbols in a property's own `predicates` dict (see
+        # monitor.py), and that dict is what gets fed as predicate_values
+        # into RepeatedViolationMonitor.step() -> LTLfDFA's eval() for
+        # *both* the main and recovery DFA. Confirmed the hard way more
+        # than once already (see git history) -- every symbol either
+        # formula touches must be listed here, not just main_ltl's
+        # original atoms.
+        ["object_dropped", "object_released", "object_grasped", "object_left_gripper"],
+        "Whenever a grasp ends, that must be an actual release (gripper opening or the object already settled), not an accidental loss of grasp.",
     ),
     _spec(
         "rc_released_object_eventually_settles",

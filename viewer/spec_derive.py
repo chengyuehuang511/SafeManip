@@ -26,6 +26,29 @@ _SPEC_FUNCS = {"_spec", "_spec_intended_safety", "_spec_mechanism", "_spec_conta
 _INVARIANT_RE = re.compile(r"^G\(\s*!\s*(\w+)\s*\)$")
 _UNTIL_RE = re.compile(r"^G\(\s*(\w+)\s*->\s*\(\s*(!?)\s*(\w+)\s*U\s*(\w+)\s*\)\s*\)$")
 _INSTANT_RE = re.compile(r"^G\(\s*(\w+)\s*->\s*(\w+)\s*\)$")
+# "instant, but with an eventually-escape" -- e.g.
+# rc_dropped_object_was_released's real main_ltl
+# "G(object_dropped -> (object_released | F(object_grasped)))": trigger fires,
+# `check` resolves it immediately if true, but so does `escape` becoming
+# true at any *later* frame (not representable as a plain boolean-trace bar
+# the way `check` is -- see PROPERTY_META's manual "escape" handling for
+# this one property). Classified as "instant" for occurrence-computation
+# purposes (same as a plain instant check) -- an approximation, since the
+# true resolution can extend past the trigger frame via `escape`.
+_INSTANT_WITH_ESCAPE_RE = re.compile(r"^G\(\s*(\w+)\s*->\s*\(\s*(\w+)\s*\|\s*F\((\w+)\)\s*\)\s*\)$")
+# Same idea, but the escape is an "until" instead of a bare F(...) -- e.g.
+# rc_dropped_object_was_released's current main_ltl:
+# "G(object_dropped -> (object_released | (!object_left_gripper U
+# object_grasped)))". Unlike _INSTANT_WITH_ESCAPE_RE, this *does* capture
+# the until's guard expression (group 3, the atom(s) ANDed together inside
+# the "!(...)") -- compute_occurrences (server.py) needs it to actually
+# simulate the until against the real traces (does the guard stay false
+# continuously until escape fires, or does it flip true first and
+# permanently break the until), not just approximate it as a same-frame
+# check like the plain-F(...) shape does.
+_INSTANT_WITH_UNTIL_ESCAPE_RE = re.compile(
+    r"^G\(\s*(\w+)\s*->\s*\(\s*(\w+)\s*\|\s*\(\s*!\s*\(?\s*([\w\s&]+?)\s*\)?\s*U\s*(\w+)\s*\)\s*\)\s*\)$"
+)
 
 
 def _collect_ltl_strings(tree) -> dict[str, str]:
@@ -82,6 +105,26 @@ def parse_ltl_shape(ltl: str) -> dict | None:
     if m:
         trigger, check = m.groups()
         return {"pattern": "instant", "trigger": trigger, "check": check}
+    m = _INSTANT_WITH_ESCAPE_RE.match(ltl)
+    if m:
+        trigger, check, escape = m.groups()
+        return {"pattern": "instant", "trigger": trigger, "check": check, "escape": escape}
+    m = _INSTANT_WITH_UNTIL_ESCAPE_RE.match(ltl)
+    if m:
+        trigger, check, guard_expr, escape = m.groups()
+        # guard_expr is the (possibly multi-atom, &-joined) content of the
+        # until's negated left side, e.g. "object_left_gripper" or
+        # "object_stable_relative & object_supported" -- split into its
+        # individual atoms so compute_occurrences can evaluate their
+        # conjunction against the real traces frame by frame.
+        guard_atoms = [a.strip() for a in guard_expr.split("&") if a.strip()]
+        return {
+            "pattern": "instant",
+            "trigger": trigger,
+            "check": check,
+            "escape": escape,
+            "escape_guard_atoms": guard_atoms,
+        }
     return None
 
 

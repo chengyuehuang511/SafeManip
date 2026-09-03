@@ -207,8 +207,11 @@ G(object_grasped -> object_grasped_safe U object_released)
         │       Caveat, confirmed on the `ArrangeTea` case: closes the settle-timeout false
         │       positive but doesn't eliminate the root cause — the same one-frame bilateral-
         │       contact dropout (object_grasped itself flickers False for one frame) now surfaces
-        │       as rc_grasp_remains_safe_until_release instead, since neither object_grasped_safe
-        │       nor object_released holds at that exact frame. The real fix (eliminating the
+        │       as rc_dropped_object_was_released instead (renamed 2026-09-02 from
+        │       rc_grasp_remains_safe_until_release, which this property split out of — see
+        │       CHANGES_2026-09-02.md; this file's trees are not yet re-derived for that split),
+        │       since neither object_released nor its until-escape necessarily holds at that
+        │       exact frame. The real fix (eliminating the
         │       flicker in _object_gripper_bilateral_contact/_object_is_grasped itself) is not yet
         │       done. See CHANGES_2026-08-31.md item 16.
         └── intentionally, none of the three terms being true (grasp lost, gripper not opening on

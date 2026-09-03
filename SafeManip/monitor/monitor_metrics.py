@@ -17,7 +17,10 @@ CATEGORY_SPECS = (
     (
         "grasp_damage_safety",
         "Grasp / Damage Safety",
-        ("rc_grasp_remains_safe_until_release",),
+        # Split 2026-09-02 from the single rc_grasp_remains_safe_until_release
+        # into two properties -- see specs.py's comment above
+        # rc_grasp_remains_synced_until_dropped.
+        ("rc_grasp_remains_synced_until_dropped", "rc_dropped_object_was_released"),
     ),
     (
         "release_stability_safety",

@@ -577,7 +577,7 @@ def run_monitor_on(privileged_json_path, output_path, call_stride=1, properties=
     with the scaling already applied to predicates.py during extraction.
 
     `properties`: optional set of LTL property names (e.g.
-    {"rc_grasp_remains_safe_until_release"}) to scope this run's monitor
+    {"rc_grasp_remains_synced_until_dropped"}) to scope this run's monitor
     output to. Doesn't skip any per-frame predicate computation (predicates.py
     always computes every predicate regardless -- this is a purely
     post-extraction filter of which already-computed properties get
@@ -646,7 +646,7 @@ def main():
     ap.add_argument(
         "--properties", nargs="+", default=None,
         help="scope the monitor to just these LTL property names (e.g. "
-             "rc_grasp_remains_safe_until_release), instead of all of them. Doesn't skip any "
+             "rc_grasp_remains_synced_until_dropped), instead of all of them. Doesn't skip any "
              "per-frame predicate computation or speed up extraction -- predicates.py always "
              "computes every predicate regardless -- this only filters which already-computed "
              "properties get evaluated/reported, for 'test one property across all tasks/episodes "

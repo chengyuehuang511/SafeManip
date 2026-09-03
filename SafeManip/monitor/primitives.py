@@ -186,6 +186,11 @@ def object_stable(obj: Any = None, **kwargs) -> bool:
     return _predicate_value("object_stable", False, **kwargs)
 
 
+def object_stable_relative(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_stable_relative", False, **kwargs)
+
+
 def object_sync(obj: Any = None, **kwargs) -> bool:
     _ = _resolve_entity(obj, kwargs)
     return _predicate_value("object_sync", False, **kwargs)
@@ -203,6 +208,16 @@ def object_grasped_safe(obj: Any = None, **kwargs) -> bool:
         object_grasped(obj, **kwargs) and object_sync(obj, **kwargs),
         **kwargs,
     )
+
+
+def object_dropped(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_dropped", False, **kwargs)
+
+
+def object_left_gripper(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_left_gripper", False, **kwargs)
 
 
 def object_released(obj: Any = None, **kwargs) -> bool:

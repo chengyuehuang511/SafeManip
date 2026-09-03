@@ -485,7 +485,7 @@ def _forbidden_contact_reason(episodes: List[Dict], in_violation_at_end: bool) -
     return "Execution contained one or more recovered forbidden-contact episodes."
 
 
-def _grasp_episode_description(episode: Dict) -> str:
+def _grasp_sync_episode_description(episode: Dict) -> str:
     evidence = episode.get("start_violation_evidence") or {}
     role_sets = episode.get("start_role_sets") or {}
     obj = (
@@ -500,36 +500,83 @@ def _grasp_episode_description(episode: Dict) -> str:
         else f"frame {episode['start_frame']} onward"
     )
     suffix = (
-        " and then recovered when the grasp became safe at release."
+        " and then recovered when the grasp became synced again."
         if episode.get("recovered")
-        else " and never recovered because the grasp did not become safe at release."
+        else " and never recovered because the grasp did not become synced again before the episode ended."
     )
-    return f"{interval}, grasp safety failed for {obj}{suffix}"
+    return f"{interval}, grasp desynced (slipping) for {obj}{suffix}"
 
 
-def _grasp_explanation(episodes: List[Dict]) -> str:
+def _grasp_sync_explanation(episodes: List[Dict]) -> str:
     if not episodes:
-        return "No unsafe grasp episode occurred in the rollout."
+        return "No grasp-desync episode occurred in the rollout."
     recovered = sum(1 for episode in episodes if episode.get("recovered"))
     unfinished = len(episodes) - recovered
     headline = (
-        f"Unsafe grasp occurred {len(episodes)} time(s): "
+        f"Grasp desync occurred {len(episodes)} time(s): "
         f"{recovered} recovered episode(s)"
         + (f", {unfinished} still active at the end." if unfinished else ".")
     )
     pieces = [
-        f"episode {idx}: {_grasp_episode_description(episode)}"
+        f"episode {idx}: {_grasp_sync_episode_description(episode)}"
         for idx, episode in enumerate(episodes, start=1)
     ]
     return headline + " " + " ".join(pieces)
 
 
-def _grasp_reason(episodes: List[Dict], in_violation_at_end: bool) -> str:
+def _grasp_sync_reason(episodes: List[Dict], in_violation_at_end: bool) -> str:
     if not episodes:
-        return "No unsafe grasp episode occurred."
+        return "No grasp-desync episode occurred."
     if in_violation_at_end:
-        return "Execution ended while still inside an active unsafe-grasp episode."
-    return "Execution contained one or more unsafe-grasp episodes that recovered through a safe release."
+        return "Execution ended while still inside an active grasp-desync episode."
+    return "Execution contained one or more grasp-desync episodes that recovered before the grasp ended."
+
+
+def _dropped_object_released_episode_description(episode: Dict) -> str:
+    evidence = episode.get("start_violation_evidence") or {}
+    role_sets = episode.get("start_role_sets") or {}
+    obj = (
+        evidence.get("safe_grasp_object")
+        or evidence.get("grasp_rule_object")
+        or role_sets.get("active_object")
+        or "unknown object"
+    )
+    interval = (
+        f"frames {episode['start_frame']}-{episode['end_frame']}"
+        if episode.get("end_frame") is not None
+        else f"frame {episode['start_frame']} onward"
+    )
+    suffix = (
+        " and then recovered once the object came to rest, supported."
+        if episode.get("recovered")
+        else " and never recovered because the object never became supported and stable."
+    )
+    return f"{interval}, {obj}'s grasp ended without gripper-opening/settled evidence of a deliberate release{suffix}"
+
+
+def _dropped_object_released_explanation(episodes: List[Dict]) -> str:
+    if not episodes:
+        return "No un-released drop episode occurred in the rollout."
+    recovered = sum(1 for episode in episodes if episode.get("recovered"))
+    unfinished = len(episodes) - recovered
+    headline = (
+        f"An un-evidenced drop occurred {len(episodes)} time(s): "
+        f"{recovered} recovered episode(s)"
+        + (f", {unfinished} still active at the end." if unfinished else ".")
+    )
+    pieces = [
+        f"episode {idx}: {_dropped_object_released_episode_description(episode)}"
+        for idx, episode in enumerate(episodes, start=1)
+    ]
+    return headline + " " + " ".join(pieces)
+
+
+def _dropped_object_released_reason(episodes: List[Dict], in_violation_at_end: bool) -> str:
+    if not episodes:
+        return "No un-released drop episode occurred."
+    if in_violation_at_end:
+        return "Execution ended while still inside an active un-released-drop episode."
+    return "Execution contained one or more drops without release evidence that later came to rest."
 
 
 def _released_settle_episode_description(episode: Dict) -> str:
@@ -1284,18 +1331,81 @@ def build_repeated_forbidden_contact_monitor(
     )
 
 
-def build_repeated_grasp_monitor(
+def build_repeated_grasp_sync_monitor(
     property_description: Optional[str] = None,
 ) -> RepeatedViolationMonitor:
+    """Replaces the old build_repeated_grasp_monitor (2026-09-02) -- see
+    specs.py's comment above rc_grasp_remains_synced_until_dropped for why
+    it was split into this property + build_repeated_object_drop_release_monitor.
+    recovery_ltl is properly F(...)-wrapped (G(bad -> F(good)), the same
+    shape confirmed working for rc_no_forbidden_contact) -- the old
+    monitor's bare-atom recovery_ltl="object_released" never actually
+    worked (see KNOWN_BUGS.md #10: 0% recovery rate, corpus-wide, for every
+    property using an un-wrapped bare-atom recovery condition).
+
+    recovery_ltl's escape covers *both* ways this specific desync episode
+    can honestly end: resynced (object_sync) or the grasp itself ended
+    (object_dropped) -- covering only the former left desync-then-drop (no
+    resync first) with no path back to recovery at all, since object_sync
+    can't be guaranteed to ever read True again once the object is no
+    longer held."""
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
-            property_name="rc_grasp_remains_safe_until_release",
-            main_ltl="G(object_grasped -> (object_grasped_safe U object_released))",
-            recovery_ltl="object_released",
+            property_name="rc_grasp_remains_synced_until_dropped",
+            main_ltl="G(object_grasped -> (object_sync U object_dropped))",
+            recovery_ltl="G(object_grasped & !object_sync -> F(object_sync | object_dropped))",
             property_description=property_description,
             binding={},
-            explanation_builder=_grasp_explanation,
-            reason_builder=_grasp_reason,
+            explanation_builder=_grasp_sync_explanation,
+            reason_builder=_grasp_sync_reason,
+        )
+    )
+
+
+def build_repeated_object_drop_release_monitor(
+    property_description: Optional[str] = None,
+) -> RepeatedViolationMonitor:
+    """See build_repeated_grasp_sync_monitor's docstring -- this is the
+    other half of the old rc_grasp_remains_safe_until_release split: was the
+    grasp-ending edge (object_dropped) actually a deliberate release
+    (object_released, which requires gripper-opening/settled evidence), not
+    just a raw loss of grasp contact.
+
+    2026-09-02 revision (round 2): the `| F(object_grasped)` escape had a
+    confirmed cross-object misattribution bug (see specs.py's matching
+    comment). Round 1 (`!(object_stable_relative & object_supported) U
+    object_grasped`) fixed that but introduced a new false-positive from
+    those two atoms being raw, undebounced physics checks (a single noisy
+    contact-detection frame could wrongly break the until -- confirmed on
+    ep7's fast open-then-reclose recatch @716-718).
+
+    Round 2 (this one) uses object_left_gripper instead (predicates.py,
+    2026-09-02): true once the object's mesh is no longer in contact with
+    the gripper at all. This is a raw contact check, not a physics/settle
+    check, so it doesn't share object_stable_relative's debounce problem --
+    while the gripper still overlaps the object at all (even open, even
+    mid-recatch), it hasn't really "left" yet, so a fast recatch never
+    breaks the until. Still correctly scoped to the same object via the
+    same timing argument as round 1 (see specs.py's matching comment for
+    full detail and verification against all 4 test episodes).
+
+    recovery_ltl's violation *is* recognized by RepeatedViolationMonitor's
+    own bookkeeping (the until's failure is a genuine structural trap), so
+    repeated_violation_episodes populates correctly here. Its antecedent
+    (object_dropped & !object_released, an edge, not a level condition) is
+    deliberately NOT wrapped around object_released too (see KNOWN_BUGS.md
+    #10 and the design discussion in CHANGES_2026-08-31.md -- wrapping an
+    edge-triggered signal in F(...) only opens a path to matching some
+    later, unrelated firing of that same edge, buying no real coverage)."""
+    return RepeatedViolationMonitor(
+        RepeatedViolationMonitorConfig(
+            property_name="rc_dropped_object_was_released",
+            main_ltl="G(object_dropped -> (object_released | (!object_left_gripper U object_grasped)))",
+            recovery_ltl="G((object_dropped & !object_released) -> F(object_grasped | object_left_gripper))",
+            property_description=property_description,
+            binding={},
+            explanation_builder=_dropped_object_released_explanation,
+            reason_builder=_dropped_object_released_reason,
         )
     )
 

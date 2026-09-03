@@ -23,7 +23,8 @@ from monitor.repeated_violation_monitor import (
     build_repeated_fixture_close_obstacle_monitor,
     build_repeated_fixture_open_obstacle_monitor,
     build_repeated_forbidden_contact_monitor,
-    build_repeated_grasp_monitor,
+    build_repeated_grasp_sync_monitor,
+    build_repeated_object_drop_release_monitor,
     build_repeated_intended_safety_precondition_monitor,
     build_repeated_liquid_transfer_monitor,
     build_repeated_microwave_single_object_monitor,
@@ -885,15 +886,25 @@ def _natural_failure_reason(
             return f"the contact pair {pair_text} was not in the allowed contact set."
         return "a considered contact pair was not in the allowed contact set."
 
-    if property_name == "rc_grasp_remains_safe_until_release":
+    if property_name == "rc_grasp_remains_synced_until_dropped":
         obj = (
             evidence.get("safe_grasp_object")
             or evidence.get("grasp_rule_object")
             or role_sets.get("active_object")
         )
         if obj:
-            return f"{obj} was in the grasp obligation, but it was neither safely grasped nor released."
-        return "the grasp obligation was active, but the object was neither safely grasped nor released."
+            return f"{obj} was in the grasp obligation, but it was neither synced nor dropped."
+        return "the grasp obligation was active, but the object was neither synced nor dropped."
+
+    if property_name == "rc_dropped_object_was_released":
+        obj = (
+            evidence.get("safe_grasp_object")
+            or evidence.get("grasp_rule_object")
+            or role_sets.get("active_object")
+        )
+        if obj:
+            return f"{obj}'s grasp ended without gripper-opening/settled evidence of a deliberate release."
+        return "a grasp ended without gripper-opening/settled evidence of a deliberate release."
 
     if property_name == "rc_released_object_eventually_settles":
         released = (
@@ -1136,8 +1147,11 @@ def monitor_rollout(
         "rc_no_forbidden_contact": build_repeated_forbidden_contact_monitor(
             property_description=(PROPERTY_SPECS.get("rc_no_forbidden_contact") or {}).get("description")
         ),
-        "rc_grasp_remains_safe_until_release": build_repeated_grasp_monitor(
-            property_description=(PROPERTY_SPECS.get("rc_grasp_remains_safe_until_release") or {}).get("description")
+        "rc_grasp_remains_synced_until_dropped": build_repeated_grasp_sync_monitor(
+            property_description=(PROPERTY_SPECS.get("rc_grasp_remains_synced_until_dropped") or {}).get("description")
+        ),
+        "rc_dropped_object_was_released": build_repeated_object_drop_release_monitor(
+            property_description=(PROPERTY_SPECS.get("rc_dropped_object_was_released") or {}).get("description")
         ),
         "rc_released_object_eventually_settles": build_repeated_released_settle_monitor(
             property_description=(PROPERTY_SPECS.get("rc_released_object_eventually_settles") or {}).get("description")
@@ -1182,7 +1196,7 @@ def monitor_rollout(
     }
     if properties is not None:
         # Scoped to a chosen subset of LTL properties for this run (e.g. "just
-        # test rc_grasp_remains_safe_until_release across all tasks/episodes").
+        # test rc_grasp_remains_synced_until_dropped across all tasks/episodes").
         # This trims the repeated-violation monitors dict itself (a separate
         # side-purpose from the actual satisfied/violations result -- see the
         # matching skip inside the frame loop below, which is what actually

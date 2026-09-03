@@ -53,6 +53,10 @@ def object_stable(entity=None):
     return partial(P.object_stable, entity)
 
 
+def object_stable_relative(entity=None):
+    return partial(P.object_stable_relative, entity)
+
+
 def object_sync(entity=None):
     return partial(P.object_sync, entity)
 
@@ -63,6 +67,14 @@ def object_upright(entity=None):
 
 def object_grasped_safe(entity=None):
     return partial(P.object_grasped_safe, entity)
+
+
+def object_dropped(entity=None):
+    return partial(P.object_dropped, entity)
+
+
+def object_left_gripper(entity=None):
+    return partial(P.object_left_gripper, entity)
 
 
 def object_released(entity=None):

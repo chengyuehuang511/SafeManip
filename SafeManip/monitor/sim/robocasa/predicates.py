@@ -118,6 +118,8 @@ PREDICATE_FAMILIES = {
         "object_sync",
         "object_upright",
         "object_grasped_safe",
+        "object_dropped",
+        "object_left_gripper",
         "object_released",
         "object_supported",
         "object_supported_on_correct",
@@ -2405,6 +2407,17 @@ def build_predicate_snapshot(
         # Clear the baseline once the grasp ends so a stale one from a
         # previous grasp can never leak into a later, unrelated one.
         monitor_state["grasp_slip_baseline_object"] = None
+    # The raw grasp-ended edge, independent of whether it looks like a
+    # deliberate release (see object_released below, which additionally
+    # requires gripper-opening/settled evidence) -- true for exactly one
+    # frame, whenever object_grasped goes True -> False, for any reason
+    # (a clean release, a silent drop, or a one-frame bilateral-contact
+    # flicker). Exported (2026-09-02) so the grasp-safety LTL can resolve
+    # its "until" on this alone (rc_grasp_remains_synced_until_dropped),
+    # leaving the separate question of whether the drop was actually a
+    # proper release to its own property (rc_dropped_object_was_released)
+    # instead of conflating both into one -- see CHANGES_2026-08-31.md.
+    object_dropped = _bool(prev_object_grasped and not object_grasped)
     object_released = _bool(
         prev_object_grasped
         and not object_grasped
@@ -2756,6 +2769,58 @@ def build_predicate_snapshot(
     object_stable_relative = _bool(
         has_active_object and _object_stable_relative(str(obj_name))
     )
+    # True once the object's AABB no longer overlaps the gripper's own AABB
+    # (treating the gripper as one rectangular region spanning its jaws,
+    # not literal mesh/contact touching) -- revised 2026-09-02 from an
+    # earlier raw-contact-based version (_object_gripper_contact_any),
+    # which turned out to have the same single-frame-flicker problem as
+    # every other contact-based signal in this file: confirmed on
+    # ArrangeBreadBasket ep7 (frame 716) that MuJoCo's own contact solver
+    # reports zero gripper-basket geom contacts for exactly one frame
+    # (mid-recatch, gripper visually still around the basket) even though
+    # the object is still positioned well within the gripper's jaw span --
+    # collision geoms are simplified/shrunk from the visual mesh, so
+    # "touching" can flicker off for a frame while the object hasn't
+    # actually left the gripper's *region* at all. AABB-overlap doesn't
+    # have this problem: it depends on continuous position, not a binary
+    # contact-solver resolution, so it changes smoothly as the object
+    # actually falls away instead of flickering at the contact-margin
+    # boundary.
+    #
+    # Deliberately uses _object_contact_aabb(obj_name) directly, NOT the
+    # general _object_aabb(obj_name) helper (_gripper_far_from_object/
+    # _pick_swept_endpoint_aabbs's usual AABB source) -- confirmed via
+    # direct frame-by-frame debugging on ep7 that _object_aabb's first
+    # choice, _object_ou_bbox_aabb() (env.objects[name].get_bbox_points()),
+    # returns a bounding box for "basket" that's ~0.1m below its actual
+    # held position the *entire* time it's grasped (Z range ~[0.75, 0.93]
+    # vs. the gripper's own ~[1.01, 1.19] and the object's real position,
+    # from _object_position, at Z~0.92 vs. the gripper's eef Z~1.04) --
+    # i.e. get_bbox_points() looks like it's returning basket's rest-pose
+    # bbox shape, not correctly following it while lifted. This made
+    # _object_aabb() never overlap the gripper at all while basket was
+    # being actively held, which would have made object_left_gripper
+    # wrongly read True continuously through an entire real grasp -- a
+    # much worse bug than the single-frame flicker this predicate was
+    # introduced to fix. _object_contact_aabb() (built from the object's
+    # own current contact-geom positions, same technique
+    # _gripper_contact_aabb() uses for the gripper) doesn't have this
+    # problem -- confirmed its Z range correctly tracks and overlaps the
+    # gripper's throughout ep7's 710-718 window. This is a real bug in
+    # _object_aabb/_object_ou_bbox_aabb worth investigating separately
+    # (see KNOWN_BUGS.md) -- not fixed at that shared level here, since
+    # other callers of _object_aabb (_gripper_far_from_object,
+    # _pick_swept_endpoint_aabbs, _gripper_object_distances) haven't been
+    # checked for the same issue and changing a shared helper's priority
+    # order needs its own verification pass.
+    _gripper_aabb_now = _gripper_aabb()
+    _object_aabb_now = _object_contact_aabb(str(obj_name)) if has_active_object else None
+    _gripper_object_overlap = (
+        _gripper_aabb_now is not None
+        and _object_aabb_now is not None
+        and _aabb_intersects(_gripper_aabb_now, _object_aabb_now)
+    )
+    object_left_gripper = _bool(has_active_object and not _gripper_object_overlap)
     # No debounce: object_sync tracks the raw relative-velocity check directly.
     # This used to require RELATIVE_SPEED_PERSISTENCE_FRAMES consecutive false
     # frames before flipping, but object_sync is now an independent, meaningful
@@ -6350,6 +6415,8 @@ def build_predicate_snapshot(
         "object_sync": object_sync,
         "object_upright": object_upright,
         "object_grasped_safe": object_grasped_safe,
+        "object_dropped": object_dropped,
+        "object_left_gripper": object_left_gripper,
         "object_released": object_released,
         "object_supported": object_supported,
         "object_supported_on_correct": object_supported_on_correct,

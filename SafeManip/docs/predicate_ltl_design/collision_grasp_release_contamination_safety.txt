@@ -82,8 +82,41 @@ TODO: also need to specify the exact correct region, not just broad object/fixtu
 
 
 
-G(object_grasped -> object_grasped_safe U object_released)
-Recovery: object_released
+Split 2026-09-02 (was one property, "G(object_grasped -> object_grasped_safe U
+object_released)" -- see CHANGES_2026-09-02.md) into two, so a bilateral-contact detection
+flicker at the eventual drop/release instant can't poison the whole "stays safe while held"
+question:
+
+rc_grasp_remains_synced_until_dropped:
+G(object_grasped -> (object_sync U object_dropped))
+Recovery: G(object_grasped & !object_sync -> F(object_sync | object_dropped))
+        recovery's escape covers *both* ways a desync episode can honestly end: resynced
+        (object_sync) or the grasp itself ended (object_dropped) -- covering only the former
+        would leave desync-then-drop (no resync first) with no path back to recovery at all
+
+rc_dropped_object_was_released:
+G(object_dropped -> (object_released | (!object_left_gripper U object_grasped)))
+Recovery: G((object_dropped & !object_released) -> F(object_grasped | object_left_gripper))
+        whenever a grasp ends, that must be an actual release (object_released), not just an
+        accidental loss of grasp -- but a drop immediately followed by a regrasp before the
+        object ever leaves the gripper's region (object_left_gripper) shouldn't count as a
+        violation either (a one-frame bilateral-contact flicker mid-recatch, still effectively
+        held throughout)
+        went through 4 rounds before landing here -- see CHANGES_2026-09-02.md for the full
+        story (a cross-object misattribution bug with a naive F(object_grasped) escape; a
+        stable/supported-based fix that introduced a new false positive from an undebounced
+        physics signal; a raw-contact-based object_left_gripper that had the same
+        single-frame-flicker problem in a new place; finally this AABB-overlap-based version)
+
+object_left_gripper:= not aabb_intersects(gripper_aabb, object_contact_aabb(active_object))
+        true once the object's AABB no longer overlaps the gripper's own AABB -- treats the
+        gripper as one rectangular region spanning its jaws (including the open space between
+        the fingers, not just their surfaces), not literal mesh/contact touching, so it changes
+        smoothly with position instead of flickering at the contact-solver's margin boundary
+        deliberately uses object_contact_aabb (built from the object's own current contact-geom
+        positions), not the general object_aabb helper -- the latter's first-choice source
+        returns a stale/offset bounding box for at least one object (basket) while actively
+        held; see KNOWN_BUGS.md #11
 
 G(object_released -> (!release_object_settle_timeout U object_settled))
 Relaxed version for recovery: G(object_released -> F<= SETTLE_TIMEOUT_FRAMES monitor frames(object_settled))
@@ -208,6 +241,15 @@ object_grasped_safe:= object_grasped and object_sync
         it fires
 
 
+object_dropped:= previously(object_grasped) and !object_grasped
+        the raw grasp-ended edge, independent of whether it looks like a deliberate release --
+        true for exactly one frame whenever object_grasped goes True -> False, for any reason
+        (a clean release, a silent drop, or a one-frame bilateral-contact flicker). Added
+        2026-09-02 so rc_grasp_remains_synced_until_dropped can resolve its "until" on this
+        alone, leaving the separate question of whether it was actually a proper release to
+        rc_dropped_object_was_released instead of one property conflating both -- see
+        CHANGES_2026-09-02.md
+
 object_released:= previously(object_grasped) and !object_grasped
         and (gripper_is_opening or previously(gripper_is_opening)
              or (object_supported(released_object) and object_stable_relative(released_object)))
@@ -233,10 +275,12 @@ object_released:= previously(object_grasped) and !object_grasped
                 positive but doesn't eliminate the underlying issue -- the same one-frame
                 bilateral-contact dropout (object_grasped itself flickers False for one frame
                 while the object is clearly still held) now surfaces as a different violation
-                instead (rc_grasp_remains_safe_until_release, since neither object_grasped_safe
-                nor object_released holds at that exact frame). The real fix would be eliminating
-                the one-frame flicker in _object_gripper_bilateral_contact/_object_is_grasped
-                itself; not yet done. See CHANGES_2026-08-31.md item 16.
+                instead (rc_dropped_object_was_released, since neither object_released nor its
+                until-escape necessarily holds at that exact frame -- renamed 2026-09-02 from
+                rc_grasp_remains_safe_until_release, which this property split out of; see
+                CHANGES_2026-09-02.md). The real fix would be eliminating the one-frame flicker
+                in _object_gripper_bilateral_contact/_object_is_grasped itself; not yet done.
+                See CHANGES_2026-08-31.md item 16.
         uses object_supported (plain, not relative) as the base condition rather than
                 object_stable: a freshly-dropped object is essentially never already resting on
                 something at the exact frame contact breaks (it's still in free-fall), so this

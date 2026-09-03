@@ -263,16 +263,24 @@ PROPERTY_META = {
         **_DERIVED_SHAPES["rc_no_forbidden_contact"],
         "children": _children_of("forbidden_contact"),
     },
-    "rc_grasp_remains_safe_until_release": {
-        **_DERIVED_SHAPES["rc_grasp_remains_safe_until_release"],
-        # object_grasped_safe = (not object_released) and object_grasped and
-        # object_sync -- object_grasped/object_sync are the auto-derived
-        # children; "not object_released" isn't (an unexported negation, and
-        # this property's own resolve condition anyway). object_grasped
-        # duplicating the top-level LTL atom row is harmless -- the
-        # display-key builder below already dedupes.
-        "children": _children_of("object_grasped_safe"),
-        "reason_children": _children_of("object_grasped_safe"),
+    # Split 2026-09-02 from the single rc_grasp_remains_safe_until_release
+    # into these two properties -- see specs.py's comment above
+    # rc_grasp_remains_synced_until_dropped for why (the old formula's
+    # resolve, object_released, essentially never fires on the same frame
+    # as a bilateral-contact detection flicker, permanently poisoning the
+    # "until" for what's usually a harmless 1-frame blip -- see
+    # docs/predicate_ltl_design/BILATERAL_CONTACT_FLICKER_BUG.md). Neither
+    # new property's obligation/check (object_sync, object_released) has a
+    # safe auto-derived decomposition -- object_sync isn't itself a
+    # multi-term AND, and object_released's top-level structure is an `or`
+    # (not decomposable per predicate_derive.py's rules) -- so neither gets
+    # a "children" entry, same as e.g.
+    # rc_raw_robot_contact_blocks_rte_grasp_until_sanitized.
+    "rc_grasp_remains_synced_until_dropped": {
+        **_DERIVED_SHAPES["rc_grasp_remains_synced_until_dropped"],
+    },
+    "rc_dropped_object_was_released": {
+        **_DERIVED_SHAPES["rc_dropped_object_was_released"],
     },
     "rc_released_object_eventually_settles": {
         **_DERIVED_SHAPES["rc_released_object_eventually_settles"],
@@ -417,6 +425,17 @@ for _prop_name, _entry in PROPERTY_META.items():
         _composite_name = _entry.get(_role)
         if _composite_name:
             _covered.update(_DERIVED_CHILDREN.get(_composite_name) or [])
+    # "escape"/"escape_guard_atoms" (instant-with-until-escape shape, e.g.
+    # rc_dropped_object_was_released) are already top-level LTL atoms --
+    # extract_ltl_atoms() picks them up directly from the ltl string, same
+    # as trigger/check -- so they must also count as "covered" here, or
+    # they'd wrongly get added to extra_top and render as a *second*,
+    # duplicate row alongside their real top-level one. Confirmed bug: was
+    # showing "object_grasped"/"object_left_gripper" twice each in the
+    # viewer before this was added.
+    _covered.add(_entry.get("escape"))
+    _covered.update(_entry.get("escape_guard_atoms") or [])
+    _covered.discard(None)
     _extra = [p for p in _SPEC_PREDICATE_LISTS.get(_prop_name, []) if p not in _covered]
     if _extra:
         _entry["extra_top"] = _extra
@@ -1095,19 +1114,133 @@ def compute_occurrences(meta, traces, active_object_by_frame, episode_last_frame
         if trig is None:
             return []
         chk_dict = dict(chk) if chk is not None else {}
+        escape = meta.get("escape")
+        guard_atoms = meta.get("escape_guard_atoms")
+        guard_traces = [dict(traces[a]) for a in (guard_atoms or []) if a in traces]
+
+        def _eventual_separation(after_frame):
+            """First frame after `after_frame` where every guard atom reads
+            True (see the until-branch below for why this matters for
+            window-sizing) -- also relevant when `check` itself resolved
+            the occurrence instantly: guard_atoms can still take a while
+            longer to actually flip true (e.g. object_left_gripper after a
+            clean object_released), and without this, the timeline window
+            has no reason to stay open long enough to show it (confirmed
+            on ArrangeBreadBasket ep0: object_released @791, but
+            object_left_gripper doesn't read True until @806 -- right at
+            the edge of the default +15 lookahead)."""
+            if not guard_traces:
+                return None
+            g = after_frame + 1
+            while g <= episode_last_frame:
+                if all(t.get(g) is True for t in guard_traces):
+                    return {"frame": g, "reason": f"{'/'.join(guard_atoms)} eventually became true"}
+                g += 1
+            return None
+
         occurrences = []
         for frame, v in trig:
             if v is not True:
                 continue
-            violated = []
-            if chk_dict.get(frame) is False:
-                violated.append({"frame": frame, "reasons": false_children(meta["check"], frame)})
-            occurrences.append({
-                "object": obj_at(frame),
-                "activation": {"frame": frame, "reason": f"{meta['trigger']} fires (edge-triggered entry event)"},
-                "violated_frames": violated,
-                "end": {"frame": frame, "resolved": True, "reason": "instantaneous check"},
-            })
+            if chk_dict.get(frame) is not False:
+                # check holds at the trigger frame itself -- resolved
+                # outright, same as the no-escape case below.
+                occurrences.append({
+                    "object": obj_at(frame),
+                    "activation": {"frame": frame, "reason": f"{meta['trigger']} fires (edge-triggered entry event)"},
+                    "violated_frames": [],
+                    "end": {"frame": frame, "resolved": True, "reason": "instantaneous check"},
+                    "eventual_separation": _eventual_separation(frame),
+                })
+                continue
+            if not escape or not guard_atoms:
+                # No escape clause on this property (plain instant) --
+                # check failed at the trigger frame and that's final.
+                occurrences.append({
+                    "object": obj_at(frame),
+                    "activation": {"frame": frame, "reason": f"{meta['trigger']} fires (edge-triggered entry event)"},
+                    "violated_frames": [{"frame": frame, "reasons": false_children(meta["check"], frame)}],
+                    "end": {"frame": frame, "resolved": True, "reason": "instantaneous check"},
+                })
+                continue
+            # check failed, but there's an "escape" clause:
+            # `!(guard_atoms AND'd) U escape` -- walk forward from the
+            # trigger frame simulating the real until, instead of only
+            # looking at the trigger frame itself. The until fails (this
+            # occurrence never resolves) the moment guard_atoms are ALL
+            # true simultaneously, at or after the trigger frame, before
+            # escape has fired; it resolves the frame escape fires, as
+            # long as guard_atoms never went all-true first.
+            esc_dict = dict(traces[escape]) if escape in traces else {}
+            resolved_frame = None
+            broke_frame = None
+            f = frame
+            while f <= episode_last_frame:
+                if esc_dict.get(f) is True:
+                    resolved_frame = f
+                    break
+                if guard_traces and all(t.get(f) is True for t in guard_traces):
+                    broke_frame = f
+                    break
+                f += 1
+            if resolved_frame is not None:
+                # The until resolves (guard_atoms never went all-true before
+                # escape fired) -- per real LTLf semantics the whole
+                # trigger -> (check | until) implication is actually TRUE at
+                # the trigger frame, given how the rest of the trace plays
+                # out, even though `check` itself read False right there.
+                # violated_frames stays empty: nothing here was ever really
+                # violated, so the timeline shouldn't mark it red (only the
+                # unresolved branch below, where the until genuinely fails,
+                # is a real violation).
+                # Also note the first frame *after* resolution where
+                # guard_atoms eventually go all-true anyway (e.g. the
+                # gripper genuinely separates from the object later, once
+                # it's finally set down for good) -- purely informational
+                # (doesn't affect resolved/violated), but without it the
+                # window-sizing below has no reason to extend the visible
+                # range that far, and a reader watching the timeline can be
+                # left wondering why a signal they expect to flip true
+                # eventually never appears to (see ArrangeBreadBasket ep7:
+                # basket recatched @716-718, released for good @926, but
+                # object_left_gripper doesn't actually read true until
+                # @942 -- 16 frames past the last occurrence's own marks,
+                # outside the default +15 lookahead window).
+                occurrences.append({
+                    "object": obj_at(frame),
+                    "activation": {"frame": frame, "reason": f"{meta['trigger']} fires (edge-triggered entry event)"},
+                    "violated_frames": [],
+                    "end": {
+                        "frame": resolved_frame,
+                        "resolved": True,
+                        "reason": f"{escape} became true before {'/'.join(guard_atoms)} did — recovered",
+                    },
+                    "eventual_separation": _eventual_separation(resolved_frame),
+                })
+            else:
+                end_frame = broke_frame if broke_frame is not None else episode_last_frame
+                violated = [
+                    {"frame": f2, "reasons": false_children(meta["check"], f2)}
+                    for f2 in range(frame, end_frame + 1)
+                ]
+                occurrences.append({
+                    "object": obj_at(frame),
+                    "activation": {"frame": frame, "reason": f"{meta['trigger']} fires (edge-triggered entry event)"},
+                    "violated_frames": violated,
+                    "end": (
+                        {
+                            "frame": broke_frame,
+                            "resolved": False,
+                            "reason": f"{'/'.join(guard_atoms)} became true before {escape} did — never recovered",
+                        }
+                        if broke_frame is not None else
+                        {
+                            "frame": episode_last_frame,
+                            "resolved": False,
+                            "reason": "never resolved — episode ended first",
+                        }
+                    ),
+                })
         return occurrences
 
     return []
@@ -1153,6 +1286,13 @@ def _occurrence_marks(occurrences):
             marks.append({
                 "kind": "end", "frame": end["frame"], "marker": end.get("marker"),
                 "label": "ends" if end.get("resolved") else "ends (unresolved)", "reason": end.get("reason"),
+                "object": occ.get("object"),
+            })
+        sep = occ.get("eventual_separation")
+        if sep and sep.get("frame") is not None:
+            marks.append({
+                "kind": "info", "frame": sep["frame"], "marker": sep.get("marker"),
+                "label": "eventually separates", "reason": sep.get("reason"),
                 "object": occ.get("object"),
             })
     marks.sort(key=lambda m: m["frame"])
@@ -1365,6 +1505,8 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
                     v["reason_labels"] = [r.replace("_", " ") for r in v["reasons"]]
                 if occ.get("end") and occ["end"].get("frame") is not None:
                     occ["end"]["marker"] = to_video_time(occ["end"]["frame"])
+                if occ.get("eventual_separation") and occ["eventual_separation"].get("frame") is not None:
+                    occ["eventual_separation"]["marker"] = to_video_time(occ["eventual_separation"]["frame"])
             marks = _occurrence_marks(occurrences)
 
         if key_frames:

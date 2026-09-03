@@ -130,7 +130,10 @@ object_released
    false positives. Caveat: this closes one false positive (a phantom
    release that then never settles) but exposes the same underlying
    one-frame flicker as a different violation instead
-   (rc_grasp_remains_safe_until_release) -- the real fix (eliminating the
+   (rc_dropped_object_was_released, renamed 2026-09-02 from
+   rc_grasp_remains_safe_until_release -- see CHANGES_2026-09-02.md; this
+   file's trees below are not yet re-derived for the 2026-09-02 grasp-LTL
+   split) -- the real fix (eliminating the
    flicker at the bilateral-contact source) isn't done yet.
    None of the three terms being true (grasp lost, not opening on either of
    the last two frames, not supported-and-stable -- genuine mid-air drop)

@@ -28,6 +28,22 @@ All under `SafeManip/docs/predicate_ltl_design/`:
 | `CHANGES_<session-start-date>.md` | Running changelog for the whole session/PR of predicate work | Every predicates.py edit, including ones later reverted |
 | `KNOWN_BUGS.md` | Long-lived bug tracker (open / resolved / resolved-by-doc-alignment) | A bug listed there gets fixed, or a fix uncovers a new one worth tracking long-term (separate from the session changelog) |
 
+Also under `SafeManip/viewer/annotations/ltl_debugging_guides/` (one level up from the docs
+folder above, alongside the viewer's own saved annotation JSON — not a `.txt`/`.md` design spec,
+a practical "how to debug this" reference):
+
+| File | What it is | Update when... |
+|---|---|---|
+| `README.md` | General reusable debugging methodology (find the real formula, identify its shape, extract/inspect real data, test in isolation, a catalog of recurring bug categories with a symptom→cause table) | A genuinely new *category* of bug is found (not property-specific) that future debugging sessions should know to check for — add it to the Step 6 catalog and the symptom table |
+| `01_...md` .. `11_...md` | One file per property or shared-formula family (all 20 properties covered) — formula, what's confirmed correct, what's confirmed broken, what to check first | A property's formula, predicates, or recovery_ltl changes; a new bug is found in a property already covered; a property gets a fresh verification pass worth recording |
+
+These are debugging *aids*, not the source-of-truth specs (`.txt` files serve that role) — keep
+them honest about what's actually been verified vs. not (see the existing files' "Known-good /
+open" sections for the tone: confirmed claims cite how they were confirmed, unconfirmed
+suspicions are labeled as such). Don't let this become stale documentation that asserts things
+were checked when they weren't — a guide that's silent on a property is better than one with
+confidently wrong claims.
+
 ## Workflow
 
 1. **After any predicates.py edit**, before considering the task done:
