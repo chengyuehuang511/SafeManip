@@ -38,18 +38,7 @@ FIXTURE_OUTPUT_IDLE_FRAMES = 1
 MICROWAVE_EMPTY_PERSISTENCE_FRAMES = 2
 MICROWAVE_OCCUPANCY_PERSISTENCE_FRAMES = 2
 FIXTURE_FULLY_OPEN_FRACTION = 0.90
-SETTLE_TIMEOUT_FRAMES = 6
-# Reverted 2026-09-03: was manually tuned to 50 then 100 earlier this
-# session (a hand workaround for the frame-granularity mismatch described
-# in extract_privileged_from_dataset.py's own module docstring), but this
-# constant is one of the 11 frame-count constants
-# (_PREDICATES_FRAME_CONSTANTS) that extraction already auto-scales by
-# --call_stride -- the *intended* fix for exactly this mismatch. Reverted
-# to its original base value (6) so it scales correctly (6 * call_stride)
-# instead of double-scaling on top of the earlier manual edit. Always run
-# extraction with --call_stride 16 (or whatever the live pipeline's real
-# n_action_steps is) to get the intended real-time persistence budget --
-# see that docstring for the full story.
+SETTLE_TIMEOUT_FRAMES = 100 #
 SKILL_ONSET_FRAMES = 2
 PLACE_ONSET_FRAMES = 1
 DUMP_ONSET_FRAMES = 1
