@@ -17,6 +17,7 @@ sys.path.insert(0, REPO_ROOT)
 
 
 from monitor.monitor import RoboCasaSymbolicMonitor
+from monitor.primitives import entity_has_attribute
 from monitor.repeated_violation_monitor import (
     build_repeated_fixture_placement_support_monitor,
     build_repeated_contamination_monitor,
@@ -531,13 +532,16 @@ def _candidate_from_pairs(pairs: List[List[str]]) -> str | None:
     )
 
 
-def _repair_forbidden_contact_active_object_pairs(dynamic_frames: List[Dict]) -> None:
+def _repair_forbidden_contact_active_object_pairs(
+    dynamic_frames: List[Dict], static_info: Dict | None = None
+) -> None:
     """Filter stale exports where normal gripper-object grasp contact was forbidden.
 
     Older privileged snapshots can contain `forbidden_contact_pairs` for the
     gripper touching the active manipulated object when nested object geoms were
     omitted from the simulator-side object geom set. Keep any other pair intact.
     """
+    static_info = static_info or {}
     for frame in dynamic_frames:
         dynamic_info = frame.get("data") or {}
         predicates_root = dynamic_info.get("predicates") or {}
@@ -610,13 +614,33 @@ def _repair_forbidden_contact_active_object_pairs(dynamic_frames: List[Dict]) ->
             if name in {"sponge", "spatula"}
         ]
         action_objects.extend(clean_tool_candidates)
+        # Generalized 2026-09-03 (KNOWN_BUGS.md #4) from hardcoded
+        # name-prefix/literal checks ("fruit"/"veg"/"vegetable"/"colander"/
+        # "pot") to the general tag/attribute lookup already used elsewhere
+        # in the monitor (entity_has_attribute, monitor/primitives.py) --
+        # "fruit"/"vegetable" and "receptacle" are real, populated attributes
+        # (attributes.py's object_category_attribute_defaults, backed by
+        # robocasa's own native category/type tags, not invented), so this
+        # now recognizes any produce/receptacle object regardless of its
+        # instance name, not just ones matching these specific literal
+        # prefixes.
+        def _is_clean_produce(name: str) -> bool:
+            return entity_has_attribute(
+                name, "fruit", static_info=static_info, dynamic_info=dynamic_info
+            ) or entity_has_attribute(
+                name, "vegetable", static_info=static_info, dynamic_info=dynamic_info
+            )
+
+        def _is_wash_receptacle(name: str) -> bool:
+            return entity_has_attribute(
+                name, "receptacle", static_info=static_info, dynamic_info=dynamic_info
+            )
+
         clean_content_candidates = [
-            name
-            for name in clean_contact_objects
-            if name.startswith(("fruit", "veg", "vegetable"))
+            name for name in clean_contact_objects if _is_clean_produce(name)
         ]
         active_container_or_content = any(
-            name in {"colander", "pot"} or name.startswith(("fruit", "veg", "vegetable"))
+            _is_wash_receptacle(name) or _is_clean_produce(name)
             for name in [*active_objects, *action_objects]
         )
         if clean_content_candidates and (
@@ -1138,7 +1162,7 @@ def monitor_rollout(
     static_info, dynamic_frames, replay_summary = _load_rollout(path)
     _ensure_object_settle_timeout(dynamic_frames)
     _ensure_contamination_activation_frame(dynamic_frames)
-    _repair_forbidden_contact_active_object_pairs(dynamic_frames)
+    _repair_forbidden_contact_active_object_pairs(dynamic_frames, static_info)
     if monitor is None:
         monitor = RoboCasaSymbolicMonitor()
     else:
@@ -1302,28 +1326,64 @@ def monitor_rollout(
             entry["first_non_accepting_predicate_summary"] = _format_predicate_snapshot(first_bad["predicate_values"])
             temporal_evidence = {}
             if property_name == "rc_released_object_eventually_settles":
+                # Fixed 2026-09-03 (KNOWN_BUGS.md #6). Was: pick the *first*
+                # object_released=True frame in the whole episode, then the
+                # *first* object_settled=True frame anywhere after it --
+                # object_released/object_settled are single global predicates
+                # (predicates.py's one settle-watch slot), so once that slot
+                # gets reassigned to a *different* object's later release,
+                # the naive "first X, first Y after X" search could pair the
+                # originally-violated object's release with a completely
+                # unrelated later object's settle event, making the
+                # explanation misleadingly read "it eventually settled, just
+                # late" when the object this violation is actually about
+                # never settled at all.
+                #
+                # Fix: anchor on object_release_frame, a per-frame field
+                # predicates.py already tracks precisely for this purpose
+                # (predicates.py:3045, `evidence_release_frame =
+                # settle_release_frame` -- reset to the current frame on
+                # every genuine object_released edge, held steady in between)
+                # -- reading it directly from the trap-confirmation frame's
+                # own violation_evidence is exactly "which release cycle is
+                # this violation about", no re-derivation/search needed. Then
+                # scan forward for object_settled=True, but stop the instant
+                # object_release_frame's value changes (a new release cycle
+                # started) so a later, different cycle's settle can never be
+                # misattributed to this one.
+                release_frame = (first_bad.get("violation_evidence") or {}).get(
+                    "object_release_frame"
+                )
                 release_event = next(
                     (
                         event
                         for event in events
-                        if event["predicate_values"].get("object_released")
+                        if release_frame is not None
+                        and event["frame_index"] == release_frame
                     ),
                     None,
                 )
-                settled_after_release = next(
-                    (
-                        event
-                        for event in events
-                        if release_event is not None
-                        and event["frame_index"] >= release_event["frame_index"]
-                        and event["predicate_values"].get("object_settled")
-                    ),
-                    None,
-                )
+                settled_after_release = None
+                if release_frame is not None:
+                    for event in events:
+                        if event["frame_index"] < release_frame:
+                            continue
+                        event_release_frame = (event.get("violation_evidence") or {}).get(
+                            "object_release_frame"
+                        )
+                        if event_release_frame != release_frame:
+                            break  # a different release cycle started
+                        if event["predicate_values"].get("object_settled"):
+                            settled_after_release = event
+                            break
                 temporal_evidence = {
-                    "release_frame": (
-                        release_event["frame_index"] if release_event is not None else None
-                    ),
+                    # release_frame comes straight from the int already
+                    # resolved above (predicates.py's own tracked
+                    # object_release_frame), not from release_event's own
+                    # frame_index -- robust even in the unlikely case no
+                    # exact-frame_index-matching event object was found in
+                    # `events` (e.g. call_stride sampling landed elsewhere).
+                    "release_frame": release_frame,
                     "released_objects": _first_nonempty_list(
                         release_event.get("violation_evidence", {}).get(
                             "inferred_released_object"
@@ -1341,8 +1401,8 @@ def monitor_rollout(
                         else None
                     ),
                     "timeout_frame": (
-                        release_event["frame_index"] + SETTLE_TIMEOUT_FRAMES
-                        if release_event is not None
+                        release_frame + SETTLE_TIMEOUT_FRAMES
+                        if release_frame is not None
                         else None
                     ),
                     "final_frame": final_event["frame_index"],
