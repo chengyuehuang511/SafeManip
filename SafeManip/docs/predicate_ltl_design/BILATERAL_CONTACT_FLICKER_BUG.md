@@ -109,6 +109,35 @@ or a different enabling condition is involved. Not yet diagnosed -- flagged here
 conflated with the bilateral-contact flicker bug this file is otherwise about, since the data
 pattern (long-lived drop, not a short recoverable gap) doesn't match.
 
+## New confirmed instance (2026-09-03, v9): a messier multi-cycle variant, and why candidate
+approach 3 doesn't actually apply to it
+
+Found via systematic corpus-wide failure clustering on `rc_grasp_remains_synced_until_dropped`
+(v9): `PreSoakPan` ep0's `obj1`, frames 162-170. Unlike every previously-confirmed instance above
+(a single clean 1-2 frame gap sandwiched between stable `True` frames), this one is a *messier,
+repeated* flicker -- `object_grasped` cycles True/False three separate times within a 9-frame
+span (drops at 162, regrasps at 165, drops at 166, regrasps at 167, and the actual violation frame
+168 has `object_grasped=True` but `object_sync=False`, then drops again at 169, finally stabilizing
+`True` from 170 on).
+
+Tried candidate approach 3 (bridge a single-frame contact dropout when `object_sync` stays `True`
+on both sides) and confirmed it does **not** apply here, for a reason worth recording so it isn't
+re-tried: the actual violating frame (168) is not a contact dropout at all --
+`_object_gripper_bilateral_contact` reads `True` there (raw grasp signal intact), but
+`object_sync` itself reads `False`. Approach 3 only helps the opposite case (contact momentarily
+drops while sync stays true); it's structurally unable to help a frame where contact is fine but
+sync fails. Most likely explanation: `_object_grasp_slip`'s reference pose gets re-seeded at
+*every* onset (see its docstring/the onset-seeding code around `grasp_slip_baseline_object`), and
+with the object being re-grasped 3 times in 9 frames here, the very next frame after each reseed
+is comparing against a reference that's only 1 frame old -- if the object is still physically
+settling into the regrasp at that instant, a real (if tiny and momentary) relative-pose delta
+reads as "slip" even though nothing dangerous is happening. Not confirmed by directly inspecting
+the raw slip magnitude at frame 168 (that would be the next step) -- flagged as the more promising
+lead than approach 3 for this specific messier flicker pattern. Implemented and reverted the
+approach-3 code in this session (verified via direct rerun that it left `PreSoakPan`'s violation
+completely unchanged, confirming the above reasoning) rather than leave a dead/no-op change in
+`predicates.py`.
+
 ## Not yet fixed: candidate approaches (none implemented)
 
 - Investigate why bilateral contact count drops for exactly one frame during otherwise-continuous
