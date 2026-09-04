@@ -25,6 +25,22 @@ _SPEC_FUNCS = {"_spec", "_spec_intended_safety", "_spec_mechanism", "_spec_conta
 # with parse_ltl_shape(...) -> None below rather than a wrong guess.
 _INVARIANT_RE = re.compile(r"^G\(\s*!\s*(\w+)\s*\)$")
 _UNTIL_RE = re.compile(r"^G\(\s*(\w+)\s*->\s*\(\s*(!?)\s*(\w+)\s*U\s*(\w+)\s*\)\s*\)$")
+# Weak-until shape -- e.g. rc_grasp_remains_synced_until_dropped's current
+# main_ltl "G(object_grasped -> ((object_sync U object_dropped) |
+# G(object_sync)))": the "| G(obligation)" branch is what makes this a
+# *safety* until (obligation may hold forever without resolve ever firing,
+# e.g. a demo that legitimately ends still mid-grasp) instead of a *liveness*
+# until (resolve must eventually happen -- see specs.py's own comment above
+# this property for why strict U was wrong here). Maps to the exact same
+# shape dict as _UNTIL_RE: server.py's compute_occurrences' "until" pattern
+# already only flags a frame as violated when the obligation atom is
+# actually false there (never asserts resolve must eventually fire), so no
+# downstream change is needed -- this regex just recognizes the shape.
+# Group 2/3 (the until's own negation+obligation) are backreferenced in the
+# trailing G(...) to require it wrap the *same* obligation atom.
+_WEAK_UNTIL_RE = re.compile(
+    r"^G\(\s*(\w+)\s*->\s*\(\s*\(\s*(!?)\s*(\w+)\s*U\s*(\w+)\s*\)\s*\|\s*G\(\s*\2\s*\3\s*\)\s*\)\s*\)$"
+)
 _INSTANT_RE = re.compile(r"^G\(\s*(\w+)\s*->\s*(\w+)\s*\)$")
 # "instant, but with an eventually-escape" -- e.g.
 # rc_dropped_object_was_released's real main_ltl
@@ -91,6 +107,16 @@ def parse_ltl_shape(ltl: str) -> dict | None:
     m = _INVARIANT_RE.match(ltl)
     if m:
         return {"pattern": "invariant", "guard": m.group(1)}
+    m = _WEAK_UNTIL_RE.match(ltl)
+    if m:
+        trigger, neg, obligation, resolve = m.groups()
+        return {
+            "pattern": "until",
+            "trigger": trigger,
+            "obligation": obligation,
+            "obligation_kind": "guard_false" if neg == "!" else "hold_true",
+            "resolve": resolve,
+        }
     m = _UNTIL_RE.match(ltl)
     if m:
         trigger, neg, obligation, resolve = m.groups()

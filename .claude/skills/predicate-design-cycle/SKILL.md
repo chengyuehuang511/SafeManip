@@ -516,6 +516,19 @@ enough to matter?
   (`while squeue -j $jobid -h | grep -q .; do sleep 30; done`) rather than trying to estimate
   wall-clock time -- SLURM queue wait times before a job even starts running are themselves
   unpredictable under `overcap`/priority contention.
+- **A `specs.py`/`predicates.py` change that only affects monitor-time evaluation (not
+  extraction) still deserves the same per-episode SLURM array parallelism as extraction does --
+  don't fall back to a plain serial Python loop just because "it's just re-running the monitor,
+  should be fast."** Confirmed this session: a serial pass calling `monitor_rollout()` once per
+  episode (each call loads a full 100-170MB `privileged_information_<N>.json`) took 2.5+ hours
+  for only 320/500 episodes -- cheap *per-episode*, not cheap *serialized x500*. Built
+  `rerun_monitor_only.py --task T --episode N` (single-pair mode mirroring `extract_privileged_
+  from_dataset.py`'s own `--task/--episode`) plus a matching `.sbatch`/submit-script pair reusing
+  the exact same per-(task,episode)-array-index pattern as extraction. Bonus: have the submit
+  script only enqueue pairs whose `_monitor.json` predates `predicates.py`/`specs.py`'s mtime --
+  if a fix lands mid-flight while a big extraction job is still running, most in-progress array
+  tasks that haven't reached their own monitor step yet will pick up the new code automatically,
+  so a full 500-pair rerun is usually much smaller in practice (64/500 in this session's case).
 - **Never point `--output_root` at a path under `/tmp` (including this session's own scratchpad
   directory) for an `sbatch`-submitted job.** Confirmed this session the hard way: `/tmp` is
   namespaced per-job (standard PAM `/tmp` isolation on most SLURM clusters) — a job's own
@@ -537,6 +550,20 @@ keeping the `.txt` specs / predicate trees / changelog / `KNOWN_BUGS.md` in sync
 `recovery-ltl-design` specifically if any of this touched a `recovery_ltl`. The changelog entry
 should capture the *rejected* candidates and why, not just the final formula -- that's what
 prevents the next session from re-proposing and re-testing something already ruled out.
+
+**A main `ltl` shape change (not just `recovery_ltl`) can also break `viewer/spec_derive.py`'s
+regex-based shape parser, and the failure is a hard crash on viewer startup, not a silent drift.**
+Confirmed this session: switching `rc_grasp_remains_synced_until_dropped`'s formula from strict
+`U` to weak until (`(p U q) | G(p)`, needed for correctness -- see the note above) made
+`server.py` fail at import time with `KeyError` in `_DERIVED_SHAPES`, since `spec_derive.py`'s
+`_UNTIL_RE` only recognizes the plain `G(trigger -> (obligation U resolve))` shape. Fixed by
+adding a new `_WEAK_UNTIL_RE` alongside it, mapped to the *same* shape dict (`pattern: "until"`,
+same trigger/obligation/resolve fields) -- server.py's `compute_occurrences` "until" handling
+already only flags a frame as violated when the obligation atom is actually false there (never
+asserts resolve must eventually fire), so no downstream rendering logic needed to change, only
+the parser needed to recognize the new shape. Any new LTL shape in `specs.py` should be checked
+against `python3 -c "import server"` (or just restarting the viewer) before considering the
+formula change done, not just against `LTLfDFA` compiling and the monitor output changing.
 
 **A `recovery_ltl` change in particular touches more files than just
 `repeated_violation_monitor.py`, and it's easy to update the code and stop there.** Confirmed
