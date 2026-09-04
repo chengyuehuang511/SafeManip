@@ -6252,8 +6252,27 @@ def build_predicate_snapshot(
             try:
                 state = fixture.get_joint_state(env, joint_names)
                 if state:
+                    # Fixed 2026-09-03 (found via systematic corpus-wide failure
+                    # clustering on rc_reach_in_fixture_only_when_fully_open, not
+                    # KNOWN_BUGS.md): compound fixtures (e.g. a fridge) can have
+                    # multiple independent doors that all match "door" in
+                    # door_joint_names (fridge door + freezer door as two
+                    # separate joints). Averaging them meant opening only the
+                    # fridge door (norm ~1.0) while the unrelated freezer door
+                    # stayed closed (norm ~0.0) produced an averaged fraction
+                    # (~0.5) well below FIXTURE_FULLY_OPEN_FRACTION (0.90),
+                    # falsely reporting "not fully open" even though the
+                    # compartment the gripper actually entered was wide open.
+                    # Confirmed corpus-wide: 100% of PackIdenticalLunches'
+                    # rc_reach_in_fixture_only_when_fully_open violations
+                    # (10/10 episodes) showed this exact fridge_door=open/
+                    # freezer_door=closed signature. Using max() instead of
+                    # mean() -- "fully open" if *any* of the fixture's doors is
+                    # open past threshold -- fixes the dilution without
+                    # affecting single-door fixtures (mean == max when there's
+                    # only one door joint).
                     values = [abs(float(value)) for value in state.values()]
-                    return sum(values) / len(values)
+                    return max(values)
             except Exception:
                 pass
         state = _fixture_state(fname)

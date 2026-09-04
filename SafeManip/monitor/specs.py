@@ -437,9 +437,26 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
     # covers *both* ways a desync episode can honestly end (resynced, or the
     # grasp itself ended) -- covering only "resynced" left a desync-then-
     # dropped-without-resyncing-first case with no path back to recovery.
+    # Fixed 2026-09-03 (found via systematic corpus-wide failure clustering
+    # on this property, not KNOWN_BUGS.md): strict `U` asserts a *liveness*
+    # guarantee ("object_dropped eventually becomes true"), but this is a
+    # *safety* property ("stays synced for as long as it's held") -- a demo
+    # that legitimately ends still holding the object (task success reached
+    # without ever needing to release it) can never satisfy "eventually
+    # dropped," so the plain LTLf finite-trace semantics of `U` mark that a
+    # permanent violation purely because the recording stopped mid-grasp.
+    # Confirmed corpus-wide: 100% of WashLettuce's 10/10 violated episodes
+    # for this property had object_grasped=True, object_sync=True,
+    # object_dropped=False at the *exact last frame* of the episode (frame
+    # num_frames-1, verified across all 10 with different episode lengths
+    # 372-581 frames) -- not a slip event at all. Switched to weak until
+    # (`p U q | G(p)`, since this LTLf grammar has no native `W`/`R`
+    # operator): either eventually dropped while having stayed synced the
+    # whole time, OR stays synced for the rest of the trace without ever
+    # needing to resolve -- exactly "safety, not liveness."
     _spec(
         "rc_grasp_remains_synced_until_dropped",
-        "G(object_grasped -> (object_sync U object_dropped))",
+        "G(object_grasped -> ((object_sync U object_dropped) | G(object_sync)))",
         ["object_grasped", "object_sync", "object_dropped"],
         "Once grasped, the object must stay synced with the gripper (not slipping) until the grasp ends.",
     ),

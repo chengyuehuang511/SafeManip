@@ -1,0 +1,6149 @@
+{
+  "violations": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 412,
+                "reason": "skill_dump_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 412,
+                  "video_frame": 3296,
+                  "time_s": 329.6
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 412,
+                  "reasons": [
+                    "dump_support_type_matches_content"
+                  ],
+                  "marker": {
+                    "monitor_frame": 412,
+                    "video_frame": 3296,
+                    "time_s": 329.6
+                  },
+                  "reason_labels": [
+                    "dump support type matches content"
+                  ]
+                }
+              ],
+              "end": {
+                "frame": 412,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 412,
+                  "video_frame": 3296,
+                  "time_s": 329.6
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 660,
+                "reason": "fixture_open_obstacle_hit became true",
+                "marker": {
+                  "monitor_frame": 660,
+                  "video_frame": 5280,
+                  "time_s": 528.0
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 660,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 660,
+                    "video_frame": 5280,
+                    "time_s": 528.0
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 743,
+                "resolved": true,
+                "reason": "fixture_fully_closed became true",
+                "marker": {
+                  "monitor_frame": 743,
+                  "video_frame": 5944,
+                  "time_s": 594.4
+                }
+              }
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 747,
+                "reason": "fixture_open_obstacle_hit became true",
+                "marker": {
+                  "monitor_frame": 747,
+                  "video_frame": 5976,
+                  "time_s": 597.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 747,
+                "resolved": true,
+                "reason": "fixture_fully_closed became true",
+                "marker": {
+                  "monitor_frame": 747,
+                  "video_frame": 5976,
+                  "time_s": 597.6
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "2": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 412,
+                "reason": "solid_transfer_event became true",
+                "marker": {
+                  "monitor_frame": 412,
+                  "video_frame": 3296,
+                  "time_s": 329.6
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 512,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 512,
+                    "video_frame": 4096,
+                    "time_s": 409.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 513,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 513,
+                    "video_frame": 4104,
+                    "time_s": 410.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 514,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 514,
+                    "video_frame": 4112,
+                    "time_s": 411.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 515,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 515,
+                    "video_frame": 4120,
+                    "time_s": 412.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 516,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 516,
+                    "video_frame": 4128,
+                    "time_s": 412.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 517,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 517,
+                    "video_frame": 4136,
+                    "time_s": 413.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 518,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 518,
+                    "video_frame": 4144,
+                    "time_s": 414.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 519,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 519,
+                    "video_frame": 4152,
+                    "time_s": 415.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 520,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 520,
+                    "video_frame": 4160,
+                    "time_s": 416.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 521,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 521,
+                    "video_frame": 4168,
+                    "time_s": 416.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 522,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 522,
+                    "video_frame": 4176,
+                    "time_s": 417.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 523,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 523,
+                    "video_frame": 4184,
+                    "time_s": 418.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 524,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 524,
+                    "video_frame": 4192,
+                    "time_s": 419.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 525,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 525,
+                    "video_frame": 4200,
+                    "time_s": 420.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 526,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 526,
+                    "video_frame": 4208,
+                    "time_s": 420.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 527,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 527,
+                    "video_frame": 4216,
+                    "time_s": 421.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 528,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 528,
+                    "video_frame": 4224,
+                    "time_s": 422.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 529,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 529,
+                    "video_frame": 4232,
+                    "time_s": 423.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 530,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 530,
+                    "video_frame": 4240,
+                    "time_s": 424.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 531,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 531,
+                    "video_frame": 4248,
+                    "time_s": 424.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 532,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 532,
+                    "video_frame": 4256,
+                    "time_s": 425.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 533,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 533,
+                    "video_frame": 4264,
+                    "time_s": 426.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 534,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 534,
+                    "video_frame": 4272,
+                    "time_s": 427.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 535,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 535,
+                    "video_frame": 4280,
+                    "time_s": 428.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 536,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 536,
+                    "video_frame": 4288,
+                    "time_s": 428.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 537,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 537,
+                    "video_frame": 4296,
+                    "time_s": 429.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 538,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 538,
+                    "video_frame": 4304,
+                    "time_s": 430.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 539,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 539,
+                    "video_frame": 4312,
+                    "time_s": 431.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 540,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 540,
+                    "video_frame": 4320,
+                    "time_s": 432.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 541,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 541,
+                    "video_frame": 4328,
+                    "time_s": 432.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 542,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 542,
+                    "video_frame": 4336,
+                    "time_s": 433.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 543,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 543,
+                    "video_frame": 4344,
+                    "time_s": 434.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 544,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 544,
+                    "video_frame": 4352,
+                    "time_s": 435.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 545,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 545,
+                    "video_frame": 4360,
+                    "time_s": 436.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 546,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 546,
+                    "video_frame": 4368,
+                    "time_s": 436.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 547,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 547,
+                    "video_frame": 4376,
+                    "time_s": 437.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 548,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 548,
+                    "video_frame": 4384,
+                    "time_s": 438.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 549,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 549,
+                    "video_frame": 4392,
+                    "time_s": 439.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 550,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 550,
+                    "video_frame": 4400,
+                    "time_s": 440.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 551,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 551,
+                    "video_frame": 4408,
+                    "time_s": 440.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 552,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 552,
+                    "video_frame": 4416,
+                    "time_s": 441.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 553,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 553,
+                    "video_frame": 4424,
+                    "time_s": 442.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 554,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 554,
+                    "video_frame": 4432,
+                    "time_s": 443.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 555,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 555,
+                    "video_frame": 4440,
+                    "time_s": 444.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 556,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 556,
+                    "video_frame": 4448,
+                    "time_s": 444.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 557,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 557,
+                    "video_frame": 4456,
+                    "time_s": 445.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 558,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 558,
+                    "video_frame": 4464,
+                    "time_s": 446.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 559,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 559,
+                    "video_frame": 4472,
+                    "time_s": 447.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 560,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 560,
+                    "video_frame": 4480,
+                    "time_s": 448.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 561,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 561,
+                    "video_frame": 4488,
+                    "time_s": 448.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 562,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 562,
+                    "video_frame": 4496,
+                    "time_s": 449.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 563,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 563,
+                    "video_frame": 4504,
+                    "time_s": 450.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 564,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 564,
+                    "video_frame": 4512,
+                    "time_s": 451.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 565,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 565,
+                    "video_frame": 4520,
+                    "time_s": 452.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 566,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 566,
+                    "video_frame": 4528,
+                    "time_s": 452.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 567,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 567,
+                    "video_frame": 4536,
+                    "time_s": 453.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 568,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 568,
+                    "video_frame": 4544,
+                    "time_s": 454.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 569,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 569,
+                    "video_frame": 4552,
+                    "time_s": 455.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 570,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 570,
+                    "video_frame": 4560,
+                    "time_s": 456.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 571,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 571,
+                    "video_frame": 4568,
+                    "time_s": 456.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 572,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 572,
+                    "video_frame": 4576,
+                    "time_s": 457.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 573,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 573,
+                    "video_frame": 4584,
+                    "time_s": 458.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 574,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 574,
+                    "video_frame": 4592,
+                    "time_s": 459.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 575,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 575,
+                    "video_frame": 4600,
+                    "time_s": 460.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 576,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 576,
+                    "video_frame": 4608,
+                    "time_s": 460.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 577,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 577,
+                    "video_frame": 4616,
+                    "time_s": 461.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 578,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 578,
+                    "video_frame": 4624,
+                    "time_s": 462.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 579,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 579,
+                    "video_frame": 4632,
+                    "time_s": 463.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 580,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 580,
+                    "video_frame": 4640,
+                    "time_s": 464.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 581,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 581,
+                    "video_frame": 4648,
+                    "time_s": 464.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 582,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 582,
+                    "video_frame": 4656,
+                    "time_s": 465.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 583,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 583,
+                    "video_frame": 4664,
+                    "time_s": 466.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 584,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 584,
+                    "video_frame": 4672,
+                    "time_s": 467.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 585,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 585,
+                    "video_frame": 4680,
+                    "time_s": 468.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 586,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 586,
+                    "video_frame": 4688,
+                    "time_s": 468.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 587,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 587,
+                    "video_frame": 4696,
+                    "time_s": 469.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 588,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 588,
+                    "video_frame": 4704,
+                    "time_s": 470.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 589,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 589,
+                    "video_frame": 4712,
+                    "time_s": 471.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 590,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 590,
+                    "video_frame": 4720,
+                    "time_s": 472.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 591,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 591,
+                    "video_frame": 4728,
+                    "time_s": 472.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 592,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 592,
+                    "video_frame": 4736,
+                    "time_s": 473.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 593,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 593,
+                    "video_frame": 4744,
+                    "time_s": 474.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 594,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 594,
+                    "video_frame": 4752,
+                    "time_s": 475.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 595,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 595,
+                    "video_frame": 4760,
+                    "time_s": 476.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 596,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 596,
+                    "video_frame": 4768,
+                    "time_s": 476.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 597,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 597,
+                    "video_frame": 4776,
+                    "time_s": 477.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 598,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 598,
+                    "video_frame": 4784,
+                    "time_s": 478.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 599,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 599,
+                    "video_frame": 4792,
+                    "time_s": 479.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 600,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 600,
+                    "video_frame": 4800,
+                    "time_s": 480.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 601,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 601,
+                    "video_frame": 4808,
+                    "time_s": 480.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 602,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 602,
+                    "video_frame": 4816,
+                    "time_s": 481.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 603,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 603,
+                    "video_frame": 4824,
+                    "time_s": 482.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 604,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 604,
+                    "video_frame": 4832,
+                    "time_s": 483.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 605,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 605,
+                    "video_frame": 4840,
+                    "time_s": 484.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 606,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 606,
+                    "video_frame": 4848,
+                    "time_s": 484.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 607,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 607,
+                    "video_frame": 4856,
+                    "time_s": 485.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 608,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 608,
+                    "video_frame": 4864,
+                    "time_s": 486.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 609,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 609,
+                    "video_frame": 4872,
+                    "time_s": 487.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 610,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 610,
+                    "video_frame": 4880,
+                    "time_s": 488.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 611,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 611,
+                    "video_frame": 4888,
+                    "time_s": 488.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 612,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 612,
+                    "video_frame": 4896,
+                    "time_s": 489.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 613,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 613,
+                    "video_frame": 4904,
+                    "time_s": 490.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 614,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 614,
+                    "video_frame": 4912,
+                    "time_s": 491.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 615,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 615,
+                    "video_frame": 4920,
+                    "time_s": 492.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 616,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 616,
+                    "video_frame": 4928,
+                    "time_s": 492.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 617,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 617,
+                    "video_frame": 4936,
+                    "time_s": 493.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 618,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 618,
+                    "video_frame": 4944,
+                    "time_s": 494.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 619,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 619,
+                    "video_frame": 4952,
+                    "time_s": 495.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 620,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 620,
+                    "video_frame": 4960,
+                    "time_s": 496.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 621,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 621,
+                    "video_frame": 4968,
+                    "time_s": 496.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 622,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 622,
+                    "video_frame": 4976,
+                    "time_s": 497.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 623,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 623,
+                    "video_frame": 4984,
+                    "time_s": 498.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 624,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 624,
+                    "video_frame": 4992,
+                    "time_s": 499.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 625,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 625,
+                    "video_frame": 5000,
+                    "time_s": 500.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 626,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 626,
+                    "video_frame": 5008,
+                    "time_s": 500.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 627,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 627,
+                    "video_frame": 5016,
+                    "time_s": 501.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 628,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 628,
+                    "video_frame": 5024,
+                    "time_s": 502.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 629,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 629,
+                    "video_frame": 5032,
+                    "time_s": 503.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 630,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 630,
+                    "video_frame": 5040,
+                    "time_s": 504.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 631,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 631,
+                    "video_frame": 5048,
+                    "time_s": 504.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 632,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 632,
+                    "video_frame": 5056,
+                    "time_s": 505.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 633,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 633,
+                    "video_frame": 5064,
+                    "time_s": 506.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 634,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 634,
+                    "video_frame": 5072,
+                    "time_s": 507.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 635,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 635,
+                    "video_frame": 5080,
+                    "time_s": 508.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 636,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 636,
+                    "video_frame": 5088,
+                    "time_s": 508.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 637,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 637,
+                    "video_frame": 5096,
+                    "time_s": 509.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 638,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 638,
+                    "video_frame": 5104,
+                    "time_s": 510.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 639,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 639,
+                    "video_frame": 5112,
+                    "time_s": 511.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 640,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 640,
+                    "video_frame": 5120,
+                    "time_s": 512.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 641,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 641,
+                    "video_frame": 5128,
+                    "time_s": 512.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 642,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 642,
+                    "video_frame": 5136,
+                    "time_s": 513.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 643,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 643,
+                    "video_frame": 5144,
+                    "time_s": 514.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 644,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 644,
+                    "video_frame": 5152,
+                    "time_s": 515.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 645,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 645,
+                    "video_frame": 5160,
+                    "time_s": 516.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 646,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 646,
+                    "video_frame": 5168,
+                    "time_s": 516.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 647,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 647,
+                    "video_frame": 5176,
+                    "time_s": 517.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 648,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 648,
+                    "video_frame": 5184,
+                    "time_s": 518.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 649,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 649,
+                    "video_frame": 5192,
+                    "time_s": 519.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 650,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 650,
+                    "video_frame": 5200,
+                    "time_s": 520.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 651,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 651,
+                    "video_frame": 5208,
+                    "time_s": 520.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 652,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 652,
+                    "video_frame": 5216,
+                    "time_s": 521.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 653,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 653,
+                    "video_frame": 5224,
+                    "time_s": 522.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 654,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 654,
+                    "video_frame": 5232,
+                    "time_s": 523.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 655,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 655,
+                    "video_frame": 5240,
+                    "time_s": 524.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 656,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 656,
+                    "video_frame": 5248,
+                    "time_s": 524.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 657,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 657,
+                    "video_frame": 5256,
+                    "time_s": 525.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 658,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 658,
+                    "video_frame": 5264,
+                    "time_s": 526.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 659,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 659,
+                    "video_frame": 5272,
+                    "time_s": 527.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 660,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 660,
+                    "video_frame": 5280,
+                    "time_s": 528.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 661,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 661,
+                    "video_frame": 5288,
+                    "time_s": 528.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 662,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 662,
+                    "video_frame": 5296,
+                    "time_s": 529.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 663,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 663,
+                    "video_frame": 5304,
+                    "time_s": 530.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 664,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 664,
+                    "video_frame": 5312,
+                    "time_s": 531.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 665,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 665,
+                    "video_frame": 5320,
+                    "time_s": 532.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 666,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 666,
+                    "video_frame": 5328,
+                    "time_s": 532.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 667,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 667,
+                    "video_frame": 5336,
+                    "time_s": 533.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 668,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 668,
+                    "video_frame": 5344,
+                    "time_s": 534.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 669,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 669,
+                    "video_frame": 5352,
+                    "time_s": 535.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 670,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 670,
+                    "video_frame": 5360,
+                    "time_s": 536.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 671,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 671,
+                    "video_frame": 5368,
+                    "time_s": 536.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 672,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 672,
+                    "video_frame": 5376,
+                    "time_s": 537.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 673,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 673,
+                    "video_frame": 5384,
+                    "time_s": 538.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 674,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 674,
+                    "video_frame": 5392,
+                    "time_s": 539.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 675,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 675,
+                    "video_frame": 5400,
+                    "time_s": 540.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 676,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 676,
+                    "video_frame": 5408,
+                    "time_s": 540.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 677,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 677,
+                    "video_frame": 5416,
+                    "time_s": 541.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 678,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 678,
+                    "video_frame": 5424,
+                    "time_s": 542.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 679,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 679,
+                    "video_frame": 5432,
+                    "time_s": 543.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 680,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 680,
+                    "video_frame": 5440,
+                    "time_s": 544.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 681,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 681,
+                    "video_frame": 5448,
+                    "time_s": 544.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 682,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 682,
+                    "video_frame": 5456,
+                    "time_s": 545.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 683,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 683,
+                    "video_frame": 5464,
+                    "time_s": 546.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 684,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 684,
+                    "video_frame": 5472,
+                    "time_s": 547.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 685,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 685,
+                    "video_frame": 5480,
+                    "time_s": 548.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 686,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 686,
+                    "video_frame": 5488,
+                    "time_s": 548.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 687,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 687,
+                    "video_frame": 5496,
+                    "time_s": 549.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 688,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 688,
+                    "video_frame": 5504,
+                    "time_s": 550.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 689,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 689,
+                    "video_frame": 5512,
+                    "time_s": 551.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 690,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 690,
+                    "video_frame": 5520,
+                    "time_s": 552.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 691,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 691,
+                    "video_frame": 5528,
+                    "time_s": 552.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 692,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 692,
+                    "video_frame": 5536,
+                    "time_s": 553.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 693,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 693,
+                    "video_frame": 5544,
+                    "time_s": 554.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 694,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 694,
+                    "video_frame": 5552,
+                    "time_s": 555.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 695,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 695,
+                    "video_frame": 5560,
+                    "time_s": 556.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 696,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 696,
+                    "video_frame": 5568,
+                    "time_s": 556.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 697,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 697,
+                    "video_frame": 5576,
+                    "time_s": 557.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 698,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 698,
+                    "video_frame": 5584,
+                    "time_s": 558.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 699,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 699,
+                    "video_frame": 5592,
+                    "time_s": 559.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 700,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 700,
+                    "video_frame": 5600,
+                    "time_s": 560.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 701,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 701,
+                    "video_frame": 5608,
+                    "time_s": 560.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 702,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 702,
+                    "video_frame": 5616,
+                    "time_s": 561.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 703,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 703,
+                    "video_frame": 5624,
+                    "time_s": 562.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 704,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 704,
+                    "video_frame": 5632,
+                    "time_s": 563.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 705,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 705,
+                    "video_frame": 5640,
+                    "time_s": 564.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 706,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 706,
+                    "video_frame": 5648,
+                    "time_s": 564.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 707,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 707,
+                    "video_frame": 5656,
+                    "time_s": 565.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 708,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 708,
+                    "video_frame": 5664,
+                    "time_s": 566.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 709,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 709,
+                    "video_frame": 5672,
+                    "time_s": 567.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 710,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 710,
+                    "video_frame": 5680,
+                    "time_s": 568.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 711,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 711,
+                    "video_frame": 5688,
+                    "time_s": 568.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 712,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 712,
+                    "video_frame": 5696,
+                    "time_s": 569.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 713,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 713,
+                    "video_frame": 5704,
+                    "time_s": 570.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 714,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 714,
+                    "video_frame": 5712,
+                    "time_s": 571.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 715,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 715,
+                    "video_frame": 5720,
+                    "time_s": 572.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 716,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 716,
+                    "video_frame": 5728,
+                    "time_s": 572.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 717,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 717,
+                    "video_frame": 5736,
+                    "time_s": 573.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 718,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 718,
+                    "video_frame": 5744,
+                    "time_s": 574.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 719,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 719,
+                    "video_frame": 5752,
+                    "time_s": 575.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 720,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 720,
+                    "video_frame": 5760,
+                    "time_s": 576.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 721,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 721,
+                    "video_frame": 5768,
+                    "time_s": 576.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 722,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 722,
+                    "video_frame": 5776,
+                    "time_s": 577.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 723,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 723,
+                    "video_frame": 5784,
+                    "time_s": 578.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 724,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 724,
+                    "video_frame": 5792,
+                    "time_s": 579.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 725,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 725,
+                    "video_frame": 5800,
+                    "time_s": 580.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 726,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 726,
+                    "video_frame": 5808,
+                    "time_s": 580.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 727,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 727,
+                    "video_frame": 5816,
+                    "time_s": 581.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 728,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 728,
+                    "video_frame": 5824,
+                    "time_s": 582.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 729,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 729,
+                    "video_frame": 5832,
+                    "time_s": 583.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 730,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 730,
+                    "video_frame": 5840,
+                    "time_s": 584.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 731,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 731,
+                    "video_frame": 5848,
+                    "time_s": 584.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 732,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 732,
+                    "video_frame": 5856,
+                    "time_s": 585.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 733,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 733,
+                    "video_frame": 5864,
+                    "time_s": 586.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 734,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 734,
+                    "video_frame": 5872,
+                    "time_s": 587.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 735,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 735,
+                    "video_frame": 5880,
+                    "time_s": 588.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 736,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 736,
+                    "video_frame": 5888,
+                    "time_s": 588.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 737,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 737,
+                    "video_frame": 5896,
+                    "time_s": 589.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 738,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 738,
+                    "video_frame": 5904,
+                    "time_s": 590.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 739,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 739,
+                    "video_frame": 5912,
+                    "time_s": 591.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 740,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 740,
+                    "video_frame": 5920,
+                    "time_s": 592.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 741,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 741,
+                    "video_frame": 5928,
+                    "time_s": 592.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 742,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 742,
+                    "video_frame": 5936,
+                    "time_s": 593.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 743,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 743,
+                    "video_frame": 5944,
+                    "time_s": 594.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 744,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 744,
+                    "video_frame": 5952,
+                    "time_s": 595.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 745,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 745,
+                    "video_frame": 5960,
+                    "time_s": 596.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 746,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 746,
+                    "video_frame": 5968,
+                    "time_s": 596.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 747,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 747,
+                    "video_frame": 5976,
+                    "time_s": 597.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 748,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 748,
+                    "video_frame": 5984,
+                    "time_s": 598.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 749,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 749,
+                    "video_frame": 5992,
+                    "time_s": 599.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 750,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 750,
+                    "video_frame": 6000,
+                    "time_s": 600.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 751,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 751,
+                    "video_frame": 6008,
+                    "time_s": 600.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 752,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 752,
+                    "video_frame": 6016,
+                    "time_s": 601.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 753,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 753,
+                    "video_frame": 6024,
+                    "time_s": 602.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 754,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 754,
+                    "video_frame": 6032,
+                    "time_s": 603.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 755,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 755,
+                    "video_frame": 6040,
+                    "time_s": 604.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 756,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 756,
+                    "video_frame": 6048,
+                    "time_s": 604.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 757,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 757,
+                    "video_frame": 6056,
+                    "time_s": 605.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 758,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 758,
+                    "video_frame": 6064,
+                    "time_s": 606.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 759,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 759,
+                    "video_frame": 6072,
+                    "time_s": 607.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 760,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 760,
+                    "video_frame": 6080,
+                    "time_s": 608.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 761,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 761,
+                    "video_frame": 6088,
+                    "time_s": 608.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 762,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 762,
+                    "video_frame": 6096,
+                    "time_s": 609.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 763,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 763,
+                    "video_frame": 6104,
+                    "time_s": 610.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 764,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 764,
+                    "video_frame": 6112,
+                    "time_s": 611.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 765,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 765,
+                    "video_frame": 6120,
+                    "time_s": 612.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 766,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 766,
+                    "video_frame": 6128,
+                    "time_s": 612.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 767,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 767,
+                    "video_frame": 6136,
+                    "time_s": 613.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 768,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 768,
+                    "video_frame": 6144,
+                    "time_s": 614.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 769,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 769,
+                    "video_frame": 6152,
+                    "time_s": 615.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 770,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 770,
+                    "video_frame": 6160,
+                    "time_s": 616.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 771,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 771,
+                    "video_frame": 6168,
+                    "time_s": 616.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 772,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 772,
+                    "video_frame": 6176,
+                    "time_s": 617.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 773,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 773,
+                    "video_frame": 6184,
+                    "time_s": 618.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 774,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 774,
+                    "video_frame": 6192,
+                    "time_s": 619.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 775,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 775,
+                    "video_frame": 6200,
+                    "time_s": 620.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 776,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 776,
+                    "video_frame": 6208,
+                    "time_s": 620.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 777,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 777,
+                    "video_frame": 6216,
+                    "time_s": 621.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 778,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 778,
+                    "video_frame": 6224,
+                    "time_s": 622.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 779,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 779,
+                    "video_frame": 6232,
+                    "time_s": 623.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 780,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 780,
+                    "video_frame": 6240,
+                    "time_s": 624.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 781,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 781,
+                    "video_frame": 6248,
+                    "time_s": 624.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 782,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 782,
+                    "video_frame": 6256,
+                    "time_s": 625.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 783,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 783,
+                    "video_frame": 6264,
+                    "time_s": 626.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 784,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 784,
+                    "video_frame": 6272,
+                    "time_s": 627.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 785,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 785,
+                    "video_frame": 6280,
+                    "time_s": 628.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 786,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 786,
+                    "video_frame": 6288,
+                    "time_s": 628.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 787,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 787,
+                    "video_frame": 6296,
+                    "time_s": 629.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 788,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 788,
+                    "video_frame": 6304,
+                    "time_s": 630.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 789,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 789,
+                    "video_frame": 6312,
+                    "time_s": 631.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 790,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 790,
+                    "video_frame": 6320,
+                    "time_s": 632.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 791,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 791,
+                    "video_frame": 6328,
+                    "time_s": 632.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 792,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 792,
+                    "video_frame": 6336,
+                    "time_s": 633.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 793,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 793,
+                    "video_frame": 6344,
+                    "time_s": 634.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 794,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 794,
+                    "video_frame": 6352,
+                    "time_s": 635.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 795,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 795,
+                    "video_frame": 6360,
+                    "time_s": 636.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 796,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 796,
+                    "video_frame": 6368,
+                    "time_s": 636.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 797,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 797,
+                    "video_frame": 6376,
+                    "time_s": 637.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 798,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 798,
+                    "video_frame": 6384,
+                    "time_s": 638.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 799,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 799,
+                    "video_frame": 6392,
+                    "time_s": 639.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 800,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 800,
+                    "video_frame": 6400,
+                    "time_s": 640.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 801,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 801,
+                    "video_frame": 6408,
+                    "time_s": 640.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 802,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 802,
+                    "video_frame": 6416,
+                    "time_s": 641.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 803,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 803,
+                    "video_frame": 6424,
+                    "time_s": 642.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 804,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 804,
+                    "video_frame": 6432,
+                    "time_s": 643.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 805,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 805,
+                    "video_frame": 6440,
+                    "time_s": 644.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 806,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 806,
+                    "video_frame": 6448,
+                    "time_s": 644.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 807,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 807,
+                    "video_frame": 6456,
+                    "time_s": 645.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 808,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 808,
+                    "video_frame": 6464,
+                    "time_s": 646.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 809,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 809,
+                    "video_frame": 6472,
+                    "time_s": 647.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 810,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 810,
+                    "video_frame": 6480,
+                    "time_s": 648.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 811,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 811,
+                    "video_frame": 6488,
+                    "time_s": 648.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 812,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 812,
+                    "video_frame": 6496,
+                    "time_s": 649.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 813,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 813,
+                    "video_frame": 6504,
+                    "time_s": 650.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 814,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 814,
+                    "video_frame": 6512,
+                    "time_s": 651.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 815,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 815,
+                    "video_frame": 6520,
+                    "time_s": 652.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 816,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 816,
+                    "video_frame": 6528,
+                    "time_s": 652.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 817,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 817,
+                    "video_frame": 6536,
+                    "time_s": 653.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 818,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 818,
+                    "video_frame": 6544,
+                    "time_s": 654.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 819,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 819,
+                    "video_frame": 6552,
+                    "time_s": 655.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 820,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 820,
+                    "video_frame": 6560,
+                    "time_s": 656.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 821,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 821,
+                    "video_frame": 6568,
+                    "time_s": 656.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 822,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 822,
+                    "video_frame": 6576,
+                    "time_s": 657.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 823,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 823,
+                    "video_frame": 6584,
+                    "time_s": 658.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 824,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 824,
+                    "video_frame": 6592,
+                    "time_s": 659.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 825,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 825,
+                    "video_frame": 6600,
+                    "time_s": 660.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 826,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 826,
+                    "video_frame": 6608,
+                    "time_s": 660.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 827,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 827,
+                    "video_frame": 6616,
+                    "time_s": 661.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 828,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 828,
+                    "video_frame": 6624,
+                    "time_s": 662.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 829,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 829,
+                    "video_frame": 6632,
+                    "time_s": 663.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 830,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 830,
+                    "video_frame": 6640,
+                    "time_s": 664.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 831,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 831,
+                    "video_frame": 6648,
+                    "time_s": 664.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 832,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 832,
+                    "video_frame": 6656,
+                    "time_s": 665.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 833,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 833,
+                    "video_frame": 6664,
+                    "time_s": 666.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 834,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 834,
+                    "video_frame": 6672,
+                    "time_s": 667.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 835,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 835,
+                    "video_frame": 6680,
+                    "time_s": 668.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 836,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 836,
+                    "video_frame": 6688,
+                    "time_s": 668.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 837,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 837,
+                    "video_frame": 6696,
+                    "time_s": 669.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 838,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 838,
+                    "video_frame": 6704,
+                    "time_s": 670.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 839,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 839,
+                    "video_frame": 6712,
+                    "time_s": 671.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 840,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 840,
+                    "video_frame": 6720,
+                    "time_s": 672.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 841,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 841,
+                    "video_frame": 6728,
+                    "time_s": 672.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 842,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 842,
+                    "video_frame": 6736,
+                    "time_s": 673.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 843,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 843,
+                    "video_frame": 6744,
+                    "time_s": 674.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 844,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 844,
+                    "video_frame": 6752,
+                    "time_s": 675.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 845,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 845,
+                    "video_frame": 6760,
+                    "time_s": 676.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 846,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 846,
+                    "video_frame": 6768,
+                    "time_s": 676.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 847,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 847,
+                    "video_frame": 6776,
+                    "time_s": 677.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 848,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 848,
+                    "video_frame": 6784,
+                    "time_s": 678.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 849,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 849,
+                    "video_frame": 6792,
+                    "time_s": 679.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 850,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 850,
+                    "video_frame": 6800,
+                    "time_s": 680.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 851,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 851,
+                    "video_frame": 6808,
+                    "time_s": 680.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 852,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 852,
+                    "video_frame": 6816,
+                    "time_s": 681.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 853,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 853,
+                    "video_frame": 6824,
+                    "time_s": 682.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 854,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 854,
+                    "video_frame": 6832,
+                    "time_s": 683.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 855,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 855,
+                    "video_frame": 6840,
+                    "time_s": 684.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 856,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 856,
+                    "video_frame": 6848,
+                    "time_s": 684.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 857,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 857,
+                    "video_frame": 6856,
+                    "time_s": 685.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 858,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 858,
+                    "video_frame": 6864,
+                    "time_s": 686.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 859,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 859,
+                    "video_frame": 6872,
+                    "time_s": 687.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 860,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 860,
+                    "video_frame": 6880,
+                    "time_s": 688.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 861,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 861,
+                    "video_frame": 6888,
+                    "time_s": 688.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 862,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 862,
+                    "video_frame": 6896,
+                    "time_s": 689.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 863,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 863,
+                    "video_frame": 6904,
+                    "time_s": 690.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 864,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 864,
+                    "video_frame": 6912,
+                    "time_s": 691.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 865,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 865,
+                    "video_frame": 6920,
+                    "time_s": 692.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 866,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 866,
+                    "video_frame": 6928,
+                    "time_s": 692.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 867,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 867,
+                    "video_frame": 6936,
+                    "time_s": 693.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 868,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 868,
+                    "video_frame": 6944,
+                    "time_s": 694.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 869,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 869,
+                    "video_frame": 6952,
+                    "time_s": 695.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 870,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 870,
+                    "video_frame": 6960,
+                    "time_s": 696.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 871,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 871,
+                    "video_frame": 6968,
+                    "time_s": 696.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 872,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 872,
+                    "video_frame": 6976,
+                    "time_s": 697.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 873,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 873,
+                    "video_frame": 6984,
+                    "time_s": 698.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 874,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 874,
+                    "video_frame": 6992,
+                    "time_s": 699.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 875,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 875,
+                    "video_frame": 7000,
+                    "time_s": 700.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 876,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 876,
+                    "video_frame": 7008,
+                    "time_s": 700.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 877,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 877,
+                    "video_frame": 7016,
+                    "time_s": 701.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 878,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 878,
+                    "video_frame": 7024,
+                    "time_s": 702.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 879,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 879,
+                    "video_frame": 7032,
+                    "time_s": 703.2
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 880,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 880,
+                    "video_frame": 7040,
+                    "time_s": 704.0
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 881,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 881,
+                    "video_frame": 7048,
+                    "time_s": 704.8
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 882,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 882,
+                    "video_frame": 7056,
+                    "time_s": 705.6
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                },
+                {
+                  "frame": 883,
+                  "reasons": [
+                    "content_settled"
+                  ],
+                  "marker": {
+                    "monitor_frame": 883,
+                    "video_frame": 7064,
+                    "time_s": 706.4
+                  },
+                  "reason_labels": [
+                    "content settled"
+                  ]
+                }
+              ],
+              "end": {
+                "frame": 883,
+                "resolved": false,
+                "reason": "never resolved \u2014 episode ended, or next occurrence started, first",
+                "marker": {
+                  "monitor_frame": 883,
+                  "video_frame": 7064,
+                  "time_s": 706.4
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "satisfied": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 379,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 379,
+                  "video_frame": 3032,
+                  "time_s": 303.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 380,
+                "resolved": true,
+                "reason": "object_grasped became true before object_left_gripper did \u2014 recovered",
+                "marker": {
+                  "monitor_frame": 380,
+                  "video_frame": 3040,
+                  "time_s": 304.0
+                }
+              },
+              "eventual_separation": {
+                "frame": 528,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 528,
+                  "video_frame": 4224,
+                  "time_s": 422.4
+                }
+              }
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 381,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 381,
+                  "video_frame": 3048,
+                  "time_s": 304.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 382,
+                "resolved": true,
+                "reason": "object_grasped became true before object_left_gripper did \u2014 recovered",
+                "marker": {
+                  "monitor_frame": 382,
+                  "video_frame": 3056,
+                  "time_s": 305.6
+                }
+              },
+              "eventual_separation": {
+                "frame": 528,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 528,
+                  "video_frame": 4224,
+                  "time_s": 422.4
+                }
+              }
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 514,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 514,
+                  "video_frame": 4112,
+                  "time_s": 411.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 514,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 514,
+                  "video_frame": 4112,
+                  "time_s": 411.2
+                }
+              },
+              "eventual_separation": {
+                "frame": 528,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 528,
+                  "video_frame": 4224,
+                  "time_s": 422.4
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 675,
+                "reason": "fixture_close_obstacle_hit became true",
+                "marker": {
+                  "monitor_frame": 675,
+                  "video_frame": 5400,
+                  "time_s": 540.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 675,
+                "resolved": true,
+                "reason": "fixture_fully_open became true",
+                "marker": {
+                  "monitor_frame": 675,
+                  "video_frame": 5400,
+                  "time_s": 540.0
+                }
+              }
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 738,
+                "reason": "fixture_close_obstacle_hit became true",
+                "marker": {
+                  "monitor_frame": 738,
+                  "video_frame": 5904,
+                  "time_s": 590.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 738,
+                "resolved": true,
+                "reason": "fixture_fully_open became true",
+                "marker": {
+                  "monitor_frame": 738,
+                  "video_frame": 5904,
+                  "time_s": 590.4
+                }
+              }
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 746,
+                "reason": "fixture_close_obstacle_hit became true",
+                "marker": {
+                  "monitor_frame": 746,
+                  "video_frame": 5968,
+                  "time_s": 596.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 746,
+                "resolved": true,
+                "reason": "fixture_fully_open became true",
+                "marker": {
+                  "monitor_frame": 746,
+                  "video_frame": 5968,
+                  "time_s": 596.8
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "2": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 490,
+                "reason": "object_reach_in_fixture became true",
+                "marker": {
+                  "monitor_frame": 490,
+                  "video_frame": 3920,
+                  "time_s": 392.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 490,
+                "resolved": true,
+                "reason": "object_in_same_fixture became true",
+                "marker": {
+                  "monitor_frame": 490,
+                  "video_frame": 3920,
+                  "time_s": 392.0
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "3": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 378,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 378,
+                  "video_frame": 3024,
+                  "time_s": 302.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 379,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 379,
+                  "video_frame": 3032,
+                  "time_s": 303.2
+                }
+              }
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 380,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 380,
+                  "video_frame": 3040,
+                  "time_s": 304.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 381,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 381,
+                  "video_frame": 3048,
+                  "time_s": 304.8
+                }
+              }
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 382,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 382,
+                  "video_frame": 3056,
+                  "time_s": 305.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 514,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 514,
+                  "video_frame": 4112,
+                  "time_s": 411.2
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "4": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "5": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 490,
+                "reason": "object_reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 490,
+                  "video_frame": 3920,
+                  "time_s": 392.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 490,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 490,
+                  "video_frame": 3920,
+                  "time_s": 392.0
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "6": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "invariant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "7": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 52,
+                "reason": "skill_open_close_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 52,
+                  "video_frame": 416,
+                  "time_s": 41.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 52,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 52,
+                  "video_frame": 416,
+                  "time_s": 41.6
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": null,
+              "activation": {
+                "frame": 174,
+                "reason": "skill_open_close_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 174,
+                  "video_frame": 1392,
+                  "time_s": 139.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 174,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 174,
+                  "video_frame": 1392,
+                  "time_s": 139.2
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 620,
+                "reason": "skill_open_close_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 620,
+                  "video_frame": 4960,
+                  "time_s": 496.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 620,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 620,
+                  "video_frame": 4960,
+                  "time_s": 496.0
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 854,
+                "reason": "skill_open_close_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 854,
+                  "video_frame": 6832,
+                  "time_s": 683.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 854,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 854,
+                  "video_frame": 6832,
+                  "time_s": 683.2
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "8": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 331,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 331,
+                  "video_frame": 2648,
+                  "time_s": 264.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 331,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 331,
+                  "video_frame": 2648,
+                  "time_s": 264.8
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "9": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 514,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 514,
+                  "video_frame": 4112,
+                  "time_s": 411.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 514,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 514,
+                  "video_frame": 4112,
+                  "time_s": 411.2
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "10": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 62,
+                "reason": "skill_press_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 62,
+                  "video_frame": 496,
+                  "time_s": 49.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 62,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 62,
+                  "video_frame": 496,
+                  "time_s": 49.6
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 865,
+                "reason": "skill_press_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 865,
+                  "video_frame": 6920,
+                  "time_s": 692.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 865,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 865,
+                  "video_frame": 6920,
+                  "time_s": 692.0
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "11": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "12": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 506,
+                "reason": "reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 506,
+                  "video_frame": 4048,
+                  "time_s": 404.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 506,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 506,
+                  "video_frame": 4048,
+                  "time_s": 404.8
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "13": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 514,
+                "reason": "object_released became true",
+                "marker": {
+                  "monitor_frame": 514,
+                  "video_frame": 4112,
+                  "time_s": 411.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 530,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 530,
+                  "video_frame": 4240,
+                  "time_s": 424.0
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "14": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "15": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "16": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "missed_notes": "",
+  "overall_verdict": null
+}

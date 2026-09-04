@@ -309,11 +309,13 @@ async function loadTrainingEpisodes(task) {
     const successBadge = analyzed
       ? `<span class="mini-badge ${ep.success ? "s-ok" : "s-fail"}">${ep.success ? "success" : "fail"}</span>`
       : `<span class="mini-badge">not analyzed</span>`;
-    // One violation-count badge per postprocess method that's actually been
-    // run for this episode (ep.methods -- see server.py's
-    // list_training_episodes), not just the default method, so both are
-    // visible at a glance without opening the episode.
-    const methodEntries = Object.entries(ep.methods || {});
+    // Only the currently-selected/latest postprocess method's badge (not one
+    // per version -- with several vN_ dirs now kept around for history, a
+    // badge-per-method row got noisy fast; the left column should read as
+    // "is the latest design good," not a version comparison table).
+    const methodEntries = Object.entries(ep.methods || {}).filter(
+      ([key]) => key === tdState.monitorMethod
+    );
     // When a single LTL property is selected (tdState.property), m.num_violations
     // is 1/0/null (violated/satisfied/not-evaluated-for-this-episode) instead of
     // an aggregate count -- worded as such rather than "N viol" for clarity.
