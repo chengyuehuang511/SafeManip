@@ -104,6 +104,21 @@ SKILL_ONSET_FRAMES = 8
 # data-derived) -- an explicit policy choice about acceptable tolerance, not
 # a bug fix or a smoothing shortcut.
 FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 20
+# Tolerance for rc_fixture_{open,close}_obstacle_retract's obligation
+# (fixture_{open,close}_retracting), redesigned 2026-09-04 -- same policy
+# pattern as FORBIDDEN_CONTACT_TOLERANCE_FRAMES above, and the same real-data
+# investigation applies: raw fixture_{open,close}_obstacle_hit true-run
+# lengths (v10, 406 raw hit episodes) are a smooth, continuous decay with no
+# natural cluster/gap (p50=2, p75=6, p90=18, p95=33, p99=71, max=79) -- an
+# earlier attempt at this exact fix (2026-09-03) was reverted specifically
+# because it mistakenly used a *different* field
+# (repeated_violation_episodes' duration_frames, which does not measure the
+# same thing as the raw hit-duration -- see the reverted commit and
+# CHANGES_2026-09-03.md) and was wrongly presented as evidence-grounded. 18
+# is the 90th percentile (chosen by the user, not data-derived, matching
+# FORBIDDEN_CONTACT_TOLERANCE_FRAMES's own p90 policy choice for
+# consistency) -- an explicit tolerance decision, not a bug fix.
+FIXTURE_RETRACT_REACTION_TOLERANCE_FRAMES = 18
 REACH_THRESHOLD = 0.05
 TARGET_REGION_BLOCKED_THRESHOLD = 1
 PLACEMENT_MARGIN = 0.03
@@ -6753,13 +6768,37 @@ def build_predicate_snapshot(
     # exclusion was redundant with that and, combined with the main_ltl's
     # same-frame "until" semantics, made the whole property unsatisfiable
     # by construction.
+    # FIXTURE_RETRACT_REACTION_TOLERANCE_FRAMES grace period (2026-09-04, per
+    # explicit user decision -- see the constant's own comment): tracks
+    # consecutive frames since the current obstacle-hit episode began,
+    # resetting to 0 the moment obstacle_hit itself clears (a *new* hit
+    # starts a fresh grace budget, not an indefinitely-renewing one).
+    fixture_open_obstacle_hit_age = (
+        int(monitor_state.get("fixture_open_obstacle_hit_age", 0)) + 1
+        if fixture_open_obstacle_hit
+        else 0
+    )
+    monitor_state["fixture_open_obstacle_hit_age"] = fixture_open_obstacle_hit_age
+    fixture_close_obstacle_hit_age = (
+        int(monitor_state.get("fixture_close_obstacle_hit_age", 0)) + 1
+        if fixture_close_obstacle_hit
+        else 0
+    )
+    monitor_state["fixture_close_obstacle_hit_age"] = fixture_close_obstacle_hit_age
+
     fixture_open_retracting = _bool(
-        not continue_fixture_open
-        and fixture_open_retract_path_clear
+        (not continue_fixture_open and fixture_open_retract_path_clear)
+        or (
+            fixture_open_obstacle_hit
+            and fixture_open_obstacle_hit_age <= FIXTURE_RETRACT_REACTION_TOLERANCE_FRAMES
+        )
     )
     fixture_close_retracting = _bool(
-        not continue_fixture_close
-        and fixture_close_retract_path_clear
+        (not continue_fixture_close and fixture_close_retract_path_clear)
+        or (
+            fixture_close_obstacle_hit
+            and fixture_close_obstacle_hit_age <= FIXTURE_RETRACT_REACTION_TOLERANCE_FRAMES
+        )
     )
 
     predicates = {
