@@ -18,6 +18,7 @@ sys.path.insert(0, REPO_ROOT)
 
 from monitor.monitor import RoboCasaSymbolicMonitor
 from monitor.primitives import entity_has_attribute
+from monitor.sim.robocasa.predicates import FORBIDDEN_CONTACT_TOLERANCE_FRAMES
 from monitor.repeated_violation_monitor import (
     build_repeated_fixture_placement_support_monitor,
     build_repeated_contamination_monitor,
@@ -277,6 +278,38 @@ def _ensure_object_settle_timeout(dynamic_frames: List[Dict]) -> None:
         if active_transfer_kind is not None and (transfer_settled or containment_timeout):
             active_transfer_kind = None
             active_transfer_frame = None
+
+
+def _ensure_forbidden_contact_sustained(dynamic_frames: List[Dict]) -> None:
+    """Recompute forbidden_contact_sustained from forbidden_contact's final,
+    post-repair values -- must run AFTER _repair_forbidden_contact_active_
+    object_pairs, not before.
+
+    forbidden_contact_sustained is a temporal (age-counted) derived signal --
+    predicates.py bakes it in during extraction using the *raw*,
+    not-yet-repaired forbidden_contact sequence for that episode. If the
+    repair step (which retroactively corrects forbidden_contact to False for
+    frames whose contact pair turns out irrelevant -- see KNOWN_BUGS.md #4)
+    runs afterward, the baked-in age counter goes stale: it can keep
+    "remembering" a contact episode that the repair step just shortened or
+    erased, producing a forbidden_contact_sustained=True on frames where the
+    (corrected) forbidden_contact was never even True nearby. Confirmed this
+    exact mismatch on DeliverStraw ep2 (2026-09-03, verifying the
+    rc_no_forbidden_contact bounded-recovery redesign): forbidden_contact_
+    sustained read True at frame 395 with the nearest forbidden_contact=True
+    run ending at frame 379, 16 frames earlier -- a stale, pre-repair
+    artifact. Recomputing from scratch here, in a single forward pass over
+    the corrected sequence, is cheap and always consistent by construction.
+    """
+    age = 0
+    for frame in dynamic_frames:
+        dynamic_info = frame.get("data") or {}
+        if not _has_frame_predicate_value(dynamic_info, "forbidden_contact"):
+            continue
+        contact = _get_frame_predicate_value(dynamic_info, "forbidden_contact")
+        age = age + 1 if contact else 0
+        sustained = age > FORBIDDEN_CONTACT_TOLERANCE_FRAMES
+        _set_frame_predicate_value(dynamic_info, "forbidden_contact_sustained", sustained)
 
 
 def _ensure_contamination_activation_frame(dynamic_frames: List[Dict]) -> None:
@@ -1163,6 +1196,7 @@ def monitor_rollout(
     _ensure_object_settle_timeout(dynamic_frames)
     _ensure_contamination_activation_frame(dynamic_frames)
     _repair_forbidden_contact_active_object_pairs(dynamic_frames, static_info)
+    _ensure_forbidden_contact_sustained(dynamic_frames)
     if monitor is None:
         monitor = RoboCasaSymbolicMonitor()
     else:

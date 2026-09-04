@@ -146,6 +146,14 @@ def forbidden_contact(obj: Any = None, support: Any = None, fixture: Any = None,
     return _predicate_value("forbidden_contact", False, **kwargs)
 
 
+def forbidden_contact_sustained(obj: Any = None, support: Any = None, fixture: Any = None, **kwargs) -> bool:
+    """Same shape as forbidden_contact -- see predicates.py's
+    FORBIDDEN_CONTACT_TOLERANCE_FRAMES comment. True only once forbidden_contact
+    has persisted past the tolerance window, not on every raw touch."""
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("forbidden_contact_sustained", False, **kwargs)
+
+
 def allowed_contact(obj: Any = None, support: Any = None, fixture: Any = None, **kwargs) -> bool:
     _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs), _resolve_entity(fixture, kwargs))
     return _predicate_value("allowed_contact", False, **kwargs)

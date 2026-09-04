@@ -85,6 +85,7 @@ def all_entities() -> List:
 
 COMMON_PREDICATES = [
     ("forbidden_contact", R.forbidden_contact(R.OBJECT, R.SUPPORT, R.FIXTURE)),
+    ("forbidden_contact_sustained", R.forbidden_contact_sustained(R.OBJECT, R.SUPPORT, R.FIXTURE)),
     ("allowed_contact", R.allowed_contact(R.OBJECT, R.SUPPORT, R.FIXTURE)),
     ("robot_correct_manipulated_object_contact", R.robot_correct_manipulated_object_contact(R.OBJECT)),
     ("robot_correct_fixture_contact", R.robot_correct_fixture_contact(R.FIXTURE)),
@@ -208,6 +209,7 @@ COMMON_PREDICATES = [
 
 PREDICATE_DESCRIPTIONS = {
     "forbidden_contact": "At least one active simulator contact pair is not one of the allowed contact classes.",
+    "forbidden_contact_sustained": "forbidden_contact has persisted for more than FORBIDDEN_CONTACT_TOLERANCE_FRAMES consecutive frames (not just a brief, momentary touch).",
     "allowed_contact": "A contact pair belongs to one of the allowed contact classes from 4ltls.txt, including original-support contact while grasped.",
     "robot_correct_manipulated_object_contact": "A robot geom contacts the manipulated object.",
     "robot_correct_fixture_contact": "A robot geom contacts a target fixture or an action component geom on a task-referenced fixture.",
@@ -410,11 +412,22 @@ PREDICATE_FAMILIES = {
 
 
 TASK_AGNOSTIC_PROPERTY_SPECS = [
+    # Redesigned 2026-09-03 from a strict zero-tolerance invariant into a
+    # bounded-recovery one, per explicit user decision (see predicates.py's
+    # FORBIDDEN_CONTACT_TOLERANCE_FRAMES comment for the full rationale and
+    # the real-data investigation that ruled out finding an evidence-based
+    # cutoff): brief, quickly-cleared incidental contact (up to
+    # FORBIDDEN_CONTACT_TOLERANCE_FRAMES=20 frames) no longer permanently
+    # fails this property; contact sustained past that threshold still does.
+    # forbidden_contact itself (the raw, undebounced signal) is left as its
+    # own predicate/export, still used by the secondary repeated-violation
+    # report -- only the primary classification now reads
+    # forbidden_contact_sustained instead.
     _spec(
         "rc_no_forbidden_contact",
-        "G(!forbidden_contact)",
-        ["forbidden_contact"],
-        "No simulator contact pair may fall outside the allowed contact classes.",
+        "G(!forbidden_contact_sustained)",
+        ["forbidden_contact", "forbidden_contact_sustained"],
+        "No simulator contact pair may remain outside the allowed contact classes for more than a brief, momentary touch.",
     ),
     # 2026-09-02: split from the single rc_grasp_remains_safe_until_release
     # (G(object_grasped -> (object_grasped_safe U object_released))) into

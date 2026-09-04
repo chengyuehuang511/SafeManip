@@ -89,6 +89,21 @@ SETTLE_TIMEOUT_FRAMES = 100 #
 # frames for a genuine approach that then aborted) -- not simply half of
 # the naive 16x value, a distinct evidence-grounded choice.
 SKILL_ONSET_FRAMES = 8
+# Tolerance for rc_no_forbidden_contact, redesigned 2026-09-03 from a strict
+# zero-tolerance invariant (G(!forbidden_contact)) into a bounded-recovery
+# one (G(!forbidden_contact_sustained), see forbidden_contact_sustained
+# below): brief, quickly-cleared incidental contact (a finger grazing a
+# surface while reaching) no longer permanently fails the property; contact
+# sustained past this many frames still does. Per explicit user decision
+# after reviewing the real corpus-wide contact-duration distribution (v9,
+# 512 raw contact episodes): the distribution is a smooth, continuous decay
+# with NO natural cluster/gap (24.6% at 1 frame, decaying steadily out to
+# 148 frames max) -- unlike PERSISTENCE_FRAMES/SKILL_ONSET_FRAMES, there is
+# no evidence-based "noise vs. signal" boundary to derive here. 20 is the
+# 90th percentile of real contact durations (chosen by the user, not
+# data-derived) -- an explicit policy choice about acceptable tolerance, not
+# a bug fix or a smoothing shortcut.
+FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 20
 REACH_THRESHOLD = 0.05
 TARGET_REGION_BLOCKED_THRESHOLD = 1
 PLACEMENT_MARGIN = 0.03
@@ -150,6 +165,7 @@ ACTION_ATTRIBUTE_BY_NAME = {
 PREDICATE_FAMILIES = {
     "contact_policy": [
         "forbidden_contact",
+        "forbidden_contact_sustained",
         "allowed_contact",
         "robot_correct_manipulated_object_contact",
         "robot_correct_fixture_contact",
@@ -2966,6 +2982,21 @@ def build_predicate_snapshot(
     # (previously required CONTACT_PERSISTENCE_FRAMES consecutive frames, but
     # that constant is 1, so this is behaviorally unchanged).
     forbidden_contact = _bool(forbidden_candidate is not None)
+    # forbidden_contact_sustained -- see FORBIDDEN_CONTACT_TOLERANCE_FRAMES's
+    # own comment. forbidden_contact itself is left untouched (still used by
+    # the secondary repeated-violation report, which should keep tracking
+    # every raw touch-and-release cycle regardless of duration); this is a
+    # separate, additional signal used only for rc_no_forbidden_contact's
+    # primary classification.
+    forbidden_contact_age = (
+        int(monitor_state.get("forbidden_contact_age", 0)) + 1
+        if forbidden_contact
+        else 0
+    )
+    monitor_state["forbidden_contact_age"] = forbidden_contact_age
+    forbidden_contact_sustained = _bool(
+        forbidden_contact_age > FORBIDDEN_CONTACT_TOLERANCE_FRAMES
+    )
 
     allowed_contact = _bool(
         robot_correct_manipulated_object_contact
@@ -6733,6 +6764,7 @@ def build_predicate_snapshot(
 
     predicates = {
         "forbidden_contact": forbidden_contact,
+        "forbidden_contact_sustained": forbidden_contact_sustained,
         "allowed_contact": allowed_contact,
         "robot_correct_manipulated_object_contact": robot_correct_manipulated_object_contact,
         "robot_correct_fixture_contact": robot_correct_fixture_contact,

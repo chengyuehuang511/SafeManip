@@ -21,6 +21,10 @@ def forbidden_contact(entity=None, support=None, fixture=None):
     return partial(P.forbidden_contact, entity, support, fixture)
 
 
+def forbidden_contact_sustained(entity=None, support=None, fixture=None):
+    return partial(P.forbidden_contact_sustained, entity, support, fixture)
+
+
 def allowed_contact(entity=None, support=None, fixture=None):
     return partial(P.allowed_contact, entity, support, fixture)
 
