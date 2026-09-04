@@ -283,6 +283,21 @@ every time, but lead with the excluded number when asked "how are we doing."
 enough, stop" number, it's the next real target to keep driving down. Don't treat exclusion as
 resolution; it's a reporting convention that surfaces the non-contact signal, not a fix.
 
+**When clustering real data to justify a new frame-count constant, verify the field you're
+clustering actually measures what you think it measures -- against the raw per-frame trace, not
+just a derived summary field.** Confirmed the hard way this session: a proposed grace period for
+`rc_fixture_{open,close}_obstacle_retract` looked well-justified from `repeated_violation_
+episodes[i]["duration_frames"]` (a clean 2-7 frame cluster, then a jump to 14+) -- but that field
+turned out not to equal the raw obstacle-hit predicate's true-run length (a real episode showed a
+9-frame raw hit reported as `duration_frames: 2`). Redoing the clustering directly against the
+full per-frame `trace` array (available in the same `repeated` block, one entry per frame of the
+whole episode) revealed the real distribution has no cluster/gap at all -- a smooth, continuous
+decay from 1 frame out past 79. Implemented the grace period, caught this via a targeted debug-
+instrumented re-extraction of one real episode (not by re-deriving the corpus statistic first),
+then reverted cleanly once the premise fell apart -- verify a new statistic against ground truth
+*before* building on it, and don't be afraid to revert entirely rather than keep an unjustified
+constant once the evidence turns out weaker than it first looked.
+
 ## Phase 4.6: frame-count constants, `--call_stride`, and the smoothing-removal tradeoff
 
 `extract_privileged_from_dataset.py` has a `--call_stride N` flag (default 1, i.e. unscaled) that
