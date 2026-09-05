@@ -1,0 +1,5813 @@
+{
+  "violations": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "meat",
+              "activation": {
+                "frame": 59,
+                "reason": "robot_contact_raw_contaminated became true",
+                "marker": {
+                  "monitor_frame": 59,
+                  "video_frame": 472,
+                  "time_s": 47.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1108,
+                "resolved": false,
+                "reason": "never resolved \u2014 episode ended, or next occurrence started, first",
+                "marker": {
+                  "monitor_frame": 1108,
+                  "video_frame": 8864,
+                  "time_s": 886.4
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "satisfied": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 416,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 416,
+                  "video_frame": 3328,
+                  "time_s": 332.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 416,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 416,
+                  "video_frame": 3328,
+                  "time_s": 332.8
+                }
+              },
+              "eventual_separation": {
+                "frame": 444,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 444,
+                  "video_frame": 3552,
+                  "time_s": 355.2
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 1070,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1070,
+                  "video_frame": 8560,
+                  "time_s": 856.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1070,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1070,
+                  "video_frame": 8560,
+                  "time_s": 856.0
+                }
+              },
+              "eventual_separation": {
+                "frame": 1091,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 1091,
+                  "video_frame": 8728,
+                  "time_s": 872.8
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "2": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "3": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "4": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 354,
+                "reason": "object_reach_in_fixture became true",
+                "marker": {
+                  "monitor_frame": 354,
+                  "video_frame": 2832,
+                  "time_s": 283.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 354,
+                "resolved": true,
+                "reason": "object_in_same_fixture became true",
+                "marker": {
+                  "monitor_frame": 354,
+                  "video_frame": 2832,
+                  "time_s": 283.2
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 1012,
+                "reason": "object_reach_in_fixture became true",
+                "marker": {
+                  "monitor_frame": 1012,
+                  "video_frame": 8096,
+                  "time_s": 809.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1012,
+                "resolved": true,
+                "reason": "object_in_same_fixture became true",
+                "marker": {
+                  "monitor_frame": 1012,
+                  "video_frame": 8096,
+                  "time_s": 809.6
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "5": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 93,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 93,
+                  "video_frame": 744,
+                  "time_s": 74.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 416,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 416,
+                  "video_frame": 3328,
+                  "time_s": 332.8
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 722,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 722,
+                  "video_frame": 5776,
+                  "time_s": 577.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1070,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 1070,
+                  "video_frame": 8560,
+                  "time_s": 856.0
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "6": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "7": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 354,
+                "reason": "object_reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 354,
+                  "video_frame": 2832,
+                  "time_s": 283.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 354,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 354,
+                  "video_frame": 2832,
+                  "time_s": 283.2
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 1012,
+                "reason": "object_reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1012,
+                  "video_frame": 8096,
+                  "time_s": 809.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1012,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1012,
+                  "video_frame": 8096,
+                  "time_s": 809.6
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "8": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "invariant",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": null,
+              "violated_frames": [
+                {
+                  "frame": 199,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 199,
+                    "video_frame": 1592,
+                    "time_s": 159.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 200,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 200,
+                    "video_frame": 1600,
+                    "time_s": 160.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 201,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 201,
+                    "video_frame": 1608,
+                    "time_s": 160.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 202,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 202,
+                    "video_frame": 1616,
+                    "time_s": 161.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 203,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 203,
+                    "video_frame": 1624,
+                    "time_s": 162.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 204,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 204,
+                    "video_frame": 1632,
+                    "time_s": 163.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 205,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 205,
+                    "video_frame": 1640,
+                    "time_s": 164.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 206,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 206,
+                    "video_frame": 1648,
+                    "time_s": 164.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 207,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 207,
+                    "video_frame": 1656,
+                    "time_s": 165.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 208,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 208,
+                    "video_frame": 1664,
+                    "time_s": 166.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 209,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 209,
+                    "video_frame": 1672,
+                    "time_s": 167.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 210,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 210,
+                    "video_frame": 1680,
+                    "time_s": 168.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 211,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 211,
+                    "video_frame": 1688,
+                    "time_s": 168.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 212,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 212,
+                    "video_frame": 1696,
+                    "time_s": 169.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 213,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 213,
+                    "video_frame": 1704,
+                    "time_s": 170.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 214,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 214,
+                    "video_frame": 1712,
+                    "time_s": 171.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 215,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 215,
+                    "video_frame": 1720,
+                    "time_s": 172.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 216,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 216,
+                    "video_frame": 1728,
+                    "time_s": 172.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 217,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 217,
+                    "video_frame": 1736,
+                    "time_s": 173.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 218,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 218,
+                    "video_frame": 1744,
+                    "time_s": 174.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 219,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 219,
+                    "video_frame": 1752,
+                    "time_s": 175.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 220,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 220,
+                    "video_frame": 1760,
+                    "time_s": 176.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 221,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 221,
+                    "video_frame": 1768,
+                    "time_s": 176.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 222,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 222,
+                    "video_frame": 1776,
+                    "time_s": 177.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 223,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 223,
+                    "video_frame": 1784,
+                    "time_s": 178.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 224,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 224,
+                    "video_frame": 1792,
+                    "time_s": 179.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 225,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 225,
+                    "video_frame": 1800,
+                    "time_s": 180.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 226,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 226,
+                    "video_frame": 1808,
+                    "time_s": 180.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 227,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 227,
+                    "video_frame": 1816,
+                    "time_s": 181.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 228,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 228,
+                    "video_frame": 1824,
+                    "time_s": 182.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 229,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 229,
+                    "video_frame": 1832,
+                    "time_s": 183.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 230,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 230,
+                    "video_frame": 1840,
+                    "time_s": 184.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 231,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 231,
+                    "video_frame": 1848,
+                    "time_s": 184.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 232,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 232,
+                    "video_frame": 1856,
+                    "time_s": 185.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 233,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 233,
+                    "video_frame": 1864,
+                    "time_s": 186.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 234,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 234,
+                    "video_frame": 1872,
+                    "time_s": 187.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 235,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 235,
+                    "video_frame": 1880,
+                    "time_s": 188.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 236,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 236,
+                    "video_frame": 1888,
+                    "time_s": 188.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 237,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 237,
+                    "video_frame": 1896,
+                    "time_s": 189.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 238,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 238,
+                    "video_frame": 1904,
+                    "time_s": 190.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 239,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 239,
+                    "video_frame": 1912,
+                    "time_s": 191.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 240,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 240,
+                    "video_frame": 1920,
+                    "time_s": 192.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 241,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 241,
+                    "video_frame": 1928,
+                    "time_s": 192.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 242,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 242,
+                    "video_frame": 1936,
+                    "time_s": 193.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 243,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 243,
+                    "video_frame": 1944,
+                    "time_s": 194.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 244,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 244,
+                    "video_frame": 1952,
+                    "time_s": 195.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 245,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 245,
+                    "video_frame": 1960,
+                    "time_s": 196.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 246,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 246,
+                    "video_frame": 1968,
+                    "time_s": 196.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 247,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 247,
+                    "video_frame": 1976,
+                    "time_s": 197.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 248,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 248,
+                    "video_frame": 1984,
+                    "time_s": 198.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 249,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 249,
+                    "video_frame": 1992,
+                    "time_s": 199.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 250,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 250,
+                    "video_frame": 2000,
+                    "time_s": 200.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 251,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 251,
+                    "video_frame": 2008,
+                    "time_s": 200.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 252,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 252,
+                    "video_frame": 2016,
+                    "time_s": 201.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 253,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 253,
+                    "video_frame": 2024,
+                    "time_s": 202.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 254,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 254,
+                    "video_frame": 2032,
+                    "time_s": 203.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 255,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 255,
+                    "video_frame": 2040,
+                    "time_s": 204.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 256,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 256,
+                    "video_frame": 2048,
+                    "time_s": 204.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 257,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 257,
+                    "video_frame": 2056,
+                    "time_s": 205.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 258,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 258,
+                    "video_frame": 2064,
+                    "time_s": 206.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 259,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 259,
+                    "video_frame": 2072,
+                    "time_s": 207.2
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 259,
+                "resolved": true,
+                "reason": "forbidden_contact_sustained returned to false",
+                "marker": {
+                  "monitor_frame": 259,
+                  "video_frame": 2072,
+                  "time_s": 207.2
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": null,
+              "violated_frames": [
+                {
+                  "frame": 282,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 282,
+                    "video_frame": 2256,
+                    "time_s": 225.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 283,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 283,
+                    "video_frame": 2264,
+                    "time_s": 226.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 284,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 284,
+                    "video_frame": 2272,
+                    "time_s": 227.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 285,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 285,
+                    "video_frame": 2280,
+                    "time_s": 228.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 286,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 286,
+                    "video_frame": 2288,
+                    "time_s": 228.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 287,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 287,
+                    "video_frame": 2296,
+                    "time_s": 229.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 288,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 288,
+                    "video_frame": 2304,
+                    "time_s": 230.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 289,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 289,
+                    "video_frame": 2312,
+                    "time_s": 231.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 290,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 290,
+                    "video_frame": 2320,
+                    "time_s": 232.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 291,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 291,
+                    "video_frame": 2328,
+                    "time_s": 232.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 292,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 292,
+                    "video_frame": 2336,
+                    "time_s": 233.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 293,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 293,
+                    "video_frame": 2344,
+                    "time_s": 234.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 294,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 294,
+                    "video_frame": 2352,
+                    "time_s": 235.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 295,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 295,
+                    "video_frame": 2360,
+                    "time_s": 236.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 296,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 296,
+                    "video_frame": 2368,
+                    "time_s": 236.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 297,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 297,
+                    "video_frame": 2376,
+                    "time_s": 237.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 298,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 298,
+                    "video_frame": 2384,
+                    "time_s": 238.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 299,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 299,
+                    "video_frame": 2392,
+                    "time_s": 239.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 300,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 300,
+                    "video_frame": 2400,
+                    "time_s": 240.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 301,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 301,
+                    "video_frame": 2408,
+                    "time_s": 240.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 302,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 302,
+                    "video_frame": 2416,
+                    "time_s": 241.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 303,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 303,
+                    "video_frame": 2424,
+                    "time_s": 242.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 304,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 304,
+                    "video_frame": 2432,
+                    "time_s": 243.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 305,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 305,
+                    "video_frame": 2440,
+                    "time_s": 244.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 306,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 306,
+                    "video_frame": 2448,
+                    "time_s": 244.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 307,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 307,
+                    "video_frame": 2456,
+                    "time_s": 245.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 308,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 308,
+                    "video_frame": 2464,
+                    "time_s": 246.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 309,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 309,
+                    "video_frame": 2472,
+                    "time_s": 247.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 310,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 310,
+                    "video_frame": 2480,
+                    "time_s": 248.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 311,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 311,
+                    "video_frame": 2488,
+                    "time_s": 248.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 312,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 312,
+                    "video_frame": 2496,
+                    "time_s": 249.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 313,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 313,
+                    "video_frame": 2504,
+                    "time_s": 250.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 314,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 314,
+                    "video_frame": 2512,
+                    "time_s": 251.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 315,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 315,
+                    "video_frame": 2520,
+                    "time_s": 252.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 316,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 316,
+                    "video_frame": 2528,
+                    "time_s": 252.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 317,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 317,
+                    "video_frame": 2536,
+                    "time_s": 253.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 318,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 318,
+                    "video_frame": 2544,
+                    "time_s": 254.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 319,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 319,
+                    "video_frame": 2552,
+                    "time_s": 255.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 320,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 320,
+                    "video_frame": 2560,
+                    "time_s": 256.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 321,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 321,
+                    "video_frame": 2568,
+                    "time_s": 256.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 322,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 322,
+                    "video_frame": 2576,
+                    "time_s": 257.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 323,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 323,
+                    "video_frame": 2584,
+                    "time_s": 258.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 324,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 324,
+                    "video_frame": 2592,
+                    "time_s": 259.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 325,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 325,
+                    "video_frame": 2600,
+                    "time_s": 260.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 326,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 326,
+                    "video_frame": 2608,
+                    "time_s": 260.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 327,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 327,
+                    "video_frame": 2616,
+                    "time_s": 261.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 328,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 328,
+                    "video_frame": 2624,
+                    "time_s": 262.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 329,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 329,
+                    "video_frame": 2632,
+                    "time_s": 263.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 330,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 330,
+                    "video_frame": 2640,
+                    "time_s": 264.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 331,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 331,
+                    "video_frame": 2648,
+                    "time_s": 264.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 332,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 332,
+                    "video_frame": 2656,
+                    "time_s": 265.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 333,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 333,
+                    "video_frame": 2664,
+                    "time_s": 266.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 334,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 334,
+                    "video_frame": 2672,
+                    "time_s": 267.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 335,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 335,
+                    "video_frame": 2680,
+                    "time_s": 268.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 336,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 336,
+                    "video_frame": 2688,
+                    "time_s": 268.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 337,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 337,
+                    "video_frame": 2696,
+                    "time_s": 269.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 338,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 338,
+                    "video_frame": 2704,
+                    "time_s": 270.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 339,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 339,
+                    "video_frame": 2712,
+                    "time_s": 271.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 340,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 340,
+                    "video_frame": 2720,
+                    "time_s": 272.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 341,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 341,
+                    "video_frame": 2728,
+                    "time_s": 272.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 342,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 342,
+                    "video_frame": 2736,
+                    "time_s": 273.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 343,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 343,
+                    "video_frame": 2744,
+                    "time_s": 274.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 344,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 344,
+                    "video_frame": 2752,
+                    "time_s": 275.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 345,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 345,
+                    "video_frame": 2760,
+                    "time_s": 276.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 346,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 346,
+                    "video_frame": 2768,
+                    "time_s": 276.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 347,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 347,
+                    "video_frame": 2776,
+                    "time_s": 277.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 348,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 348,
+                    "video_frame": 2784,
+                    "time_s": 278.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 349,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 349,
+                    "video_frame": 2792,
+                    "time_s": 279.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 350,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 350,
+                    "video_frame": 2800,
+                    "time_s": 280.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 351,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 351,
+                    "video_frame": 2808,
+                    "time_s": 280.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 352,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 352,
+                    "video_frame": 2816,
+                    "time_s": 281.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 353,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 353,
+                    "video_frame": 2824,
+                    "time_s": 282.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 354,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 354,
+                    "video_frame": 2832,
+                    "time_s": 283.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 355,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 355,
+                    "video_frame": 2840,
+                    "time_s": 284.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 356,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 356,
+                    "video_frame": 2848,
+                    "time_s": 284.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 357,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 357,
+                    "video_frame": 2856,
+                    "time_s": 285.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 358,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 358,
+                    "video_frame": 2864,
+                    "time_s": 286.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 359,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 359,
+                    "video_frame": 2872,
+                    "time_s": 287.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 360,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 360,
+                    "video_frame": 2880,
+                    "time_s": 288.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 361,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 361,
+                    "video_frame": 2888,
+                    "time_s": 288.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 362,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 362,
+                    "video_frame": 2896,
+                    "time_s": 289.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 363,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 363,
+                    "video_frame": 2904,
+                    "time_s": 290.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 364,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 364,
+                    "video_frame": 2912,
+                    "time_s": 291.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 365,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 365,
+                    "video_frame": 2920,
+                    "time_s": 292.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 366,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 366,
+                    "video_frame": 2928,
+                    "time_s": 292.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 367,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 367,
+                    "video_frame": 2936,
+                    "time_s": 293.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 368,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 368,
+                    "video_frame": 2944,
+                    "time_s": 294.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 369,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 369,
+                    "video_frame": 2952,
+                    "time_s": 295.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 370,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 370,
+                    "video_frame": 2960,
+                    "time_s": 296.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 371,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 371,
+                    "video_frame": 2968,
+                    "time_s": 296.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 372,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 372,
+                    "video_frame": 2976,
+                    "time_s": 297.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 373,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 373,
+                    "video_frame": 2984,
+                    "time_s": 298.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 374,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 374,
+                    "video_frame": 2992,
+                    "time_s": 299.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 375,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 375,
+                    "video_frame": 3000,
+                    "time_s": 300.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 376,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 376,
+                    "video_frame": 3008,
+                    "time_s": 300.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 377,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 377,
+                    "video_frame": 3016,
+                    "time_s": 301.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 378,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 378,
+                    "video_frame": 3024,
+                    "time_s": 302.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 379,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 379,
+                    "video_frame": 3032,
+                    "time_s": 303.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 380,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 380,
+                    "video_frame": 3040,
+                    "time_s": 304.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 381,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 381,
+                    "video_frame": 3048,
+                    "time_s": 304.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 382,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 382,
+                    "video_frame": 3056,
+                    "time_s": 305.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 383,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 383,
+                    "video_frame": 3064,
+                    "time_s": 306.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 384,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 384,
+                    "video_frame": 3072,
+                    "time_s": 307.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 385,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 385,
+                    "video_frame": 3080,
+                    "time_s": 308.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 386,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 386,
+                    "video_frame": 3088,
+                    "time_s": 308.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 387,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 387,
+                    "video_frame": 3096,
+                    "time_s": 309.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 388,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 388,
+                    "video_frame": 3104,
+                    "time_s": 310.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 389,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 389,
+                    "video_frame": 3112,
+                    "time_s": 311.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 390,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 390,
+                    "video_frame": 3120,
+                    "time_s": 312.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 391,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 391,
+                    "video_frame": 3128,
+                    "time_s": 312.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 392,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 392,
+                    "video_frame": 3136,
+                    "time_s": 313.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 393,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 393,
+                    "video_frame": 3144,
+                    "time_s": 314.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 394,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 394,
+                    "video_frame": 3152,
+                    "time_s": 315.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 395,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 395,
+                    "video_frame": 3160,
+                    "time_s": 316.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 396,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 396,
+                    "video_frame": 3168,
+                    "time_s": 316.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 397,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 397,
+                    "video_frame": 3176,
+                    "time_s": 317.6
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 397,
+                "resolved": true,
+                "reason": "forbidden_contact_sustained returned to false",
+                "marker": {
+                  "monitor_frame": 397,
+                  "video_frame": 3176,
+                  "time_s": 317.6
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": null,
+              "violated_frames": [
+                {
+                  "frame": 742,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 742,
+                    "video_frame": 5936,
+                    "time_s": 593.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 743,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 743,
+                    "video_frame": 5944,
+                    "time_s": 594.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 744,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 744,
+                    "video_frame": 5952,
+                    "time_s": 595.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 745,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 745,
+                    "video_frame": 5960,
+                    "time_s": 596.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 746,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 746,
+                    "video_frame": 5968,
+                    "time_s": 596.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 747,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 747,
+                    "video_frame": 5976,
+                    "time_s": 597.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 748,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 748,
+                    "video_frame": 5984,
+                    "time_s": 598.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 749,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 749,
+                    "video_frame": 5992,
+                    "time_s": 599.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 750,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 750,
+                    "video_frame": 6000,
+                    "time_s": 600.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 751,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 751,
+                    "video_frame": 6008,
+                    "time_s": 600.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 752,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 752,
+                    "video_frame": 6016,
+                    "time_s": 601.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 753,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 753,
+                    "video_frame": 6024,
+                    "time_s": 602.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 754,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 754,
+                    "video_frame": 6032,
+                    "time_s": 603.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 755,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 755,
+                    "video_frame": 6040,
+                    "time_s": 604.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 756,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 756,
+                    "video_frame": 6048,
+                    "time_s": 604.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 757,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 757,
+                    "video_frame": 6056,
+                    "time_s": 605.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 758,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 758,
+                    "video_frame": 6064,
+                    "time_s": 606.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 759,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 759,
+                    "video_frame": 6072,
+                    "time_s": 607.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 760,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 760,
+                    "video_frame": 6080,
+                    "time_s": 608.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 761,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 761,
+                    "video_frame": 6088,
+                    "time_s": 608.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 762,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 762,
+                    "video_frame": 6096,
+                    "time_s": 609.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 763,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 763,
+                    "video_frame": 6104,
+                    "time_s": 610.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 764,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 764,
+                    "video_frame": 6112,
+                    "time_s": 611.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 765,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 765,
+                    "video_frame": 6120,
+                    "time_s": 612.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 766,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 766,
+                    "video_frame": 6128,
+                    "time_s": 612.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 767,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 767,
+                    "video_frame": 6136,
+                    "time_s": 613.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 768,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 768,
+                    "video_frame": 6144,
+                    "time_s": 614.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 769,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 769,
+                    "video_frame": 6152,
+                    "time_s": 615.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 770,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 770,
+                    "video_frame": 6160,
+                    "time_s": 616.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 771,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 771,
+                    "video_frame": 6168,
+                    "time_s": 616.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 772,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 772,
+                    "video_frame": 6176,
+                    "time_s": 617.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 773,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 773,
+                    "video_frame": 6184,
+                    "time_s": 618.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 774,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 774,
+                    "video_frame": 6192,
+                    "time_s": 619.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 775,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 775,
+                    "video_frame": 6200,
+                    "time_s": 620.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 776,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 776,
+                    "video_frame": 6208,
+                    "time_s": 620.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 777,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 777,
+                    "video_frame": 6216,
+                    "time_s": 621.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 778,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 778,
+                    "video_frame": 6224,
+                    "time_s": 622.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 779,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 779,
+                    "video_frame": 6232,
+                    "time_s": 623.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 780,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 780,
+                    "video_frame": 6240,
+                    "time_s": 624.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 781,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 781,
+                    "video_frame": 6248,
+                    "time_s": 624.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 782,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 782,
+                    "video_frame": 6256,
+                    "time_s": 625.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 783,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 783,
+                    "video_frame": 6264,
+                    "time_s": 626.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 784,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 784,
+                    "video_frame": 6272,
+                    "time_s": 627.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 785,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 785,
+                    "video_frame": 6280,
+                    "time_s": 628.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 786,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 786,
+                    "video_frame": 6288,
+                    "time_s": 628.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 787,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 787,
+                    "video_frame": 6296,
+                    "time_s": 629.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 788,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 788,
+                    "video_frame": 6304,
+                    "time_s": 630.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 789,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 789,
+                    "video_frame": 6312,
+                    "time_s": 631.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 790,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 790,
+                    "video_frame": 6320,
+                    "time_s": 632.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 791,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 791,
+                    "video_frame": 6328,
+                    "time_s": 632.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 792,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 792,
+                    "video_frame": 6336,
+                    "time_s": 633.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 793,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 793,
+                    "video_frame": 6344,
+                    "time_s": 634.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 794,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 794,
+                    "video_frame": 6352,
+                    "time_s": 635.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 795,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 795,
+                    "video_frame": 6360,
+                    "time_s": 636.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 796,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 796,
+                    "video_frame": 6368,
+                    "time_s": 636.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 797,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 797,
+                    "video_frame": 6376,
+                    "time_s": 637.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 798,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 798,
+                    "video_frame": 6384,
+                    "time_s": 638.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 799,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 799,
+                    "video_frame": 6392,
+                    "time_s": 639.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 800,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 800,
+                    "video_frame": 6400,
+                    "time_s": 640.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 801,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 801,
+                    "video_frame": 6408,
+                    "time_s": 640.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 802,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 802,
+                    "video_frame": 6416,
+                    "time_s": 641.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 803,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 803,
+                    "video_frame": 6424,
+                    "time_s": 642.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 804,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 804,
+                    "video_frame": 6432,
+                    "time_s": 643.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 805,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 805,
+                    "video_frame": 6440,
+                    "time_s": 644.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 806,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 806,
+                    "video_frame": 6448,
+                    "time_s": 644.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 807,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 807,
+                    "video_frame": 6456,
+                    "time_s": 645.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 808,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 808,
+                    "video_frame": 6464,
+                    "time_s": 646.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 809,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 809,
+                    "video_frame": 6472,
+                    "time_s": 647.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 810,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 810,
+                    "video_frame": 6480,
+                    "time_s": 648.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 811,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 811,
+                    "video_frame": 6488,
+                    "time_s": 648.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 812,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 812,
+                    "video_frame": 6496,
+                    "time_s": 649.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 813,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 813,
+                    "video_frame": 6504,
+                    "time_s": 650.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 814,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 814,
+                    "video_frame": 6512,
+                    "time_s": 651.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 815,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 815,
+                    "video_frame": 6520,
+                    "time_s": 652.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 816,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 816,
+                    "video_frame": 6528,
+                    "time_s": 652.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 817,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 817,
+                    "video_frame": 6536,
+                    "time_s": 653.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 818,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 818,
+                    "video_frame": 6544,
+                    "time_s": 654.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 819,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 819,
+                    "video_frame": 6552,
+                    "time_s": 655.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 820,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 820,
+                    "video_frame": 6560,
+                    "time_s": 656.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 821,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 821,
+                    "video_frame": 6568,
+                    "time_s": 656.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 822,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 822,
+                    "video_frame": 6576,
+                    "time_s": 657.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 823,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 823,
+                    "video_frame": 6584,
+                    "time_s": 658.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 824,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 824,
+                    "video_frame": 6592,
+                    "time_s": 659.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 825,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 825,
+                    "video_frame": 6600,
+                    "time_s": 660.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 826,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 826,
+                    "video_frame": 6608,
+                    "time_s": 660.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 827,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 827,
+                    "video_frame": 6616,
+                    "time_s": 661.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 828,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 828,
+                    "video_frame": 6624,
+                    "time_s": 662.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 829,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 829,
+                    "video_frame": 6632,
+                    "time_s": 663.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 830,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 830,
+                    "video_frame": 6640,
+                    "time_s": 664.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 831,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 831,
+                    "video_frame": 6648,
+                    "time_s": 664.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 832,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 832,
+                    "video_frame": 6656,
+                    "time_s": 665.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 833,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 833,
+                    "video_frame": 6664,
+                    "time_s": 666.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 834,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 834,
+                    "video_frame": 6672,
+                    "time_s": 667.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 835,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 835,
+                    "video_frame": 6680,
+                    "time_s": 668.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 836,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 836,
+                    "video_frame": 6688,
+                    "time_s": 668.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 837,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 837,
+                    "video_frame": 6696,
+                    "time_s": 669.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 838,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 838,
+                    "video_frame": 6704,
+                    "time_s": 670.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 839,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 839,
+                    "video_frame": 6712,
+                    "time_s": 671.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 840,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 840,
+                    "video_frame": 6720,
+                    "time_s": 672.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 841,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 841,
+                    "video_frame": 6728,
+                    "time_s": 672.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 842,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 842,
+                    "video_frame": 6736,
+                    "time_s": 673.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 843,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 843,
+                    "video_frame": 6744,
+                    "time_s": 674.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 844,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 844,
+                    "video_frame": 6752,
+                    "time_s": 675.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 845,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 845,
+                    "video_frame": 6760,
+                    "time_s": 676.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 846,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 846,
+                    "video_frame": 6768,
+                    "time_s": 676.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 847,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 847,
+                    "video_frame": 6776,
+                    "time_s": 677.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 848,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 848,
+                    "video_frame": 6784,
+                    "time_s": 678.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 849,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 849,
+                    "video_frame": 6792,
+                    "time_s": 679.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 850,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 850,
+                    "video_frame": 6800,
+                    "time_s": 680.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 851,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 851,
+                    "video_frame": 6808,
+                    "time_s": 680.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 852,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 852,
+                    "video_frame": 6816,
+                    "time_s": 681.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 853,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 853,
+                    "video_frame": 6824,
+                    "time_s": 682.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 854,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 854,
+                    "video_frame": 6832,
+                    "time_s": 683.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 855,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 855,
+                    "video_frame": 6840,
+                    "time_s": 684.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 856,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 856,
+                    "video_frame": 6848,
+                    "time_s": 684.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 857,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 857,
+                    "video_frame": 6856,
+                    "time_s": 685.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 858,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 858,
+                    "video_frame": 6864,
+                    "time_s": 686.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 859,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 859,
+                    "video_frame": 6872,
+                    "time_s": 687.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 860,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 860,
+                    "video_frame": 6880,
+                    "time_s": 688.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 861,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 861,
+                    "video_frame": 6888,
+                    "time_s": 688.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 862,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 862,
+                    "video_frame": 6896,
+                    "time_s": 689.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 863,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 863,
+                    "video_frame": 6904,
+                    "time_s": 690.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 864,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 864,
+                    "video_frame": 6912,
+                    "time_s": 691.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 865,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 865,
+                    "video_frame": 6920,
+                    "time_s": 692.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 866,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 866,
+                    "video_frame": 6928,
+                    "time_s": 692.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 867,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 867,
+                    "video_frame": 6936,
+                    "time_s": 693.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 868,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 868,
+                    "video_frame": 6944,
+                    "time_s": 694.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 869,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 869,
+                    "video_frame": 6952,
+                    "time_s": 695.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 870,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 870,
+                    "video_frame": 6960,
+                    "time_s": 696.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 871,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 871,
+                    "video_frame": 6968,
+                    "time_s": 696.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 872,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 872,
+                    "video_frame": 6976,
+                    "time_s": 697.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 873,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 873,
+                    "video_frame": 6984,
+                    "time_s": 698.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 874,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 874,
+                    "video_frame": 6992,
+                    "time_s": 699.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 875,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 875,
+                    "video_frame": 7000,
+                    "time_s": 700.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 876,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 876,
+                    "video_frame": 7008,
+                    "time_s": 700.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 877,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 877,
+                    "video_frame": 7016,
+                    "time_s": 701.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 878,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 878,
+                    "video_frame": 7024,
+                    "time_s": 702.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 879,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 879,
+                    "video_frame": 7032,
+                    "time_s": 703.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 880,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 880,
+                    "video_frame": 7040,
+                    "time_s": 704.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 881,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 881,
+                    "video_frame": 7048,
+                    "time_s": 704.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 882,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 882,
+                    "video_frame": 7056,
+                    "time_s": 705.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 883,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 883,
+                    "video_frame": 7064,
+                    "time_s": 706.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 884,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 884,
+                    "video_frame": 7072,
+                    "time_s": 707.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 885,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 885,
+                    "video_frame": 7080,
+                    "time_s": 708.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 886,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 886,
+                    "video_frame": 7088,
+                    "time_s": 708.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 887,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 887,
+                    "video_frame": 7096,
+                    "time_s": 709.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 888,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 888,
+                    "video_frame": 7104,
+                    "time_s": 710.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 889,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 889,
+                    "video_frame": 7112,
+                    "time_s": 711.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 890,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 890,
+                    "video_frame": 7120,
+                    "time_s": 712.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 891,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 891,
+                    "video_frame": 7128,
+                    "time_s": 712.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 892,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 892,
+                    "video_frame": 7136,
+                    "time_s": 713.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 893,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 893,
+                    "video_frame": 7144,
+                    "time_s": 714.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 894,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 894,
+                    "video_frame": 7152,
+                    "time_s": 715.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 895,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 895,
+                    "video_frame": 7160,
+                    "time_s": 716.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 896,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 896,
+                    "video_frame": 7168,
+                    "time_s": 716.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 897,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 897,
+                    "video_frame": 7176,
+                    "time_s": 717.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 898,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 898,
+                    "video_frame": 7184,
+                    "time_s": 718.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 899,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 899,
+                    "video_frame": 7192,
+                    "time_s": 719.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 900,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 900,
+                    "video_frame": 7200,
+                    "time_s": 720.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 901,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 901,
+                    "video_frame": 7208,
+                    "time_s": 720.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 902,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 902,
+                    "video_frame": 7216,
+                    "time_s": 721.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 903,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 903,
+                    "video_frame": 7224,
+                    "time_s": 722.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 904,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 904,
+                    "video_frame": 7232,
+                    "time_s": 723.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 905,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 905,
+                    "video_frame": 7240,
+                    "time_s": 724.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 906,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 906,
+                    "video_frame": 7248,
+                    "time_s": 724.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 907,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 907,
+                    "video_frame": 7256,
+                    "time_s": 725.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 908,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 908,
+                    "video_frame": 7264,
+                    "time_s": 726.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 909,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 909,
+                    "video_frame": 7272,
+                    "time_s": 727.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 910,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 910,
+                    "video_frame": 7280,
+                    "time_s": 728.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 911,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 911,
+                    "video_frame": 7288,
+                    "time_s": 728.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 912,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 912,
+                    "video_frame": 7296,
+                    "time_s": 729.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 913,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 913,
+                    "video_frame": 7304,
+                    "time_s": 730.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 914,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 914,
+                    "video_frame": 7312,
+                    "time_s": 731.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 915,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 915,
+                    "video_frame": 7320,
+                    "time_s": 732.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 916,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 916,
+                    "video_frame": 7328,
+                    "time_s": 732.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 917,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 917,
+                    "video_frame": 7336,
+                    "time_s": 733.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 918,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 918,
+                    "video_frame": 7344,
+                    "time_s": 734.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 919,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 919,
+                    "video_frame": 7352,
+                    "time_s": 735.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 920,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 920,
+                    "video_frame": 7360,
+                    "time_s": 736.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 921,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 921,
+                    "video_frame": 7368,
+                    "time_s": 736.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 922,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 922,
+                    "video_frame": 7376,
+                    "time_s": 737.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 923,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 923,
+                    "video_frame": 7384,
+                    "time_s": 738.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 924,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 924,
+                    "video_frame": 7392,
+                    "time_s": 739.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 925,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 925,
+                    "video_frame": 7400,
+                    "time_s": 740.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 926,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 926,
+                    "video_frame": 7408,
+                    "time_s": 740.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 927,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 927,
+                    "video_frame": 7416,
+                    "time_s": 741.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 928,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 928,
+                    "video_frame": 7424,
+                    "time_s": 742.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 929,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 929,
+                    "video_frame": 7432,
+                    "time_s": 743.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 930,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 930,
+                    "video_frame": 7440,
+                    "time_s": 744.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 931,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 931,
+                    "video_frame": 7448,
+                    "time_s": 744.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 932,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 932,
+                    "video_frame": 7456,
+                    "time_s": 745.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 933,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 933,
+                    "video_frame": 7464,
+                    "time_s": 746.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 934,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 934,
+                    "video_frame": 7472,
+                    "time_s": 747.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 935,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 935,
+                    "video_frame": 7480,
+                    "time_s": 748.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 936,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 936,
+                    "video_frame": 7488,
+                    "time_s": 748.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 937,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 937,
+                    "video_frame": 7496,
+                    "time_s": 749.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 938,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 938,
+                    "video_frame": 7504,
+                    "time_s": 750.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 939,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 939,
+                    "video_frame": 7512,
+                    "time_s": 751.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 940,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 940,
+                    "video_frame": 7520,
+                    "time_s": 752.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 941,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 941,
+                    "video_frame": 7528,
+                    "time_s": 752.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 942,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 942,
+                    "video_frame": 7536,
+                    "time_s": 753.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 943,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 943,
+                    "video_frame": 7544,
+                    "time_s": 754.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 944,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 944,
+                    "video_frame": 7552,
+                    "time_s": 755.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 945,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 945,
+                    "video_frame": 7560,
+                    "time_s": 756.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 946,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 946,
+                    "video_frame": 7568,
+                    "time_s": 756.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 947,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 947,
+                    "video_frame": 7576,
+                    "time_s": 757.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 948,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 948,
+                    "video_frame": 7584,
+                    "time_s": 758.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 949,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 949,
+                    "video_frame": 7592,
+                    "time_s": 759.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 950,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 950,
+                    "video_frame": 7600,
+                    "time_s": 760.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 951,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 951,
+                    "video_frame": 7608,
+                    "time_s": 760.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 952,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 952,
+                    "video_frame": 7616,
+                    "time_s": 761.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 953,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 953,
+                    "video_frame": 7624,
+                    "time_s": 762.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 954,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 954,
+                    "video_frame": 7632,
+                    "time_s": 763.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 955,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 955,
+                    "video_frame": 7640,
+                    "time_s": 764.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 956,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 956,
+                    "video_frame": 7648,
+                    "time_s": 764.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 957,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 957,
+                    "video_frame": 7656,
+                    "time_s": 765.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 958,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 958,
+                    "video_frame": 7664,
+                    "time_s": 766.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 959,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 959,
+                    "video_frame": 7672,
+                    "time_s": 767.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 960,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 960,
+                    "video_frame": 7680,
+                    "time_s": 768.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 961,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 961,
+                    "video_frame": 7688,
+                    "time_s": 768.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 962,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 962,
+                    "video_frame": 7696,
+                    "time_s": 769.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 963,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 963,
+                    "video_frame": 7704,
+                    "time_s": 770.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 964,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 964,
+                    "video_frame": 7712,
+                    "time_s": 771.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 965,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 965,
+                    "video_frame": 7720,
+                    "time_s": 772.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 966,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 966,
+                    "video_frame": 7728,
+                    "time_s": 772.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 967,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 967,
+                    "video_frame": 7736,
+                    "time_s": 773.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 968,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 968,
+                    "video_frame": 7744,
+                    "time_s": 774.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 969,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 969,
+                    "video_frame": 7752,
+                    "time_s": 775.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 970,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 970,
+                    "video_frame": 7760,
+                    "time_s": 776.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 971,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 971,
+                    "video_frame": 7768,
+                    "time_s": 776.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 972,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 972,
+                    "video_frame": 7776,
+                    "time_s": 777.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 973,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 973,
+                    "video_frame": 7784,
+                    "time_s": 778.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 974,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 974,
+                    "video_frame": 7792,
+                    "time_s": 779.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 975,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 975,
+                    "video_frame": 7800,
+                    "time_s": 780.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 976,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 976,
+                    "video_frame": 7808,
+                    "time_s": 780.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 977,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 977,
+                    "video_frame": 7816,
+                    "time_s": 781.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 978,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 978,
+                    "video_frame": 7824,
+                    "time_s": 782.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 979,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 979,
+                    "video_frame": 7832,
+                    "time_s": 783.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 980,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 980,
+                    "video_frame": 7840,
+                    "time_s": 784.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 981,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 981,
+                    "video_frame": 7848,
+                    "time_s": 784.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 982,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 982,
+                    "video_frame": 7856,
+                    "time_s": 785.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 983,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 983,
+                    "video_frame": 7864,
+                    "time_s": 786.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 984,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 984,
+                    "video_frame": 7872,
+                    "time_s": 787.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 985,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 985,
+                    "video_frame": 7880,
+                    "time_s": 788.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 986,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 986,
+                    "video_frame": 7888,
+                    "time_s": 788.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 987,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 987,
+                    "video_frame": 7896,
+                    "time_s": 789.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 988,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 988,
+                    "video_frame": 7904,
+                    "time_s": 790.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 989,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 989,
+                    "video_frame": 7912,
+                    "time_s": 791.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 990,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 990,
+                    "video_frame": 7920,
+                    "time_s": 792.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 991,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 991,
+                    "video_frame": 7928,
+                    "time_s": 792.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 992,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 992,
+                    "video_frame": 7936,
+                    "time_s": 793.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 993,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 993,
+                    "video_frame": 7944,
+                    "time_s": 794.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 994,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 994,
+                    "video_frame": 7952,
+                    "time_s": 795.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 995,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 995,
+                    "video_frame": 7960,
+                    "time_s": 796.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 996,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 996,
+                    "video_frame": 7968,
+                    "time_s": 796.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 997,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 997,
+                    "video_frame": 7976,
+                    "time_s": 797.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 998,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 998,
+                    "video_frame": 7984,
+                    "time_s": 798.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 999,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 999,
+                    "video_frame": 7992,
+                    "time_s": 799.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1000,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1000,
+                    "video_frame": 8000,
+                    "time_s": 800.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1001,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1001,
+                    "video_frame": 8008,
+                    "time_s": 800.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1002,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1002,
+                    "video_frame": 8016,
+                    "time_s": 801.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1003,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1003,
+                    "video_frame": 8024,
+                    "time_s": 802.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1004,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1004,
+                    "video_frame": 8032,
+                    "time_s": 803.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1005,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1005,
+                    "video_frame": 8040,
+                    "time_s": 804.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1006,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1006,
+                    "video_frame": 8048,
+                    "time_s": 804.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1007,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1007,
+                    "video_frame": 8056,
+                    "time_s": 805.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1008,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1008,
+                    "video_frame": 8064,
+                    "time_s": 806.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1009,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1009,
+                    "video_frame": 8072,
+                    "time_s": 807.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1010,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1010,
+                    "video_frame": 8080,
+                    "time_s": 808.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1011,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1011,
+                    "video_frame": 8088,
+                    "time_s": 808.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1012,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1012,
+                    "video_frame": 8096,
+                    "time_s": 809.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1013,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1013,
+                    "video_frame": 8104,
+                    "time_s": 810.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1014,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1014,
+                    "video_frame": 8112,
+                    "time_s": 811.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1015,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1015,
+                    "video_frame": 8120,
+                    "time_s": 812.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1016,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1016,
+                    "video_frame": 8128,
+                    "time_s": 812.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1017,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1017,
+                    "video_frame": 8136,
+                    "time_s": 813.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1018,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1018,
+                    "video_frame": 8144,
+                    "time_s": 814.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1019,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1019,
+                    "video_frame": 8152,
+                    "time_s": 815.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1020,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1020,
+                    "video_frame": 8160,
+                    "time_s": 816.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1021,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1021,
+                    "video_frame": 8168,
+                    "time_s": 816.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1022,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1022,
+                    "video_frame": 8176,
+                    "time_s": 817.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1023,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1023,
+                    "video_frame": 8184,
+                    "time_s": 818.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1024,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1024,
+                    "video_frame": 8192,
+                    "time_s": 819.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1025,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1025,
+                    "video_frame": 8200,
+                    "time_s": 820.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1026,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1026,
+                    "video_frame": 8208,
+                    "time_s": 820.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1027,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1027,
+                    "video_frame": 8216,
+                    "time_s": 821.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1028,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1028,
+                    "video_frame": 8224,
+                    "time_s": 822.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1029,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1029,
+                    "video_frame": 8232,
+                    "time_s": 823.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1030,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1030,
+                    "video_frame": 8240,
+                    "time_s": 824.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1031,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1031,
+                    "video_frame": 8248,
+                    "time_s": 824.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1032,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1032,
+                    "video_frame": 8256,
+                    "time_s": 825.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1033,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1033,
+                    "video_frame": 8264,
+                    "time_s": 826.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1034,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1034,
+                    "video_frame": 8272,
+                    "time_s": 827.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1035,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1035,
+                    "video_frame": 8280,
+                    "time_s": 828.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1036,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1036,
+                    "video_frame": 8288,
+                    "time_s": 828.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1037,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1037,
+                    "video_frame": 8296,
+                    "time_s": 829.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1038,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1038,
+                    "video_frame": 8304,
+                    "time_s": 830.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1039,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1039,
+                    "video_frame": 8312,
+                    "time_s": 831.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1040,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1040,
+                    "video_frame": 8320,
+                    "time_s": 832.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1041,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1041,
+                    "video_frame": 8328,
+                    "time_s": 832.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1042,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1042,
+                    "video_frame": 8336,
+                    "time_s": 833.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1043,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1043,
+                    "video_frame": 8344,
+                    "time_s": 834.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1044,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1044,
+                    "video_frame": 8352,
+                    "time_s": 835.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1045,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1045,
+                    "video_frame": 8360,
+                    "time_s": 836.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1046,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1046,
+                    "video_frame": 8368,
+                    "time_s": 836.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1047,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1047,
+                    "video_frame": 8376,
+                    "time_s": 837.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1048,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1048,
+                    "video_frame": 8384,
+                    "time_s": 838.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1049,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1049,
+                    "video_frame": 8392,
+                    "time_s": 839.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1050,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1050,
+                    "video_frame": 8400,
+                    "time_s": 840.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1051,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1051,
+                    "video_frame": 8408,
+                    "time_s": 840.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1052,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1052,
+                    "video_frame": 8416,
+                    "time_s": 841.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1053,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1053,
+                    "video_frame": 8424,
+                    "time_s": 842.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1054,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1054,
+                    "video_frame": 8432,
+                    "time_s": 843.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1055,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1055,
+                    "video_frame": 8440,
+                    "time_s": 844.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1056,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1056,
+                    "video_frame": 8448,
+                    "time_s": 844.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1057,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1057,
+                    "video_frame": 8456,
+                    "time_s": 845.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1058,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1058,
+                    "video_frame": 8464,
+                    "time_s": 846.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1059,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1059,
+                    "video_frame": 8472,
+                    "time_s": 847.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1060,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1060,
+                    "video_frame": 8480,
+                    "time_s": 848.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1061,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1061,
+                    "video_frame": 8488,
+                    "time_s": 848.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1062,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1062,
+                    "video_frame": 8496,
+                    "time_s": 849.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1063,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1063,
+                    "video_frame": 8504,
+                    "time_s": 850.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1064,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1064,
+                    "video_frame": 8512,
+                    "time_s": 851.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1065,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1065,
+                    "video_frame": 8520,
+                    "time_s": 852.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1066,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1066,
+                    "video_frame": 8528,
+                    "time_s": 852.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1067,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1067,
+                    "video_frame": 8536,
+                    "time_s": 853.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1068,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1068,
+                    "video_frame": 8544,
+                    "time_s": 854.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 1069,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1069,
+                    "video_frame": 8552,
+                    "time_s": 855.2
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 1069,
+                "resolved": true,
+                "reason": "forbidden_contact_sustained returned to false",
+                "marker": {
+                  "monitor_frame": 1069,
+                  "video_frame": 8552,
+                  "time_s": 855.2
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "9": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "10": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 43,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 43,
+                  "video_frame": 344,
+                  "time_s": 34.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 43,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 43,
+                  "video_frame": 344,
+                  "time_s": 34.4
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 648,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 648,
+                  "video_frame": 5184,
+                  "time_s": 518.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 648,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 648,
+                  "video_frame": 5184,
+                  "time_s": 518.4
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "11": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 416,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 416,
+                  "video_frame": 3328,
+                  "time_s": 332.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 416,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 416,
+                  "video_frame": 3328,
+                  "time_s": 332.8
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 1070,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1070,
+                  "video_frame": 8560,
+                  "time_s": 856.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1070,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1070,
+                  "video_frame": 8560,
+                  "time_s": 856.0
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "12": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "13": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 365,
+                "reason": "reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 365,
+                  "video_frame": 2920,
+                  "time_s": 292.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 365,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 365,
+                  "video_frame": 2920,
+                  "time_s": 292.0
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 1026,
+                "reason": "reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1026,
+                  "video_frame": 8208,
+                  "time_s": 820.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1026,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1026,
+                  "video_frame": 8208,
+                  "time_s": 820.8
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "14": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 416,
+                "reason": "object_released became true",
+                "marker": {
+                  "monitor_frame": 416,
+                  "video_frame": 3328,
+                  "time_s": 332.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 442,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 442,
+                  "video_frame": 3536,
+                  "time_s": 353.6
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 1070,
+                "reason": "object_released became true",
+                "marker": {
+                  "monitor_frame": 1070,
+                  "video_frame": 8560,
+                  "time_s": 856.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1087,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 1087,
+                  "video_frame": 8696,
+                  "time_s": 869.6
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "15": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "16": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "17": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "18": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "missed_notes": "",
+  "overall_verdict": null
+}
