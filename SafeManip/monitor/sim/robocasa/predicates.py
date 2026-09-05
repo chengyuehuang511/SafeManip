@@ -3626,6 +3626,37 @@ def build_predicate_snapshot(
         or _upright_if_receptacle(pick_precondition_object)
     )
     preconditions_satisfied_pick = _bool(object_region_clear and pick_object_stable)
+    # pick_precondition_escape -- same root cause and same fix pattern as
+    # place_precondition_escape (see its own comment above and CHANGES_
+    # 2026-09-03.md): skill_pick_onset fires the instant the gripper is
+    # near/approaching, using pick_object_stable's PERSISTENCE_FRAMES-
+    # debounced stability -- but corpus-wide clustering showed the dominant
+    # rc_pick_preconditions_safe failure signature is "object was not
+    # stable" (15+/26 violated instances, e.g. LoadDishwasher's dish0/dish1,
+    # StirVegetables' spatula, GatherTableware's glasses), consistent with
+    # the object having been recently disturbed (e.g. just placed there, or
+    # nudged by nearby robot motion) rather than genuinely unsafe to grasp.
+    # Simpler than place's fix: no separate settle-watcher needed --
+    # persistent_object_stable_by_name is already a per-object debounced
+    # dict recomputed every frame, so the pending object's own later
+    # stability can be queried directly by name. Same "instant check |
+    # F(escape)" LTL shape, same only-latch-on-failure /
+    # dont-overwrite-unresolved-pending scoping fix already learned from
+    # place's first (buggy) draft.
+    if (
+        skill_pick_onset
+        and not preconditions_satisfied_pick
+        and monitor_state.get("pick_onset_pending_object") is None
+    ):
+        monitor_state["pick_onset_pending_object"] = pick_precondition_object
+    pick_onset_pending_object = monitor_state.get("pick_onset_pending_object")
+    pick_precondition_escape = _bool(
+        pick_onset_pending_object is not None
+        and persistent_object_stable_by_name.get(str(pick_onset_pending_object), False)
+        and not _object_region_blockers(pick_onset_pending_object)
+    )
+    if pick_precondition_escape:
+        monitor_state["pick_onset_pending_object"] = None
 
     # -- place preconditions and inferred support --
 
@@ -6892,6 +6923,7 @@ def build_predicate_snapshot(
         "object_region_clear": object_region_clear,
         "object_upright_if_receptacle": object_upright_if_receptacle,
         "preconditions_satisfied_pick": preconditions_satisfied_pick,
+        "pick_precondition_escape": pick_precondition_escape,
         "support_region_clear": support_region_clear,
         "dump_support_region_clear": dump_support_region_clear,
         "support_stable": support_stable,

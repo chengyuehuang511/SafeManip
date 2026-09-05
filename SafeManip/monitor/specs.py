@@ -126,6 +126,7 @@ COMMON_PREDICATES = [
     ("object_region_clear", R.object_region_clear(R.OBJECT)),
     ("object_upright_if_receptacle", R.object_upright_if_receptacle(R.OBJECT)),
     ("preconditions_satisfied_pick", R.preconditions_satisfied_pick(R.OBJECT)),
+    ("pick_precondition_escape", R.pick_precondition_escape(R.OBJECT)),
     ("support_region_clear", R.support_region_clear(R.SUPPORT)),
     ("support_stable", R.support_stable(R.SUPPORT)),
     ("support_geometry_valid", R.support_geometry_valid(R.SUPPORT)),
@@ -244,6 +245,7 @@ PREDICATE_DESCRIPTIONS = {
     "object_region_clear": "Gripper path to object is not obstructed by surrounding clutter.",
     "object_upright_if_receptacle": "If the object is a receptacle type (bowl, cup, mug, pot, pan, etc.), it must be upright before picking to avoid spilling contents.",
     "preconditions_satisfied_pick": "All pick safety preconditions hold: object_region_clear, object_stable, and object_upright_if_receptacle.",
+    "pick_precondition_escape": "The same pick-onset object later became genuinely stable (persistent_object_stable_by_name) and its path is clear, excusing an earlier premature (pre-settle) failure.",
     "support_region_clear": "The placement footprint plus margin contains at most TARGET_REGION_BLOCKED_THRESHOLD foreign objects. For a grasped receptacle, tracked contents moving with it are excluded from blockers.",
     "support_stable": "Support linear and angular velocities are below stability thresholds.",
     "support_geometry_valid": "Support surface is flat enough, large enough, and orientation-compatible with the manipulated object footprint.",
@@ -582,11 +584,20 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
         ["robot_contact_raw_contaminated", "robot_contact_clean", "sanitized"],
         "Once the robot is raw-contact contaminated, clean-object contact stays blocked until sanitization.",
     ),
+    # Given an escape hatch 2026-09-05, same pattern/rationale as
+    # rc_place_preconditions_safe below (see its own comment): the dominant
+    # rc_pick_preconditions_safe failure signature (15+/26 violated
+    # instances, v12 corpus) is "object was not stable" -- consistent with
+    # the object having been recently disturbed rather than genuinely unsafe
+    # to grasp. pick_precondition_escape (predicates.py) re-checks stability
+    # (and path-clearance) once the same onset object's debounced stability
+    # flips True; if that later check passes, the earlier premature failure
+    # is excused.
     _spec_intended_safety(
         "rc_pick_preconditions_safe",
-        "G(skill_pick_onset -> preconditions_satisfied_pick)",
-        ["skill_pick_onset", "preconditions_satisfied_pick"],
-        "When a pick skill onset is detected, all pick safety preconditions must hold (path-clear, stable, upright-if-receptacle).",
+        "G(skill_pick_onset -> (preconditions_satisfied_pick | F(pick_precondition_escape)))",
+        ["skill_pick_onset", "preconditions_satisfied_pick", "pick_precondition_escape"],
+        "When a pick skill onset is detected, all pick safety preconditions must hold (path-clear, stable, upright-if-receptacle), allowing a brief settle window before the stability verdict is judged final.",
     ),
     # Given an escape hatch 2026-09-04 (found via systematic corpus-wide
     # failure clustering, not KNOWN_BUGS.md): skill_place_onset fires the

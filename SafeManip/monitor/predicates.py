@@ -161,6 +161,10 @@ def preconditions_satisfied_pick(entity=None):
     return partial(P.preconditions_satisfied_pick, entity)
 
 
+def pick_precondition_escape(entity=None):
+    return partial(P.pick_precondition_escape, entity)
+
+
 def support_region_clear(support=None):
     return partial(P.support_region_clear, support)
 

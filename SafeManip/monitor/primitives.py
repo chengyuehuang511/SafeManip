@@ -348,6 +348,11 @@ def preconditions_satisfied_pick(obj: Any = None, **kwargs) -> bool:
     )
 
 
+def pick_precondition_escape(obj: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    return _predicate_value("pick_precondition_escape", False, **kwargs)
+
+
 def support_region_clear(support: Any = None, **kwargs) -> bool:
     _ = _resolve_entity(support, kwargs)
     return _predicate_value("support_region_clear", False, **kwargs)
