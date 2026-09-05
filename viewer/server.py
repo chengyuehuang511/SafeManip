@@ -433,7 +433,17 @@ for _prop_name, _entry in PROPERTY_META.items():
     # duplicate row alongside their real top-level one. Confirmed bug: was
     # showing "object_grasped"/"object_left_gripper" twice each in the
     # viewer before this was added.
-    _covered.add(_entry.get("escape"))
+    #
+    # The until-with-until-escape shape's "escape" is a dict (obligation/
+    # resolve/obligation_kind), not a bare atom name (unlike the instant-
+    # with-until-escape shape above) -- add its own obligation/resolve
+    # atoms individually instead of the dict itself.
+    _escape_value = _entry.get("escape")
+    if isinstance(_escape_value, dict):
+        _covered.add(_escape_value.get("obligation"))
+        _covered.add(_escape_value.get("resolve"))
+    else:
+        _covered.add(_escape_value)
     _covered.update(_entry.get("escape_guard_atoms") or [])
     _covered.discard(None)
     _extra = [p for p in _SPEC_PREDICATE_LISTS.get(_prop_name, []) if p not in _covered]
@@ -1075,32 +1085,59 @@ def compute_occurrences(meta, traces, active_object_by_frame, episode_last_frame
         # resolve's components, not on the timeout flag itself.
         reason_atom = meta["obligation"] if meta["obligation_kind"] == "hold_true" else meta["resolve"]
 
+        # Optional second "escape" until-clause (e.g.
+        # rc_released_object_eventually_settles's re-grasp escape) --
+        # resolves the occurrence via a completely separate obligation/
+        # resolve pair, independent of the primary branch above. An
+        # occurrence only stays "violated" on frames where *both* branches
+        # are simultaneously unresolved; either one resolving ends it.
+        escape_meta = meta.get("escape")
+        esc_obl_dict = {}
+        esc_res_dict = {}
+        esc_bad_value = False
+        if escape_meta:
+            esc_obl = traces.get(escape_meta["obligation"])
+            esc_res = traces.get(escape_meta["resolve"])
+            esc_obl_dict = dict(esc_obl) if esc_obl is not None else {}
+            esc_res_dict = dict(esc_res) if esc_res is not None else {}
+            esc_bad_value = escape_meta["obligation_kind"] != "hold_true"
+
         occurrences = []
         for i, start in enumerate(starts):
             next_start = starts[i + 1] if i + 1 < len(starts) else None
             search_end = (next_start - 1) if next_start is not None else episode_last_frame
             end_frame = None
+            end_reason = None
             for f in range(start, search_end + 1):
-                if res_dict.get(f) is True:
+                primary_resolved = res_dict.get(f) is True
+                escape_resolved = escape_meta is not None and esc_res_dict.get(f) is True
+                if primary_resolved or escape_resolved:
                     end_frame = f
+                    end_reason = (
+                        f"{meta['resolve']} became true" if primary_resolved
+                        else f"{escape_meta['resolve']} became true (escape)"
+                    )
                     break
-            # the frame `resolve` itself becomes true satisfies the U outright
-            # regardless of the obligation's value on that same frame, so it's
-            # excluded from the violation range (only frames strictly before
-            # resolution count) — otherwise the resolving frame itself gets
-            # misreported as a violation.
+            # the frame either resolve atom becomes true satisfies its own U
+            # outright regardless of either obligation's value on that same
+            # frame, so it's excluded from the violation range (only frames
+            # strictly before resolution count).
             violated_range_end = end_frame if end_frame is not None else search_end + 1
             violated = [
                 {"frame": f, "reasons": false_children(reason_atom, f)}
                 for f in range(start, violated_range_end)
                 if obl_dict.get(f) is bad_value
+                and (
+                    escape_meta is None
+                    or esc_obl_dict.get(f) is esc_bad_value
+                )
             ]
             occurrences.append({
                 "object": obj_at(start),
                 "activation": {"frame": start, "reason": f"{meta['trigger']} became true"},
                 "violated_frames": violated,
                 "end": (
-                    {"frame": end_frame, "resolved": True, "reason": f"{meta['resolve']} became true"}
+                    {"frame": end_frame, "resolved": True, "reason": end_reason}
                     if end_frame is not None else
                     {"frame": search_end, "resolved": False,
                      "reason": "never resolved — episode ended, or next occurrence started, first"}

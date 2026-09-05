@@ -65,6 +65,22 @@ _INSTANT_WITH_ESCAPE_RE = re.compile(r"^G\(\s*(\w+)\s*->\s*\(\s*(\w+)\s*\|\s*F\(
 _INSTANT_WITH_UNTIL_ESCAPE_RE = re.compile(
     r"^G\(\s*(\w+)\s*->\s*\(\s*(\w+)\s*\|\s*\(\s*!\s*\(?\s*([\w\s&]+?)\s*\)?\s*U\s*(\w+)\s*\)\s*\)\s*\)$"
 )
+# "until, with an until-shaped escape" -- e.g.
+# rc_released_object_eventually_settles's current main_ltl
+# "G(object_dropped -> (!release_object_settle_timeout U object_settled) |
+# (!object_left_gripper U object_grasped))": unlike _INSTANT_WITH_UNTIL_
+# ESCAPE_RE, the primary branch is itself an until (not a plain "check"
+# atom) -- the obligation must hold (guard_false-style, negated) until the
+# primary resolve fires, *or* a completely separate until-clause (the
+# re-grasp escape, same shape/purpose as rc_dropped_object_was_released's
+# own escape) resolves instead. Maps to the "until" pattern (server.py's
+# compute_occurrences already handles this correctly for the primary
+# branch alone), plus an "escape" sub-dict carrying the second until's own
+# obligation_kind/resolve so compute_occurrences can also check whether
+# *that* branch resolved before treating an occurrence as unresolved.
+_UNTIL_WITH_UNTIL_ESCAPE_RE = re.compile(
+    r"^G\(\s*(\w+)\s*->\s*\(\s*(!?)\s*(\w+)\s*U\s*(\w+)\s*\)\s*\|\s*\(\s*(!?)\s*(\w+)\s*U\s*(\w+)\s*\)\s*\)$"
+)
 
 
 def _collect_ltl_strings(tree) -> dict[str, str]:
@@ -107,6 +123,21 @@ def parse_ltl_shape(ltl: str) -> dict | None:
     m = _INVARIANT_RE.match(ltl)
     if m:
         return {"pattern": "invariant", "guard": m.group(1)}
+    m = _UNTIL_WITH_UNTIL_ESCAPE_RE.match(ltl)
+    if m:
+        trigger, neg, obligation, resolve, esc_neg, esc_obligation, esc_resolve = m.groups()
+        return {
+            "pattern": "until",
+            "trigger": trigger,
+            "obligation": obligation,
+            "obligation_kind": "guard_false" if neg == "!" else "hold_true",
+            "resolve": resolve,
+            "escape": {
+                "obligation": esc_obligation,
+                "obligation_kind": "guard_false" if esc_neg == "!" else "hold_true",
+                "resolve": esc_resolve,
+            },
+        }
     m = _WEAK_UNTIL_RE.match(ltl)
     if m:
         trigger, neg, obligation, resolve = m.groups()

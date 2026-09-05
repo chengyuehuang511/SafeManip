@@ -573,11 +573,29 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
         ["object_dropped", "object_released", "object_grasped", "object_left_gripper"],
         "Whenever a grasp ends, that must be an actual release (gripper opening or the object already settled), not an accidental loss of grasp.",
     ),
+    # Retargeted 2026-09-05 (explicit user decision) from object_released to
+    # object_dropped, with the same re-grasp escape rc_dropped_object_was_
+    # released already uses -- closes a real coverage gap: previously, a
+    # grasp-ending event that never qualified as a deliberate object_released
+    # (a genuine uncontrolled drop, not classified as a legitimate release)
+    # skipped this settle-check entirely, so we had zero information about
+    # whether that dropped object ever came to rest. object_dropped fires on
+    # every grasp-ending edge (deliberate release, accidental drop, or a raw
+    # one-frame contact-detection flicker), so the re-grasp escape
+    # (!object_left_gripper U object_grasped) is required here for the same
+    # reason rc_dropped_object_was_released needs it -- without it, every
+    # momentary flicker would spuriously open a settle-timeout race.
+    # Deliberately does NOT replace/merge with rc_dropped_object_was_released
+    # (which stays exactly as-is, same trigger, unrelated obligation) -- they
+    # ask genuinely different questions ("was this drop legitimate" vs. "does
+    # the world end up safe afterward") and evaluating them independently
+    # means an uncontrolled-but-harmless drop still gets correctly flagged
+    # by the other property even if this one is satisfied.
     _spec(
         "rc_released_object_eventually_settles",
-        "G(object_released -> (!release_object_settle_timeout U object_settled))",
-        ["object_released", "object_settled", "release_object_settle_timeout"],
-        "After release, the released object must become settled within SETTLE_TIMEOUT_FRAMES monitor frames.",
+        "G(object_dropped -> (!release_object_settle_timeout U object_settled) | (!object_left_gripper U object_grasped))",
+        ["object_dropped", "object_settled", "release_object_settle_timeout", "object_left_gripper", "object_grasped"],
+        "After a grasp ends (release, accidental drop, or flicker), either the object must become settled within SETTLE_TIMEOUT_FRAMES monitor frames, or the grasp must resume before the object ever really left the gripper.",
     ),
     _spec(
         "rc_raw_robot_contact_blocks_rte_grasp_until_sanitized",

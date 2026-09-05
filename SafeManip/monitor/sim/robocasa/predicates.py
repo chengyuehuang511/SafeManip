@@ -58,7 +58,25 @@ GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
 # 16x value.
 PERSISTENCE_FRAMES = 5
 FIXTURE_FULLY_OPEN_FRACTION = 0.90
-SETTLE_TIMEOUT_FRAMES = 100 #
+SETTLE_TIMEOUT_FRAMES = 100
+# Kept at 100 (2026-09-05, explicit user decision) despite real settle-
+# latency data showing a long tail past it (v14 corpus, 74 instances,
+# correctly attributed per-object-name via each violation's own release
+# frame and that object's own position/velocity trace: p50=25, p75=178,
+# p90=278, p95=317, p99=492 frames, no natural cluster/gap -- same shape as
+# FORBIDDEN_CONTACT_TOLERANCE_FRAMES/FIXTURE_RETRACT_REACTION_TOLERANCE_
+# FRAMES). Rather than raise this threshold, rc_released_object_eventually_
+# settles's trigger/obligation was redesigned instead (see its spec in
+# specs.py) to retarget from object_released to object_dropped with a
+# re-grasp escape -- addressing the underlying coverage gap (uncontrolled
+# drops that never qualified as object_released previously skipped this
+# check entirely) directly, rather than papering over slow-settle cases
+# with a larger timeout. 22% of previously-violated instances (16/74) never
+# genuinely settle at all within the recorded episode regardless (confirmed
+# via real position/velocity data, e.g. SearingMeat's pan visibly moving/
+# falling ~0.5m well past its nominal release frame with no second release
+# event ever firing -- real, ongoing physical disturbance during active
+# use, not a monitor mis-attribution bug) -- no timeout value fixes those.
 # Consolidated 2026-09-03: was 4 separate onset/approach-persistence
 # constants (SKILL_ONSET_FRAMES=2, PLACE_ONSET_FRAMES=1 [dead -- see
 # below], DUMP_ONSET_FRAMES=1, PICK_APPROACH_PERSISTENCE_FRAMES=2), all
@@ -2727,7 +2745,20 @@ def build_predicate_snapshot(
         )
     )
     awaiting_settle = _bool(monitor_state.get("awaiting_settle", False))
-    if object_released:
+    # Widened 2026-09-05 (explicit user decision, matching rc_released_
+    # object_eventually_settles' retargeted trigger in specs.py) from
+    # object_released to object_dropped: object_dropped fires on every
+    # grasp-ending edge for any reason (object_released is a strict subset,
+    # additionally requiring gripper-opening/settled evidence), so this
+    # naturally also starts watching for uncontrolled drops that never
+    # qualified as a deliberate release -- previously invisible to this
+    # settle-tracking entirely. A flicker-drop immediately followed by a
+    # re-grasp still starts this tracking (it isn't cancelled by re-
+    # grasping, only by object_settled/timeout below) -- harmless for the
+    # LTL classification itself, since the property's own re-grasp escape
+    # (!object_left_gripper U object_grasped) resolves the verdict
+    # correctly regardless of what this bookkeeping does in the background.
+    if object_dropped:
         awaiting_settle = True
         settle_watch_object = previous_active_object
         settle_watch_age = 0

@@ -1532,8 +1532,18 @@ def build_repeated_released_settle_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_released_object_eventually_settles",
-            main_ltl="G(object_released -> (!release_object_settle_timeout U object_settled))",
-            recovery_ltl="F(object_settled | release_object_settle_timeout)",
+            # Retargeted 2026-09-05 (explicit user decision, matching specs.py's
+            # own updated main_ltl) from object_released to object_dropped, with
+            # the same re-grasp escape rc_dropped_object_was_released already
+            # uses -- see specs.py's comment above this property for the full
+            # rationale (closes a coverage gap: uncontrolled drops that never
+            # qualified as a deliberate object_released previously skipped this
+            # settle-check entirely).
+            main_ltl=(
+                "G(object_dropped -> (!release_object_settle_timeout U object_settled) "
+                "| (!object_left_gripper U object_grasped))"
+            ),
+            recovery_ltl="F(object_settled | release_object_settle_timeout | object_grasped)",
             property_description=property_description,
             binding={},
             explanation_builder=_released_settle_explanation,
