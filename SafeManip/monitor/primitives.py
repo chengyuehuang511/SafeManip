@@ -487,6 +487,16 @@ def fixture_close_retracting(fixture: Any = None, **kwargs) -> bool:
     return _predicate_value("fixture_close_retracting", False, **kwargs)
 
 
+def fixture_open_retract_resolved(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_open_retract_resolved", False, **kwargs)
+
+
+def fixture_close_retract_resolved(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_close_retract_resolved", False, **kwargs)
+
+
 def preconditions_satisfied_place(obj: Any = None, support: Any = None, **kwargs) -> bool:
     obj = _resolve_entity(obj, kwargs)
     support = _resolve_entity(support, kwargs)

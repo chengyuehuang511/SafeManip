@@ -446,6 +446,79 @@ possible", "target the grasp-redesign's rate, but no shortcuts"), write it into 
 phase here in the same turn, before moving on to the next task -- don't wait for a natural
 stopping point.
 
+## Phase 4.7: corpus-wide violation-rate clustering as a bug-finding heuristic
+
+**Any `(task, property)` pair where all or nearly all independent episodes of that task violate
+the same property (e.g. 8/10, 10/10) is much more likely a systematic monitor bug than 10
+independently-arising real safety issues in 10 different human demonstrations.** Real safety
+problems in ground-truth demos are rare and vary episode to episode; a near-total rate for one
+specific task+property combination is a strong, cheap-to-compute signal to go looking for a bug
+before trusting the number as real. Confirmed this exact pattern surfacing 4 separate real bugs in
+one session (`_object_support_type_matches_any` missing a fixture-contact check entirely;
+`fixture_obstacle_contact` never excluding objects legitimately housed inside the active fixture;
+`fixture_{open,close}_retracting`'s self-contradicting definition, Phase 4.6's bucket 1; and the
+timeout-escape gap below).
+
+**How to run the scan:** glob every task's `*_monitor.json` in the corpus, group violations by
+`(task, property_name)`, count how many of that task's episodes (out of how many total) violated
+each property. Anything at or near the episode count (e.g. `>= 8/10`) is a candidate.
+
+```python
+import json, glob
+from collections import defaultdict
+tot, viol = defaultdict(int), defaultdict(int)
+for f in glob.glob(f"{corpus_dir}/*/privileged_information_*_monitor.json"):
+    task = f.split("/")[-2]
+    d = json.load(open(f))
+    tot[task] += 1
+    seen = set()
+    for v in d["violations"]:
+        pn = v.get("property_name", "")
+        if pn not in seen:
+            viol[(task, pn)] += 1
+            seen.add(pn)
+for (task, pn), n in sorted(viol.items()):
+    if n >= 8:
+        print(task, pn, n, "/", tot[task])
+```
+(Filter on `v.get("property_name")`, not a substring match against `v.get("ltl")` -- the raw LTL
+string for a property often doesn't literally contain the property's own name as a substring,
+e.g. `rc_fixture_close_obstacle_retract`'s `ltl` field contains `"obstacle_hit"` and
+`"retracting"` separately, never the joined string `"obstacle_retract"`. Confirmed this session:
+an initial scan silently returned zero matches everywhere because of exactly this mistake.)
+
+**Once a candidate is found, classify it by *where in the episode* the violation lands before
+assuming a single root cause** -- the same task+property pair can have more than one distinct bug
+contributing to the same headline number:
+- **Mid-episode, scattered across different frames per episode:** usually a signal-computation
+  false positive -- some predicate is reading `True` when it structurally shouldn't for a
+  specific, common scenario the corpus happens to exercise a lot. Confirmed this session:
+  `fixture_obstacle_contact` (mechanism_safety) counted *any* non-robot, non-fixture geom
+  touching the fixture as an obstacle, including objects the task deliberately places **inside**
+  the fixture itself (food in a microwave/oven, dishes in a dishwasher rack) -- those sit in
+  constant, legitimate contact with the fixture interior for the whole task, so any task whose
+  premise is "put things inside this appliance" (`HeatKebabSandwich`, `LoadDishwasher`,
+  `SteamInMicrowave`) hit this every single episode. Fix: exclude geoms belonging to objects
+  genuinely housed/supported by the active fixture (the same check `_fixture_retract_path_
+  blockers` already uses for a different purpose).
+- **The literal last frame of the episode, every time:** a finite-trace boundary artifact, not a
+  signal bug -- a bare `G(trigger -> (obligation U resolve))` with no escape means if `obligation`
+  holds continuously (the robot behaved correctly) but the episode simply ends before `resolve`
+  happens to become true, the DFA reads that as an unresolved "until" and reports a violation, even
+  though nothing ever actually went wrong. Confirmed this session:
+  `rc_fixture_{open,close}_obstacle_retract`'s target (`fixture_fully_{open,closed}`) requires the
+  fixture to be driven all the way back to the opposite extreme, but real demos routinely just
+  disengage from an obstacle and move on to the rest of the task without ever revisiting that
+  fixture -- median gap between the robot's last obstacle hit and episode end, across these cases,
+  was 133 frames of the robot doing something else entirely. Fix: same escape-hatch shape as
+  Phase 1's settle-timeout pattern -- add a bounded, age-counter-gated `..._resolved` predicate
+  (`fully_open/closed OR retracting has held continuously for N frames with no fresh trigger`) and
+  point the `U`'s resolve target at that instead of the bare extreme-position atom. Pick `N` from
+  real data the same way as any other frame-count constant (Phase 4.6 item 7) -- don't guess.
+- **A task can show both patterns at once for the same property** -- tally the mid-trace and
+  end-of-trace instances separately per `(task, property)` before concluding you've found "the"
+  bug; fixing one may leave the other's share of the count untouched.
+
 ## Phase 5: refine (when the user proposes a candidate, or you find a bug)
 
 - **Verify every new candidate the same way, from scratch** -- don't assume a variant "should"

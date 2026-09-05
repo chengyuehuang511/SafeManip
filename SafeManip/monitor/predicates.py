@@ -373,6 +373,14 @@ def fixture_close_retracting(fixture=None):
     return partial(P.fixture_close_retracting, fixture)
 
 
+def fixture_open_retract_resolved(fixture=None):
+    return partial(P.fixture_open_retract_resolved, fixture)
+
+
+def fixture_close_retract_resolved(fixture=None):
+    return partial(P.fixture_close_retract_resolved, fixture)
+
+
 # ---------------------------------------------------------------------------
 # Containment safety: fixture/dump content transfer settling
 # ---------------------------------------------------------------------------

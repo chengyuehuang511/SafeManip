@@ -137,6 +137,17 @@ FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 20
 # FORBIDDEN_CONTACT_TOLERANCE_FRAMES's own p90 policy choice for
 # consistency) -- an explicit tolerance decision, not a bug fix.
 FIXTURE_RETRACT_REACTION_TOLERANCE_FRAMES = 18
+# How many consecutive frames fixture_{open,close}_retracting must hold
+# (with no fresh obstacle hit) before the retract obligation counts as
+# resolved even if the fixture never actually reaches fully-{closed,open}
+# again. Found 2026-09-05 via systematic corpus-wide 10/10-violation
+# scanning: real demos routinely disengage safely and then simply move on
+# with the rest of the task, never revisiting the fixture to drive it all
+# the way back to the opposite extreme -- median observed gap between the
+# last obstacle hit and episode end, across genuinely-safe end-of-trace
+# cases, was 133 frames (p90 237; smallest 13). 100 matches
+# SETTLE_TIMEOUT_FRAMES for consistency and covers the corpus majority.
+FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES = 100
 REACH_THRESHOLD = 0.05
 TARGET_REGION_BLOCKED_THRESHOLD = 1
 PLACEMENT_MARGIN = 0.03
@@ -1442,6 +1453,40 @@ def build_predicate_snapshot(
         attrs = _object_attributes(str(name))
         if not bool(attrs & FOOD_TYPE_NAMES):
             return True
+        # Found via manual inspection of real positives (2026-09-05, not
+        # KNOWN_BUGS.md): this function only ever checked OTHER OBJECTS as
+        # possible supports, never fixtures at all -- unlike its sibling
+        # _object_supported_on_correct (right below), which correctly checks
+        # both. A food-type object resting directly on an ordinary fixture
+        # surface (a counter, shelf, cabinet interior -- e.g.
+        # CategorizeCondiments' condiments placed onto counters/cabinets, not
+        # into another object) could never satisfy this, so object_settled
+        # stayed permanently False even when the object was genuinely,
+        # visibly at rest (confirmed: object_supported_settle=True and
+        # object_stable_relative_settle=True holding continuously, only
+        # object_support_type_matches_any_settle stuck False). Added the
+        # missing fixture-contact check, mirroring _object_supported_on_
+        # correct's approach. Floor fixtures excluded -- the sibling
+        # _support_type_matches() (place preconditions) already treats floor
+        # support as invalid for any manipulated object, and a food item
+        # resting on the floor genuinely isn't "properly supported" just
+        # because *some* fixture contact exists.
+        for fixture_name in getattr(env, "fixtures", {}).keys():
+            fixture_name = str(fixture_name)
+            if _fixture_is_floor(fixture_name):
+                continue
+            try:
+                if OU.check_obj_fixture_contact(env, name, fixture_name):
+                    return True
+            except Exception:
+                pass
+            try:
+                if OU.obj_inside_of(env, name, fixture_name, partial_check=True):
+                    return True
+            except Exception:
+                pass
+            if _fixture_rack_contact(fixture_name, str(name)):
+                return True
         for support_name in getattr(env, "objects", {}).keys():
             support_name = str(support_name)
             if support_name == str(name):
@@ -6810,6 +6855,33 @@ def build_predicate_snapshot(
             elif _pg2 in _af_geom_ids_for_initial:
                 _af_initial_contact_geom_ids.add(_pg1)
 
+    # Objects genuinely housed inside/supported by the active fixture (e.g. the
+    # food item placed inside a microwave/oven/dishwasher for the task itself)
+    # are expected to be in continuous geom contact with it -- that contact is
+    # not an obstruction to the door/mechanism and must not count as an
+    # "obstacle hit".
+    _af_housed_object_geom_ids: set[int] = set()
+    if active_fixture_contact_name is not None:
+        for _oname in all_object_names:
+            _housed = False
+            try:
+                _housed = bool(
+                    OU.obj_inside_of(
+                        env, str(_oname), str(active_fixture_contact_name),
+                        partial_check=True,
+                    )
+                )
+            except Exception:
+                _housed = False
+            if not _housed:
+                _housed = _fixture_rack_contact(
+                    str(active_fixture_contact_name), str(_oname)
+                )
+            if _housed:
+                _af_housed_object_geom_ids.update(
+                    object_geom_ids_by_name.get(str(_oname), set())
+                )
+
     _fixture_obstacle_contact_raw = False
     _fixture_obstacle_geom_name: str | None = None
     if active_fixture_contact_name is not None:
@@ -6830,6 +6902,8 @@ def build_predicate_snapshot(
             if _other in _all_fixture_geom_ids:
                 continue
             if _other in _af_initial_contact_geom_ids:
+                continue
+            if _other in _af_housed_object_geom_ids:
                 continue
             _fixture_obstacle_contact_raw = True
             try:
@@ -6959,6 +7033,39 @@ def build_predicate_snapshot(
         )
     )
 
+    # fixture_open_retract_resolved / fixture_close_retract_resolved: gives
+    # rc_fixture_{open,close}_obstacle_retract's "until" a second, bounded
+    # way to resolve besides literally reaching fully-{closed,open} again --
+    # see FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES's own comment. Age resets
+    # to 0 the instant a fresh obstacle hit occurs or retracting itself
+    # drops (a genuine re-obstruction shouldn't count toward resolving the
+    # earlier one), and only accrues while retracting is holding cleanly.
+    fixture_open_retract_resolve_age = (
+        int(monitor_state.get("fixture_open_retract_resolve_age", 0)) + 1
+        if (fixture_open_retracting and not fixture_open_obstacle_hit)
+        else 0
+    )
+    monitor_state["fixture_open_retract_resolve_age"] = fixture_open_retract_resolve_age
+    fixture_close_retract_resolve_age = (
+        int(monitor_state.get("fixture_close_retract_resolve_age", 0)) + 1
+        if (fixture_close_retracting and not fixture_close_obstacle_hit)
+        else 0
+    )
+    monitor_state["fixture_close_retract_resolve_age"] = fixture_close_retract_resolve_age
+
+    fixture_open_retract_timeout = _bool(
+        fixture_open_retract_resolve_age >= FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES
+    )
+    fixture_close_retract_timeout = _bool(
+        fixture_close_retract_resolve_age >= FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES
+    )
+    fixture_open_retract_resolved = _bool(
+        fixture_fully_closed or fixture_open_retract_timeout
+    )
+    fixture_close_retract_resolved = _bool(
+        fixture_fully_open or fixture_close_retract_timeout
+    )
+
     predicates = {
         "forbidden_contact": forbidden_contact,
         "forbidden_contact_sustained": forbidden_contact_sustained,
@@ -7054,6 +7161,8 @@ def build_predicate_snapshot(
         "fixture_close_obstacle_hit": fixture_close_obstacle_hit,
         "fixture_open_retracting": fixture_open_retracting,
         "fixture_close_retracting": fixture_close_retracting,
+        "fixture_open_retract_resolved": fixture_open_retract_resolved,
+        "fixture_close_retract_resolved": fixture_close_retract_resolved,
         "containment_transfer_event": containment_transfer_event,
         "fixture_output_started": fixture_output_started,
         "fixture_output_stopped": fixture_output_stopped,

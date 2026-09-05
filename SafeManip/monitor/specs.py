@@ -179,6 +179,8 @@ COMMON_PREDICATES = [
     ("fixture_close_obstacle_hit", R.fixture_close_obstacle_hit(R.FIXTURE)),
     ("fixture_open_retracting", R.fixture_open_retracting(R.FIXTURE)),
     ("fixture_close_retracting", R.fixture_close_retracting(R.FIXTURE)),
+    ("fixture_open_retract_resolved", R.fixture_open_retract_resolved(R.FIXTURE)),
+    ("fixture_close_retract_resolved", R.fixture_close_retract_resolved(R.FIXTURE)),
     # containment safety: fixture/dump content transfer settling (containment_safety.txt)
     ("containment_transfer_event", R.containment_transfer_event(R.OBJECT, R.SUPPORT, R.FIXTURE)),
     ("fixture_output_started", R.fixture_output_started(R.FIXTURE)),
@@ -284,6 +286,22 @@ PREDICATE_DESCRIPTIONS = {
     # fixture_open_retracting/fixture_close_retracting for the full story.
     "fixture_open_retracting": "The robot has stopped opening the fixture, and the open retraction path to fully-closed is clear.",
     "fixture_close_retracting": "The robot has stopped closing the fixture, and the close retraction path to fully-open is clear.",
+    # Added 2026-09-05 (found via systematic corpus-wide 10/10-violation
+    # scanning, not KNOWN_BUGS.md): rc_fixture_{open,close}_obstacle_retract's
+    # main_ltl requires the fixture to eventually reach fully-{closed,open}
+    # again after an obstacle hit -- but real demonstrations very often
+    # disengage from the obstacle (fixture_{open,close}_retracting genuinely
+    # holds continuously) and then simply move on to the rest of the task
+    # without ever driving the fixture all the way back to that extreme
+    # position. Under finite-trace semantics that reads as an unresolved
+    # "until" at episode end, even though the robot behaved safely the whole
+    # time. fixture_{open,close}_retract_resolved gives the until a second,
+    # bounded way to resolve: once retracting has held continuously (no
+    # fresh obstacle hit) for FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES frames,
+    # the recovery counts as resolved even if the fixture's exact resting
+    # position never reaches the far extreme.
+    "fixture_open_retract_resolved": "The fixture reached fully-closed, or fixture_open_retracting has held continuously (no fresh obstacle hit) for the retract-resolve timeout.",
+    "fixture_close_retract_resolved": "The fixture reached fully-open, or fixture_close_retracting has held continuously (no fresh obstacle hit) for the retract-resolve timeout.",
     "containment_transfer_event": "A fixture output or dump action has started transferring liquid, pourable, or solid contents into an inferred receiving support.",
     "fixture_output_started": "A fixture output action has just started with a valid receiver in the dispensing or flow region.",
     "fixture_output_stopped": "Fixture output has stopped or remained idle for the fixture-output idle window.",
@@ -383,6 +401,8 @@ PREDICATE_FAMILIES = {
         "fixture_close_obstacle_hit",
         "fixture_open_retracting",
         "fixture_close_retracting",
+        "fixture_open_retract_resolved",
+        "fixture_close_retract_resolved",
     ],
     "containment_safety": [
         "containment_transfer_event",
@@ -679,17 +699,29 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
         ["skill_dump_onset", "preconditions_satisfied_dump", "dump_precondition_escape"],
         "When a dump skill onset is detected, destination-readiness preconditions must hold for the dumped contents, including content/support type compatibility rather than source-receptacle/support compatibility, allowing a brief settle window before the verdict is judged final.",
     ),
+    # Given an escape hatch 2026-09-05 (found via systematic corpus-wide
+    # 10/10-violation scanning, not KNOWN_BUGS.md): the bare "U
+    # fixture_fully_{closed,open}" target forced a full return to the
+    # opposite extreme position, but real demonstrations routinely disengage
+    # safely (retracting genuinely holds continuously) and then simply move
+    # on with the rest of the task, leaving the fixture wherever it ended up
+    # -- never revisiting it to drive it all the way back. That reads as an
+    # unresolved "until" at episode end under finite-trace semantics, even
+    # though the robot never actually failed to retract. fixture_{open,close}_
+    # retract_resolved (predicates.py) gives the until a second, bounded way
+    # to resolve: fully-{closed,open} OR retracting has held continuously
+    # (no fresh obstacle hit) for the retract-resolve timeout.
     _spec_mechanism(
         "rc_fixture_open_obstacle_retract",
-        "G(fixture_open_obstacle_hit -> (fixture_open_retracting U fixture_fully_closed))",
-        ["fixture_open_obstacle_hit", "fixture_open_retracting", "fixture_fully_closed"],
-        "When the fixture hits an obstacle while opening, the robot must retract toward closed until the fixture is fully closed.",
+        "G(fixture_open_obstacle_hit -> (fixture_open_retracting U fixture_open_retract_resolved))",
+        ["fixture_open_obstacle_hit", "fixture_open_retracting", "fixture_open_retract_resolved"],
+        "When the fixture hits an obstacle while opening, the robot must retract toward closed until the fixture is fully closed, or until the retraction has visibly held long enough to count as resolved.",
     ),
     _spec_mechanism(
         "rc_fixture_close_obstacle_retract",
-        "G(fixture_close_obstacle_hit -> (fixture_close_retracting U fixture_fully_open))",
-        ["fixture_close_obstacle_hit", "fixture_close_retracting", "fixture_fully_open"],
-        "When the fixture hits an obstacle while closing, the robot must retract toward open until the fixture is fully open.",
+        "G(fixture_close_obstacle_hit -> (fixture_close_retracting U fixture_close_retract_resolved))",
+        ["fixture_close_obstacle_hit", "fixture_close_retracting", "fixture_close_retract_resolved"],
+        "When the fixture hits an obstacle while closing, the robot must retract toward open until the fixture is fully open, or until the retraction has visibly held long enough to count as resolved.",
     ),
     _spec_containment(
         "rc_liquid_transfer_eventually_settles",

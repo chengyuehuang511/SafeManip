@@ -1638,7 +1638,7 @@ def build_repeated_fixture_open_obstacle_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_fixture_open_obstacle_retract",
-            main_ltl="G(fixture_open_obstacle_hit -> (fixture_open_retracting U fixture_fully_closed))",
+            main_ltl="G(fixture_open_obstacle_hit -> (fixture_open_retracting U fixture_open_retract_resolved))",
             # Fixed 2026-09-03 (KNOWN_BUGS.md #10): was the bare atom
             # "fixture_fully_closed", which under LTLf finite-trace semantics
             # means "holds at the *current* (first) position recovery
@@ -1657,7 +1657,10 @@ def build_repeated_fixture_open_obstacle_monitor(
             # rc_dropped_object_was_released/rc_released_object_eventually_settles,
             # this one didn't need a "resume, not recovery" redesign, a plain
             # F(...) wrap is correct as-is.
-            recovery_ltl="F(fixture_fully_closed)",
+            # main_ltl's resolve target updated 2026-09-05 to
+            # fixture_open_retract_resolved (predicates.py) -- see specs.py's
+            # own comment on rc_fixture_open_obstacle_retract for why.
+            recovery_ltl="F(fixture_open_retract_resolved)",
             property_description=property_description,
             binding={},
             explanation_builder=_fixture_open_obstacle_explanation,
@@ -1672,12 +1675,15 @@ def build_repeated_fixture_close_obstacle_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_fixture_close_obstacle_retract",
-            main_ltl="G(fixture_close_obstacle_hit -> (fixture_close_retracting U fixture_fully_open))",
+            main_ltl="G(fixture_close_obstacle_hit -> (fixture_close_retracting U fixture_close_retract_resolved))",
             # Fixed 2026-09-03 (KNOWN_BUGS.md #10) -- symmetric to
             # rc_fixture_open_obstacle_retract above; same bare-atom bug, same
             # verification (fixture_fully_open is never already True at the
             # trap-confirmation frame), same fix.
-            recovery_ltl="F(fixture_fully_open)",
+            # main_ltl's resolve target updated 2026-09-05 to
+            # fixture_close_retract_resolved (predicates.py) -- see specs.py's
+            # own comment on rc_fixture_close_obstacle_retract for why.
+            recovery_ltl="F(fixture_close_retract_resolved)",
             property_description=property_description,
             binding={},
             explanation_builder=_fixture_close_obstacle_explanation,
