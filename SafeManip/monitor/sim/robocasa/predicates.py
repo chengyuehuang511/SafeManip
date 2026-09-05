@@ -5163,6 +5163,26 @@ def build_predicate_snapshot(
             return _fixture_closed(fname) and _heat_contents_ready(
                 contents, {"microwavable", "food"}
             )
+        # "toaster" checked before "oven" -- found via systematic corpus-wide
+        # failure clustering, not KNOWN_BUGS.md: a "ToasterOven" fixture's
+        # class name contains both substrings ("toasteroven"), so this used
+        # to always fall into the oven branch (its stricter, closed-door-
+        # requiring 2-attr check) regardless of whether the fixture was
+        # actually a plain oven or a combined toaster oven. Confirmed via
+        # _fixture_ready_failure_reason (the explanation-text builder a few
+        # lines below in this file) already checking "toaster" before "oven"
+        # for this exact reason -- the two implementations disagreed on
+        # which branch a ToasterOven takes, producing a genuinely
+        # inconsistent verdict-vs-explanation-text pair (confirmed on
+        # HeatKebabSandwich's toaster_oven_main_group: real content
+        # attributes computed directly showed kebab/baguette both have
+        # "food"/"cookable", which should satisfy the toaster's own 4-attr
+        # check, but the mis-ordered oven branch fired instead and
+        # additionally required the door to be closed).
+        if "toaster" in fclass:
+            return _heat_contents_ready(
+                contents, {"toastable", "bread_food", "cookable", "food"}
+            )
         if "oven" in fclass:
             return _fixture_closed(fname) and _heat_contents_ready(
                 contents, {"cookable", "food"}
@@ -5177,10 +5197,6 @@ def build_predicate_snapshot(
             state = _fixture_state(fname)
             return not contents or _state_bool(
                 state, "lid_on_blender", "lid_closed", default=True
-            )
-        if "toaster" in fclass:
-            return _heat_contents_ready(
-                contents, {"toastable", "bread_food", "cookable", "food"}
             )
         return True
 
@@ -5229,13 +5245,18 @@ def build_predicate_snapshot(
             contents = _objects_at_fixture(fname)
             if "stove" in fclass:
                 return _stove_contents_ready(contents)
-            if "oven" in fclass:
-                return _fixture_closed(fname) and _heat_contents_ready(
-                    contents, {"cookable", "food"}
-                )
+            # "toaster" checked before "oven" -- same fixed ordering bug as
+            # _fixture_ready_for_press above (see its own comment for the
+            # full rationale): a "ToasterOven" fixture's class name contains
+            # both substrings, so this used to always take the oven branch
+            # regardless of the fixture's real type.
             if "toaster" in fclass:
                 return _heat_contents_ready(
                     contents, {"toastable", "bread_food", "cookable", "food"}
+                )
+            if "oven" in fclass:
+                return _fixture_closed(fname) and _heat_contents_ready(
+                    contents, {"cookable", "food"}
                 )
             return _bool("mixer" in fclass)
         return False
