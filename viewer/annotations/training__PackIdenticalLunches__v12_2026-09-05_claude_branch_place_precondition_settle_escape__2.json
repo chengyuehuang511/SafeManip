@@ -1,0 +1,1153 @@
+{
+  "violations": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 50,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 50,
+                  "video_frame": 400,
+                  "time_s": 40.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 50,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 50,
+                  "video_frame": 400,
+                  "time_s": 40.0
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 450,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 450,
+                  "video_frame": 3600,
+                  "time_s": 360.0
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 450,
+                  "reasons": [
+                    "object_region_clear"
+                  ],
+                  "marker": {
+                    "monitor_frame": 450,
+                    "video_frame": 3600,
+                    "time_s": 360.0
+                  },
+                  "reason_labels": [
+                    "object region clear"
+                  ]
+                }
+              ],
+              "end": {
+                "frame": 450,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 450,
+                  "video_frame": 3600,
+                  "time_s": 360.0
+                }
+              }
+            },
+            {
+              "object": "mushroom",
+              "activation": {
+                "frame": 879,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 879,
+                  "video_frame": 7032,
+                  "time_s": 703.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 879,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 879,
+                  "video_frame": 7032,
+                  "time_s": 703.2
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 1278,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1278,
+                  "video_frame": 10224,
+                  "time_s": 1022.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1278,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1278,
+                  "video_frame": 10224,
+                  "time_s": 1022.4
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 67,
+                "reason": "robot_contact_raw_contaminated became true",
+                "marker": {
+                  "monitor_frame": 67,
+                  "video_frame": 536,
+                  "time_s": 53.6
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 1290,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 1290,
+                    "video_frame": 10320,
+                    "time_s": 1032.0
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 1573,
+                "resolved": false,
+                "reason": "never resolved \u2014 episode ended, or next occurrence started, first",
+                "marker": {
+                  "monitor_frame": 1573,
+                  "video_frame": 12584,
+                  "time_s": 1258.4
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "2": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 267,
+                "reason": "object_released became true",
+                "marker": {
+                  "monitor_frame": 267,
+                  "video_frame": 2136,
+                  "time_s": 213.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 278,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 278,
+                  "video_frame": 2224,
+                  "time_s": 222.4
+                }
+              }
+            },
+            {
+              "object": "mushroom",
+              "activation": {
+                "frame": 663,
+                "reason": "object_released became true",
+                "marker": {
+                  "monitor_frame": 663,
+                  "video_frame": 5304,
+                  "time_s": 530.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 673,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 673,
+                  "video_frame": 5384,
+                  "time_s": 538.4
+                }
+              }
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 910,
+                "reason": "object_released became true",
+                "marker": {
+                  "monitor_frame": 910,
+                  "video_frame": 7280,
+                  "time_s": 728.0
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 1010,
+                  "reasons": [
+                    "object_supported_settle",
+                    "object_support_type_matches_any_settle",
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 1010,
+                    "video_frame": 8080,
+                    "time_s": 808.0
+                  },
+                  "reason_labels": [
+                    "object supported settle",
+                    "object support type matches any settle",
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                }
+              ],
+              "end": {
+                "frame": 1097,
+                "resolved": false,
+                "reason": "never resolved \u2014 episode ended, or next occurrence started, first",
+                "marker": {
+                  "monitor_frame": 1097,
+                  "video_frame": 8776,
+                  "time_s": 877.6
+                }
+              }
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 1098,
+                "reason": "object_released became true",
+                "marker": {
+                  "monitor_frame": 1098,
+                  "video_frame": 8784,
+                  "time_s": 878.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1107,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 1107,
+                  "video_frame": 8856,
+                  "time_s": 885.6
+                }
+              }
+            },
+            {
+              "object": "mushroom",
+              "activation": {
+                "frame": 1534,
+                "reason": "object_released became true",
+                "marker": {
+                  "monitor_frame": 1534,
+                  "video_frame": 12272,
+                  "time_s": 1227.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1548,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 1548,
+                  "video_frame": 12384,
+                  "time_s": 1238.4
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "satisfied": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 267,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 267,
+                  "video_frame": 2136,
+                  "time_s": 213.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 267,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 267,
+                  "video_frame": 2136,
+                  "time_s": 213.6
+                }
+              },
+              "eventual_separation": {
+                "frame": 268,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 268,
+                  "video_frame": 2144,
+                  "time_s": 214.4
+                }
+              }
+            },
+            {
+              "object": "mushroom",
+              "activation": {
+                "frame": 663,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 663,
+                  "video_frame": 5304,
+                  "time_s": 530.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 663,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 663,
+                  "video_frame": 5304,
+                  "time_s": 530.4
+                }
+              },
+              "eventual_separation": {
+                "frame": 669,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 669,
+                  "video_frame": 5352,
+                  "time_s": 535.2
+                }
+              }
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 910,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 910,
+                  "video_frame": 7280,
+                  "time_s": 728.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 910,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 910,
+                  "video_frame": 7280,
+                  "time_s": 728.0
+                }
+              },
+              "eventual_separation": {
+                "frame": 1103,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 1103,
+                  "video_frame": 8824,
+                  "time_s": 882.4
+                }
+              }
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 1098,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1098,
+                  "video_frame": 8784,
+                  "time_s": 878.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1098,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1098,
+                  "video_frame": 8784,
+                  "time_s": 878.4
+                }
+              },
+              "eventual_separation": {
+                "frame": 1103,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 1103,
+                  "video_frame": 8824,
+                  "time_s": 882.4
+                }
+              }
+            },
+            {
+              "object": "mushroom",
+              "activation": {
+                "frame": 1534,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1534,
+                  "video_frame": 12272,
+                  "time_s": 1227.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1534,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1534,
+                  "video_frame": 12272,
+                  "time_s": 1227.2
+                }
+              },
+              "eventual_separation": {
+                "frame": 1547,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 1547,
+                  "video_frame": 12376,
+                  "time_s": 1237.6
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "2": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "3": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "4": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "5": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 67,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 67,
+                  "video_frame": 536,
+                  "time_s": 53.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 267,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 267,
+                  "video_frame": 2136,
+                  "time_s": 213.6
+                }
+              }
+            },
+            {
+              "object": "mushroom",
+              "activation": {
+                "frame": 485,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 485,
+                  "video_frame": 3880,
+                  "time_s": 388.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 663,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 663,
+                  "video_frame": 5304,
+                  "time_s": 530.4
+                }
+              }
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 903,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 903,
+                  "video_frame": 7224,
+                  "time_s": 722.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 910,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 910,
+                  "video_frame": 7280,
+                  "time_s": 728.0
+                }
+              }
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 917,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 917,
+                  "video_frame": 7336,
+                  "time_s": 733.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1098,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 1098,
+                  "video_frame": 8784,
+                  "time_s": 878.4
+                }
+              }
+            },
+            {
+              "object": "mushroom",
+              "activation": {
+                "frame": 1298,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 1298,
+                  "video_frame": 10384,
+                  "time_s": 1038.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1534,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 1534,
+                  "video_frame": 12272,
+                  "time_s": 1227.2
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "6": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "7": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "8": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "invariant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "9": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 378,
+                "reason": "skill_open_close_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 378,
+                  "video_frame": 3024,
+                  "time_s": 302.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 378,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 378,
+                  "video_frame": 3024,
+                  "time_s": 302.4
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "mushroom",
+              "activation": {
+                "frame": 775,
+                "reason": "skill_open_close_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 775,
+                  "video_frame": 6200,
+                  "time_s": 620.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 775,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 775,
+                  "video_frame": 6200,
+                  "time_s": 620.0
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 1193,
+                "reason": "skill_open_close_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1193,
+                  "video_frame": 9544,
+                  "time_s": 954.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1193,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1193,
+                  "video_frame": 9544,
+                  "time_s": 954.4
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "10": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 267,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 267,
+                  "video_frame": 2136,
+                  "time_s": 213.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 267,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 267,
+                  "video_frame": 2136,
+                  "time_s": 213.6
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "mushroom",
+              "activation": {
+                "frame": 663,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 663,
+                  "video_frame": 5304,
+                  "time_s": 530.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 663,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 663,
+                  "video_frame": 5304,
+                  "time_s": 530.4
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 910,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 910,
+                  "video_frame": 7280,
+                  "time_s": 728.0
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 910,
+                  "reasons": [
+                    "support_objects_clean_for_manipulated_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 910,
+                    "video_frame": 7280,
+                    "time_s": 728.0
+                  },
+                  "reason_labels": [
+                    "support objects clean for manipulated object"
+                  ]
+                }
+              ],
+              "end": {
+                "frame": 910,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 910,
+                  "video_frame": 7280,
+                  "time_s": 728.0
+                }
+              }
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 1098,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1098,
+                  "video_frame": 8784,
+                  "time_s": 878.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1098,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1098,
+                  "video_frame": 8784,
+                  "time_s": 878.4
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "mushroom",
+              "activation": {
+                "frame": 1534,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1534,
+                  "video_frame": 12272,
+                  "time_s": 1227.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1534,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1534,
+                  "video_frame": 12272,
+                  "time_s": 1227.2
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "11": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "12": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 27,
+                "reason": "reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 27,
+                  "video_frame": 216,
+                  "time_s": 21.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 27,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 27,
+                  "video_frame": 216,
+                  "time_s": 21.6
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 440,
+                "reason": "reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 440,
+                  "video_frame": 3520,
+                  "time_s": 352.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 440,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 440,
+                  "video_frame": 3520,
+                  "time_s": 352.0
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "mushroom",
+              "activation": {
+                "frame": 866,
+                "reason": "reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 866,
+                  "video_frame": 6928,
+                  "time_s": 692.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 866,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 866,
+                  "video_frame": 6928,
+                  "time_s": 692.8
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "steak",
+              "activation": {
+                "frame": 1263,
+                "reason": "reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1263,
+                  "video_frame": 10104,
+                  "time_s": 1010.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1263,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1263,
+                  "video_frame": 10104,
+                  "time_s": 1010.4
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "13": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "14": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "15": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "16": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "missed_notes": "",
+  "overall_verdict": null
+}
