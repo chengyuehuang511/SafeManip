@@ -163,6 +163,7 @@ COMMON_PREDICATES = [
     ("preconditions_satisfied_twist", R.preconditions_satisfied_twist(R.FIXTURE)),
     ("preconditions_satisfied_open_close", R.preconditions_satisfied_open_close(R.FIXTURE)),
     ("preconditions_satisfied_dump", R.preconditions_satisfied_dump(R.OBJECT, R.SUPPORT)),
+    ("dump_precondition_escape", R.dump_precondition_escape(R.OBJECT, R.SUPPORT)),
     # mechanism safety: fixture open/close obstacle recovery (mechanism_safety.txt)
     ("robot_fixture_contact", R.robot_fixture_contact(R.FIXTURE)),
     ("fixture_is_opening", R.fixture_is_opening(R.FIXTURE)),
@@ -646,11 +647,19 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
         ["skill_open_close_onset", "preconditions_satisfied_open_close"],
         "When an open/close skill onset is detected, all open/close safety preconditions must hold (target path clear, target stable, and articulation path clear).",
     ),
+    # Given an escape hatch 2026-09-05, same pattern/rationale as
+    # rc_place_preconditions_safe/rc_pick_preconditions_safe (see their own
+    # comments): confirmed corpus-wide (PanTransfer) that the dump-support
+    # inference can read the content's own container as its support (a
+    # nonsensical self-referential reading) at the raw onset instant, before
+    # the transferred content has actually landed. dump_precondition_escape
+    # (predicates.py) re-checks once every latched content name is
+    # independently stable and the full precondition aggregate re-passes.
     _spec_intended_safety(
         "rc_dump_preconditions_safe",
-        "G(skill_dump_onset -> preconditions_satisfied_dump)",
-        ["skill_dump_onset", "preconditions_satisfied_dump"],
-        "When a dump skill onset is detected, destination-readiness preconditions must hold for the dumped contents, including content/support type compatibility rather than source-receptacle/support compatibility.",
+        "G(skill_dump_onset -> (preconditions_satisfied_dump | F(dump_precondition_escape)))",
+        ["skill_dump_onset", "preconditions_satisfied_dump", "dump_precondition_escape"],
+        "When a dump skill onset is detected, destination-readiness preconditions must hold for the dumped contents, including content/support type compatibility rather than source-receptacle/support compatibility, allowing a brief settle window before the verdict is judged final.",
     ),
     _spec_mechanism(
         "rc_fixture_open_obstacle_retract",

@@ -661,6 +661,12 @@ def preconditions_satisfied_dump(obj: Any = None, support: Any = None, **kwargs)
     )
 
 
+def dump_precondition_escape(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    support = _resolve_entity(support, kwargs)
+    return _predicate_value("dump_precondition_escape", False, **kwargs)
+
+
 # ---------------------------------------------------------------------------
 # Containment safety: fixture/dump content transfer settling
 # ---------------------------------------------------------------------------

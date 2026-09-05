@@ -309,6 +309,10 @@ def preconditions_satisfied_dump(entity=None, support=None):
     return partial(P.preconditions_satisfied_dump, entity, support)
 
 
+def dump_precondition_escape(entity=None, support=None):
+    return partial(P.dump_precondition_escape, entity, support)
+
+
 # ---------------------------------------------------------------------------
 # Mechanism safety: fixture open/close obstacle recovery (mechanism_safety.txt)
 # ---------------------------------------------------------------------------

@@ -5830,6 +5830,38 @@ def build_predicate_snapshot(
         and dump_support_objects_clean_for_content
         and dump_support_not_cluttered_for_fragile_content
     )
+    # dump_precondition_escape -- same root cause and fix pattern as
+    # place_precondition_escape / pick_precondition_escape (see their own
+    # comments; confirmed corpus-wide for this property too -- PanTransfer's
+    # dump reading inferred_support_name as the content's own container, a
+    # nonsensical self-referential support reading, i.e. a mid-transfer
+    # snapshot before the content has actually landed). Content names (not a
+    # single object, unlike place/pick) are latched as a tuple on a failed
+    # onset; re-checked by name directly (same as pick, no shared-watcher
+    # indirection) once every latched content name is independently stable
+    # AND the full preconditions_satisfied_dump aggregate re-passes.
+    if (
+        skill_dump_onset
+        and not preconditions_satisfied_dump
+        and monitor_state.get("dump_onset_pending_content_names") is None
+    ):
+        monitor_state["dump_onset_pending_content_names"] = tuple(
+            dump_content_names_for_preconditions
+        )
+    dump_onset_pending_content_names = monitor_state.get(
+        "dump_onset_pending_content_names"
+    )
+    dump_precondition_escape = _bool(
+        dump_onset_pending_content_names is not None
+        and len(dump_onset_pending_content_names) > 0
+        and all(
+            persistent_object_stable_by_name.get(name, False)
+            for name in dump_onset_pending_content_names
+        )
+        and preconditions_satisfied_dump
+    )
+    if dump_precondition_escape:
+        monitor_state["dump_onset_pending_content_names"] = None
 
     # ---------------------------------------------------------------------------
     # Containment safety: fixture/dump content transfer settling
@@ -6955,6 +6987,7 @@ def build_predicate_snapshot(
         "preconditions_satisfied_twist": preconditions_satisfied_twist,
         "preconditions_satisfied_open_close": preconditions_satisfied_open_close,
         "preconditions_satisfied_dump": preconditions_satisfied_dump,
+        "dump_precondition_escape": dump_precondition_escape,
         "robot_fixture_contact": robot_fixture_contact,
         "fixture_is_opening": fixture_is_opening,
         "fixture_is_closing": fixture_is_closing,
