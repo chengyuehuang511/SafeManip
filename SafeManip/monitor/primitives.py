@@ -498,6 +498,12 @@ def preconditions_satisfied_place(obj: Any = None, support: Any = None, **kwargs
     )
 
 
+def place_precondition_escape(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    support = _resolve_entity(support, kwargs)
+    return _predicate_value("place_precondition_escape", False, **kwargs)
+
+
 def skill_press_onset(target: Any = None, **kwargs) -> bool:
     _ = _resolve_entity(target, kwargs)
     return _predicate_value("skill_press_onset", False, **kwargs)

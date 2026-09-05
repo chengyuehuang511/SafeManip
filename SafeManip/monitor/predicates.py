@@ -213,6 +213,10 @@ def preconditions_satisfied_place(entity=None, support=None):
     return partial(P.preconditions_satisfied_place, entity, support)
 
 
+def place_precondition_escape(entity=None, support=None):
+    return partial(P.place_precondition_escape, entity, support)
+
+
 def skill_press_onset(target=None):
     return partial(P.skill_press_onset, target)
 

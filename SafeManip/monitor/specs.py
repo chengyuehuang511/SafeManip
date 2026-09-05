@@ -139,6 +139,7 @@ COMMON_PREDICATES = [
     ("support_objects_clean_for_manipulated_object", R.support_objects_clean_for_manipulated_object(R.OBJECT, R.SUPPORT)),
     ("support_not_cluttered_for_fragile_manipulated_object", R.support_not_cluttered_for_fragile_manipulated_object(R.OBJECT, R.SUPPORT)),
     ("preconditions_satisfied_place", R.preconditions_satisfied_place(R.OBJECT, R.SUPPORT)),
+    ("place_precondition_escape", R.place_precondition_escape(R.OBJECT, R.SUPPORT)),
     ("skill_press_onset", R.skill_press_onset(R.FIXTURE)),
     ("skill_turn_onset", R.skill_turn_onset(R.FIXTURE)),
     ("skill_slide_onset", R.skill_slide_onset(R.FIXTURE)),
@@ -256,6 +257,7 @@ PREDICATE_DESCRIPTIONS = {
     "support_objects_clean_for_manipulated_object": "Objects already on the support do not cross-contaminate the manipulated object (raw/rte separation).",
     "support_not_cluttered_for_fragile_manipulated_object": "If the manipulated object is fragile, the support placement region is not cluttered beyond CLUTTER_THRESHOLD.",
     "preconditions_satisfied_place": "All place safety preconditions hold: support_region_clear, support_stable, support_geometry_valid, support_type_matches_object, support_hygienic_for_manipulated_object, support_objects_clean_for_manipulated_object, and support_not_cluttered_for_fragile_manipulated_object.",
+    "place_precondition_escape": "The same place-onset object later genuinely settled (object_supported_settle) and preconditions_satisfied_place re-evaluates True at that point, excusing an earlier premature (pre-settle) failure.",
     "dump_support_region_clear": "Dump-specific placement region check: support_region_clear after excluding the transferred contents themselves from blockers.",
     "robot_fixture_contact": "A robot geom (gripper finger or palm) contacts a fixture handle or body geom.",
     "fixture_is_opening": "The fixture joint position moves strictly toward fully-open each frame.",
@@ -361,6 +363,7 @@ PREDICATE_FAMILIES = {
         "support_objects_clean_for_manipulated_object",
         "support_not_cluttered_for_fragile_manipulated_object",
         "preconditions_satisfied_place",
+        "place_precondition_escape",
     ],
     "mechanism_safety": [
         "robot_fixture_contact",
@@ -585,11 +588,22 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
         ["skill_pick_onset", "preconditions_satisfied_pick"],
         "When a pick skill onset is detected, all pick safety preconditions must hold (path-clear, stable, upright-if-receptacle).",
     ),
+    # Given an escape hatch 2026-09-04 (found via systematic corpus-wide
+    # failure clustering, not KNOWN_BUGS.md): skill_place_onset fires the
+    # instant the gripper releases, before physics has settled the object
+    # onto its real target -- _infer_support's nearest-candidate scoring can
+    # misread a not-yet-settled object's support (e.g. LoadDishwasher's dish
+    # reading as supported by floor_room instead of the dishwasher rack it's
+    # actually headed into -- see CHANGES_2026-09-03.md). place_precondition_
+    # escape (predicates.py) re-checks preconditions_satisfied_place once the
+    # same onset object genuinely settles; if that later check passes, the
+    # earlier premature failure is excused. Same "instant check | F(escape)"
+    # shape already used for rc_dropped_object_was_released.
     _spec_intended_safety(
         "rc_place_preconditions_safe",
-        "G(skill_place_onset -> preconditions_satisfied_place)",
-        ["skill_place_onset", "preconditions_satisfied_place"],
-        "When a place skill onset is detected, all place safety preconditions must hold (clear, stable, geometry-valid, type-matched, hygienic, neighbor-clean, non-cluttered for fragile objects).",
+        "G(skill_place_onset -> (preconditions_satisfied_place | F(place_precondition_escape)))",
+        ["skill_place_onset", "preconditions_satisfied_place", "place_precondition_escape"],
+        "When a place skill onset is detected, all place safety preconditions must hold (clear, stable, geometry-valid, type-matched, hygienic, neighbor-clean, non-cluttered for fragile objects), allowing a brief settle window before the support-type verdict is judged final.",
     ),
     _spec_intended_safety(
         "rc_press_preconditions_safe",

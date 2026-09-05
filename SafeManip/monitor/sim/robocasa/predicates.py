@@ -4039,6 +4039,49 @@ def build_predicate_snapshot(
         and support_objects_clean_for_manipulated_object
         and support_not_cluttered_for_fragile_manipulated_object
     )
+    # place_precondition_escape -- found via systematic corpus-wide failure
+    # clustering (not KNOWN_BUGS.md): skill_place_onset fires the instant
+    # object_released becomes true, before physics has actually settled the
+    # object onto its real target (_infer_support's nearest-candidate
+    # scoring can misread a not-yet-settled object's support as something
+    # nonsensical, e.g. LoadDishwasher's dish reading as supported by
+    # floor_room instead of the dishwasher rack it's actually headed into --
+    # see CHANGES_2026-09-03.md). Rather than change *when* skill_place_onset
+    # fires (a bigger, riskier timing redesign touching every place-related
+    # consumer of that predicate), this gives the onset's own obligation an
+    # escape hatch, using the exact same "instant check | F(escape)" LTL
+    # shape already used for rc_dropped_object_was_released: if preconditions
+    # failed at the raw onset instant, but the SAME onset object later
+    # becomes genuinely settled (object_supported_settle) AND preconditions_
+    # satisfied_place re-evaluates True at that point (using the now-correct,
+    # settled support reading), the obligation is retroactively excused.
+    #
+    # IMPORTANT: only latch a *failed* onset, and only if nothing is already
+    # pending. The LTLf "check | F(escape)" shape's F(escape) is global, not
+    # scoped to which trigger occurrence opened it -- confirmed the hard way
+    # (2026-09-04): an earlier version latched on *every* onset unconditionally,
+    # so a later, unrelated, cleanly-successful placement (e.g. lemon_wedge)
+    # could retroactively excuse an earlier, genuinely-failed one (e.g.
+    # ice_bowl's real over-cluttered-support violation) just by both objects
+    # sharing the same monitor_state slot. Only setting the pending object when
+    # the check actually failed -- and refusing to overwrite an unresolved one
+    # -- means escape can only ever fire for the placement that's actually
+    # still open, not a coincidentally-later-successful unrelated one.
+    if (
+        skill_place_onset
+        and not preconditions_satisfied_place
+        and monitor_state.get("place_onset_pending_object") is None
+    ):
+        monitor_state["place_onset_pending_object"] = place_onset_object
+    place_onset_pending_object = monitor_state.get("place_onset_pending_object")
+    place_precondition_escape = _bool(
+        place_onset_pending_object is not None
+        and settle_obj_name == place_onset_pending_object
+        and object_supported_settle
+        and preconditions_satisfied_place
+    )
+    if place_precondition_escape:
+        monitor_state["place_onset_pending_object"] = None
 
     # -- non-pick/place intended-safety preconditions --
 
@@ -6863,6 +6906,7 @@ def build_predicate_snapshot(
         "support_objects_clean_for_manipulated_object": support_objects_clean_for_manipulated_object,
         "support_not_cluttered_for_fragile_manipulated_object": support_not_cluttered_for_fragile_manipulated_object,
         "preconditions_satisfied_place": preconditions_satisfied_place,
+        "place_precondition_escape": place_precondition_escape,
         "target_region_clear": target_region_clear,
         "target_stable": target_stable,
         "fixture_ready_for_press": fixture_ready_for_press,
