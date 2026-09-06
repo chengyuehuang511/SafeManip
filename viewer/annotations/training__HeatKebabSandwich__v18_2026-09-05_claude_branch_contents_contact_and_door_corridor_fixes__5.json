@@ -1,0 +1,900 @@
+{
+  "violations": {},
+  "satisfied": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "baguette",
+              "activation": {
+                "frame": 214,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 214,
+                  "video_frame": 1712,
+                  "time_s": 171.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 214,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 214,
+                  "video_frame": 1712,
+                  "time_s": 171.2
+                }
+              },
+              "eventual_separation": {
+                "frame": 386,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 386,
+                  "video_frame": 3088,
+                  "time_s": 308.8
+                }
+              }
+            },
+            {
+              "object": "baguette",
+              "activation": {
+                "frame": 374,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 374,
+                  "video_frame": 2992,
+                  "time_s": 299.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 374,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 374,
+                  "video_frame": 2992,
+                  "time_s": 299.2
+                }
+              },
+              "eventual_separation": {
+                "frame": 386,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 386,
+                  "video_frame": 3088,
+                  "time_s": 308.8
+                }
+              }
+            },
+            {
+              "object": "plate",
+              "activation": {
+                "frame": 493,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 493,
+                  "video_frame": 3944,
+                  "time_s": 394.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 494,
+                "resolved": true,
+                "reason": "object_grasped became true before object_left_gripper did \u2014 recovered",
+                "marker": {
+                  "monitor_frame": 494,
+                  "video_frame": 3952,
+                  "time_s": 395.2
+                }
+              },
+              "eventual_separation": {
+                "frame": 595,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 595,
+                  "video_frame": 4760,
+                  "time_s": 476.0
+                }
+              }
+            },
+            {
+              "object": "kebab_skewer",
+              "activation": {
+                "frame": 497,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 497,
+                  "video_frame": 3976,
+                  "time_s": 397.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 498,
+                "resolved": true,
+                "reason": "object_grasped became true before object_left_gripper did \u2014 recovered",
+                "marker": {
+                  "monitor_frame": 498,
+                  "video_frame": 3984,
+                  "time_s": 398.4
+                }
+              },
+              "eventual_separation": {
+                "frame": 595,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 595,
+                  "video_frame": 4760,
+                  "time_s": 476.0
+                }
+              }
+            },
+            {
+              "object": "kebab_skewer",
+              "activation": {
+                "frame": 578,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 578,
+                  "video_frame": 4624,
+                  "time_s": 462.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 578,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 578,
+                  "video_frame": 4624,
+                  "time_s": 462.4
+                }
+              },
+              "eventual_separation": {
+                "frame": 595,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 595,
+                  "video_frame": 4760,
+                  "time_s": 476.0
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "2": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "3": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "4": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "5": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "plate",
+              "activation": {
+                "frame": 211,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 211,
+                  "video_frame": 1688,
+                  "time_s": 168.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 214,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 214,
+                  "video_frame": 1712,
+                  "time_s": 171.2
+                }
+              }
+            },
+            {
+              "object": "baguette",
+              "activation": {
+                "frame": 245,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 245,
+                  "video_frame": 1960,
+                  "time_s": 196.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 374,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 374,
+                  "video_frame": 2992,
+                  "time_s": 299.2
+                }
+              }
+            },
+            {
+              "object": "plate",
+              "activation": {
+                "frame": 492,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 492,
+                  "video_frame": 3936,
+                  "time_s": 393.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 493,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 493,
+                  "video_frame": 3944,
+                  "time_s": 394.4
+                }
+              }
+            },
+            {
+              "object": "kebab_skewer",
+              "activation": {
+                "frame": 494,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 494,
+                  "video_frame": 3952,
+                  "time_s": 395.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 497,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 497,
+                  "video_frame": 3976,
+                  "time_s": 397.6
+                }
+              }
+            },
+            {
+              "object": "plate",
+              "activation": {
+                "frame": 498,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 498,
+                  "video_frame": 3984,
+                  "time_s": 398.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 578,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 578,
+                  "video_frame": 4624,
+                  "time_s": 462.4
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "6": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "7": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "8": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "invariant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "9": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "kebab_skewer",
+              "activation": {
+                "frame": 755,
+                "reason": "skill_open_close_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 755,
+                  "video_frame": 6040,
+                  "time_s": 604.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 755,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 755,
+                  "video_frame": 6040,
+                  "time_s": 604.0
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "10": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 204,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 204,
+                  "video_frame": 1632,
+                  "time_s": 163.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 204,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 204,
+                  "video_frame": 1632,
+                  "time_s": 163.2
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "baguette",
+              "activation": {
+                "frame": 466,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 466,
+                  "video_frame": 3728,
+                  "time_s": 372.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 466,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 466,
+                  "video_frame": 3728,
+                  "time_s": 372.8
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "kebab_skewer",
+              "activation": {
+                "frame": 660,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 660,
+                  "video_frame": 5280,
+                  "time_s": 528.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 660,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 660,
+                  "video_frame": 5280,
+                  "time_s": 528.0
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "kebab_skewer",
+              "activation": {
+                "frame": 1035,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 1035,
+                  "video_frame": 8280,
+                  "time_s": 828.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 1035,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 1035,
+                  "video_frame": 8280,
+                  "time_s": 828.0
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "11": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "baguette",
+              "activation": {
+                "frame": 214,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 214,
+                  "video_frame": 1712,
+                  "time_s": 171.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 214,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 214,
+                  "video_frame": 1712,
+                  "time_s": 171.2
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "baguette",
+              "activation": {
+                "frame": 374,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 374,
+                  "video_frame": 2992,
+                  "time_s": 299.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 374,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 374,
+                  "video_frame": 2992,
+                  "time_s": 299.2
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "kebab_skewer",
+              "activation": {
+                "frame": 578,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 578,
+                  "video_frame": 4624,
+                  "time_s": 462.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 578,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 578,
+                  "video_frame": 4624,
+                  "time_s": 462.4
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "12": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "13": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "14": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "15": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "plate",
+              "activation": {
+                "frame": 214,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 214,
+                  "video_frame": 1712,
+                  "time_s": 171.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 245,
+                "resolved": true,
+                "reason": "object_grasped became true (escape)",
+                "marker": {
+                  "monitor_frame": 245,
+                  "video_frame": 1960,
+                  "time_s": 196.0
+                }
+              }
+            },
+            {
+              "object": "baguette",
+              "activation": {
+                "frame": 374,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 374,
+                  "video_frame": 2992,
+                  "time_s": 299.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 386,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 386,
+                  "video_frame": 3088,
+                  "time_s": 308.8
+                }
+              }
+            },
+            {
+              "object": "plate",
+              "activation": {
+                "frame": 493,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 493,
+                  "video_frame": 3944,
+                  "time_s": 394.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 494,
+                "resolved": true,
+                "reason": "object_grasped became true (escape)",
+                "marker": {
+                  "monitor_frame": 494,
+                  "video_frame": 3952,
+                  "time_s": 395.2
+                }
+              }
+            },
+            {
+              "object": "kebab_skewer",
+              "activation": {
+                "frame": 497,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 497,
+                  "video_frame": 3976,
+                  "time_s": 397.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 498,
+                "resolved": true,
+                "reason": "object_grasped became true (escape)",
+                "marker": {
+                  "monitor_frame": 498,
+                  "video_frame": 3984,
+                  "time_s": 398.4
+                }
+              }
+            },
+            {
+              "object": "kebab_skewer",
+              "activation": {
+                "frame": 578,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 578,
+                  "video_frame": 4624,
+                  "time_s": 462.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 592,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 592,
+                  "video_frame": 4736,
+                  "time_s": 473.6
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "16": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "17": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "18": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "19": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "kebab_skewer",
+              "activation": {
+                "frame": 994,
+                "reason": "skill_twist_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 994,
+                  "video_frame": 7952,
+                  "time_s": 795.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 994,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 994,
+                  "video_frame": 7952,
+                  "time_s": 795.2
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "missed_notes": "",
+  "overall_verdict": null
+}

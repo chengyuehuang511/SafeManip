@@ -1,0 +1,895 @@
+{
+  "violations": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 68,
+                "reason": "robot_contact_raw_contaminated became true",
+                "marker": {
+                  "monitor_frame": 68,
+                  "video_frame": 544,
+                  "time_s": 54.4
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 864,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 864,
+                    "video_frame": 6912,
+                    "time_s": 691.2
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 864,
+                "resolved": false,
+                "reason": "never resolved \u2014 episode ended, or next occurrence started, first",
+                "marker": {
+                  "monitor_frame": 864,
+                  "video_frame": 6912,
+                  "time_s": 691.2
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "satisfied": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 72,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 72,
+                  "video_frame": 576,
+                  "time_s": 57.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 73,
+                "resolved": true,
+                "reason": "object_grasped became true before object_left_gripper did \u2014 recovered",
+                "marker": {
+                  "monitor_frame": 73,
+                  "video_frame": 584,
+                  "time_s": 58.4
+                }
+              },
+              "eventual_separation": {
+                "frame": 341,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 341,
+                  "video_frame": 2728,
+                  "time_s": 272.8
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 323,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 323,
+                  "video_frame": 2584,
+                  "time_s": 258.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 323,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 323,
+                  "video_frame": 2584,
+                  "time_s": 258.4
+                }
+              },
+              "eventual_separation": {
+                "frame": 341,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 341,
+                  "video_frame": 2728,
+                  "time_s": 272.8
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 590,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 590,
+                  "video_frame": 4720,
+                  "time_s": 472.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 592,
+                "resolved": true,
+                "reason": "object_grasped became true before object_left_gripper did \u2014 recovered",
+                "marker": {
+                  "monitor_frame": 592,
+                  "video_frame": 4736,
+                  "time_s": 473.6
+                }
+              },
+              "eventual_separation": {
+                "frame": 846,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 846,
+                  "video_frame": 6768,
+                  "time_s": 676.8
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 827,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 827,
+                  "video_frame": 6616,
+                  "time_s": 661.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 827,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 827,
+                  "video_frame": 6616,
+                  "time_s": 661.6
+                }
+              },
+              "eventual_separation": {
+                "frame": 846,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 846,
+                  "video_frame": 6768,
+                  "time_s": 676.8
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "2": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "3": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "4": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 298,
+                "reason": "object_reach_in_fixture became true",
+                "marker": {
+                  "monitor_frame": 298,
+                  "video_frame": 2384,
+                  "time_s": 238.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 298,
+                "resolved": true,
+                "reason": "object_in_same_fixture became true",
+                "marker": {
+                  "monitor_frame": 298,
+                  "video_frame": 2384,
+                  "time_s": 238.4
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 810,
+                "reason": "object_reach_in_fixture became true",
+                "marker": {
+                  "monitor_frame": 810,
+                  "video_frame": 6480,
+                  "time_s": 648.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 810,
+                "resolved": true,
+                "reason": "object_in_same_fixture became true",
+                "marker": {
+                  "monitor_frame": 810,
+                  "video_frame": 6480,
+                  "time_s": 648.0
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "5": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 70,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 70,
+                  "video_frame": 560,
+                  "time_s": 56.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 72,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 72,
+                  "video_frame": 576,
+                  "time_s": 57.6
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 73,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 73,
+                  "video_frame": 584,
+                  "time_s": 58.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 323,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 323,
+                  "video_frame": 2584,
+                  "time_s": 258.4
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 589,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 589,
+                  "video_frame": 4712,
+                  "time_s": 471.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 590,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 590,
+                  "video_frame": 4720,
+                  "time_s": 472.0
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 592,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 592,
+                  "video_frame": 4736,
+                  "time_s": 473.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 827,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 827,
+                  "video_frame": 6616,
+                  "time_s": 661.6
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "6": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "7": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 298,
+                "reason": "object_reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 298,
+                  "video_frame": 2384,
+                  "time_s": 238.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 298,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 298,
+                  "video_frame": 2384,
+                  "time_s": 238.4
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 810,
+                "reason": "object_reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 810,
+                  "video_frame": 6480,
+                  "time_s": 648.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 810,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 810,
+                  "video_frame": 6480,
+                  "time_s": 648.0
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "8": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "invariant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "9": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "10": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 57,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 57,
+                  "video_frame": 456,
+                  "time_s": 45.6
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 57,
+                  "reasons": [
+                    "pick_object_stable"
+                  ],
+                  "marker": {
+                    "monitor_frame": 57,
+                    "video_frame": 456,
+                    "time_s": 45.6
+                  },
+                  "reason_labels": [
+                    "pick object stable"
+                  ]
+                }
+              ],
+              "end": {
+                "frame": 57,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 57,
+                  "video_frame": 456,
+                  "time_s": 45.6
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 546,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 546,
+                  "video_frame": 4368,
+                  "time_s": 436.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 546,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 546,
+                  "video_frame": 4368,
+                  "time_s": 436.8
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "11": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 323,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 323,
+                  "video_frame": 2584,
+                  "time_s": 258.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 323,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 323,
+                  "video_frame": 2584,
+                  "time_s": 258.4
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 827,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 827,
+                  "video_frame": 6616,
+                  "time_s": 661.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 827,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 827,
+                  "video_frame": 6616,
+                  "time_s": 661.6
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "12": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "13": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 310,
+                "reason": "reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 310,
+                  "video_frame": 2480,
+                  "time_s": 248.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 310,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 310,
+                  "video_frame": 2480,
+                  "time_s": 248.0
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 829,
+                "reason": "reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 829,
+                  "video_frame": 6632,
+                  "time_s": 663.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 829,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 829,
+                  "video_frame": 6632,
+                  "time_s": 663.2
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "14": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 72,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 72,
+                  "video_frame": 576,
+                  "time_s": 57.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 73,
+                "resolved": true,
+                "reason": "object_grasped became true (escape)",
+                "marker": {
+                  "monitor_frame": 73,
+                  "video_frame": 584,
+                  "time_s": 58.4
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 323,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 323,
+                  "video_frame": 2584,
+                  "time_s": 258.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 341,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 341,
+                  "video_frame": 2728,
+                  "time_s": 272.8
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 590,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 590,
+                  "video_frame": 4720,
+                  "time_s": 472.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 592,
+                "resolved": true,
+                "reason": "object_grasped became true (escape)",
+                "marker": {
+                  "monitor_frame": 592,
+                  "video_frame": 4736,
+                  "time_s": 473.6
+                }
+              }
+            },
+            {
+              "object": "tupperware",
+              "activation": {
+                "frame": 827,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 827,
+                  "video_frame": 6616,
+                  "time_s": 661.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 842,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 842,
+                  "video_frame": 6736,
+                  "time_s": 673.6
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "15": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "16": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "17": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "18": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "missed_notes": "",
+  "overall_verdict": null
+}
