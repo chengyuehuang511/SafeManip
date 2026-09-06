@@ -956,6 +956,15 @@ def build_predicate_snapshot(
             for elt in node.elts:
                 values.update(_literal_string_set(elt, bindings))
             return values
+        # `a + b` (e.g. `all_names = plastic + glass`) -- list/tuple
+        # concatenation of two otherwise-literal-derivable name lists, found
+        # via RecycleBottlesByType (2026-09-05, per the goal's stricter
+        # per-task-per-property scan): a common way multi-category success
+        # checks build one combined name list from several literal ones.
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            return _literal_string_set(node.left, bindings) | _literal_string_set(
+                node.right, bindings
+            )
         return set()
 
     def _fixture_name_from_ast(node: ast.AST) -> str | None:
@@ -996,16 +1005,64 @@ def build_predicate_snapshot(
             for obj in objs:
                 fixture_targets[obj].add(fixture_name)
 
+        def visit_body(stmts: list[ast.stmt], bindings: dict[str, set[str]]):
+            """Walk a statement block (function/module/branch body) in
+            program order, threading a *mutable* bindings dict forward so a
+            plain assignment (`plastic = [...]`) is visible to every later
+            sibling statement, not just its own subtree -- the previous
+            design only ever propagated bindings downward from a `for`
+            loop's own body, so a task whose success check just assigns
+            name lists to local variables (no loop at all) got nothing.
+            Found via RecycleBottlesByType (2026-09-05, the goal's stricter
+            per-task-per-property scan)."""
+            for stmt in stmts:
+                if (
+                    isinstance(stmt, ast.Assign)
+                    and len(stmt.targets) == 1
+                    and isinstance(stmt.targets[0], ast.Name)
+                ):
+                    values = _literal_string_set(stmt.value, bindings)
+                    if values:
+                        bindings[stmt.targets[0].id] = values
+                visit(stmt, bindings)
+
         def visit(node: ast.AST, bindings: dict[str, set[str]]):
             if isinstance(node, ast.For) and isinstance(node.target, ast.Name):
                 values = _literal_string_set(node.iter, bindings)
                 next_bindings = dict(bindings)
                 if values:
                     next_bindings[node.target.id] = values
-                for child in node.body:
-                    visit(child, next_bindings)
-                for child in node.orelse:
-                    visit(child, bindings)
+                visit_body(node.body, next_bindings)
+                visit_body(node.orelse, bindings)
+                return
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Module)):
+                visit_body(node.body, bindings)
+                return
+            if isinstance(
+                node, (ast.GeneratorExp, ast.ListComp, ast.SetComp, ast.DictComp)
+            ):
+                # `all(check(...) for name in all_names)` -- a comprehension/
+                # genexp's own `for` clause(s), same binding semantics as a
+                # real `for` statement but a different AST shape entirely
+                # (`ast.comprehension` nodes under `.generators`, not
+                # `ast.For`). Found via RecycleBottlesByType: its actual
+                # `check_obj_fixture_contact` call lives inside exactly this
+                # shape (`all(OU.check_obj_fixture_contact(...) for name in
+                # all_names)`), which the previous visitor never recursed
+                # into at all.
+                next_bindings = dict(bindings)
+                for gen in node.generators:
+                    if isinstance(gen.target, ast.Name):
+                        values = _literal_string_set(gen.iter, next_bindings)
+                        if values:
+                            next_bindings[gen.target.id] = values
+                    for cond in gen.ifs:
+                        visit(cond, next_bindings)
+                elt = getattr(node, "elt", None) or getattr(node, "value", None)
+                if elt is not None:
+                    visit(elt, next_bindings)
+                if isinstance(node, ast.DictComp):
+                    visit(node.key, next_bindings)
                 return
             if isinstance(node, ast.Call):
                 func = node.func
