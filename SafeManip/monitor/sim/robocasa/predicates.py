@@ -6986,10 +6986,84 @@ def build_predicate_snapshot(
             pass
         return _fixture_rack_contact(str(fname), str(oname))
 
+    def _fixture_door_geom_ids(fname: str) -> set[int]:
+        """Just the door/handle/hinge/drawer-face geoms of `fname`, via the
+        same keyword-based geom-name + body-tree matching
+        _fixture_action_component_geom_ids_by_names uses for "open_close"
+        -- but not gated by that function's own contact-policy-action
+        check (a fixture is legitimately openable, and its retract path
+        legitimately means "the door's own swing/slide region", whether or
+        not the task's contact policy happens to also designate it for
+        deliberate open/close contact). Falls back to an empty set (caller
+        should fall back to the whole-fixture AABB) if no door-ish geoms
+        are found at all, e.g. a fixture naming convention this substring
+        match doesn't recognize."""
+        keywords = ACTION_COMPONENT_KEYWORDS.get("open_close", ())
+        fixture_geom_ids = _fixture_geom_ids_by_names({str(fname)})
+        geom_ids = set()
+        for geom_id in fixture_geom_ids:
+            try:
+                geom_name = str(env.sim.model.geom_id2name(int(geom_id)) or "")
+            except Exception:
+                geom_name = ""
+            if any(keyword in geom_name.lower() for keyword in keywords):
+                geom_ids.add(int(geom_id))
+        fixture = _fixture_by_name(str(fname))
+        prefix = str(getattr(fixture, "naming_prefix", "") or "") if fixture else ""
+        worldbody = getattr(fixture, "worldbody", None) if fixture else None
+        if worldbody is not None:
+            try:
+                body_elems = list(worldbody.iter("body"))
+            except Exception:
+                body_elems = []
+            selected_body_ids = set()
+            for body in body_elems:
+                if not isinstance(body, ET.Element):
+                    continue
+                body_name = str(body.get("name") or "")
+                if not body_name:
+                    continue
+                full_name = (
+                    f"{prefix}{body_name}"
+                    if prefix and not body_name.startswith(prefix)
+                    else body_name
+                )
+                match_text = f"{body_name} {full_name}".lower()
+                if not any(keyword in match_text for keyword in keywords):
+                    continue
+                try:
+                    selected_body_ids.add(int(env.sim.model.body_name2id(full_name)))
+                except Exception:
+                    continue
+            if selected_body_ids:
+                geom_ids.update(
+                    int(geom_id)
+                    for geom_id, body_id in enumerate(env.sim.model.geom_bodyid)
+                    if int(body_id) in selected_body_ids
+                    and int(geom_id) in fixture_geom_ids
+                )
+        return geom_ids
+
     def _fixture_retract_path_blockers(fname: str | None) -> list[str] | None:
         if fname is None:
             return []
-        fixture_aabb = _fixture_aabb(str(fname))
+        # Fixed 2026-09-05 (found via the goal's stricter per-task-per-
+        # property scan, not KNOWN_BUGS.md): the corridor used to be the
+        # *whole fixture's* AABB (cabinet body + door together) expanded by
+        # a small margin -- for a cabinet/drawer, that extends well past the
+        # door's own actual swing/slide region, out over whatever's sitting
+        # on the adjacent counter. Confirmed corpus-wide (SetUpCuttingStation
+        # 5/10: a knife placed on the counter for the cutting-station setup,
+        # nowhere near the door's real motion path, flagged as a retract-path
+        # blocker every time). Narrowed the corridor to just the door/handle/
+        # hinge/drawer-face geoms' own AABB where those can be identified,
+        # falling back to the old whole-fixture AABB only when they can't
+        # (e.g. an unusual naming convention with no "door"/"handle"/etc.
+        # substring at all).
+        door_geom_ids = _fixture_door_geom_ids(str(fname))
+        fixture_aabb = (
+            _geom_ids_aabb(door_geom_ids) if door_geom_ids else None
+        ) or _fixture_aabb(str(fname))
         if fixture_aabb is None:
             return None
         corridor_aabb = _expanded_aabb(fixture_aabb, PATH_OBSTRUCTION_OVERLAP_ALLOWANCE)
