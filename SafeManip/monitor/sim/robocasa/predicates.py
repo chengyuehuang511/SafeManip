@@ -2862,6 +2862,31 @@ def build_predicate_snapshot(
     grasped_object_geom_ids = (
         _object_geom_ids(active_object) if active_object else set()
     )
+    # Found via manual review (2026-09-05, not KNOWN_BUGS.md): when the
+    # currently-grasped object is itself a receptacle already holding
+    # contents (e.g. picking up a whole container with lettuce pieces
+    # already inside it), the contents legitimately stay in continuous
+    # contact with the container's interior for the entire carry -- but
+    # none of the allowed-contact categories below covered this at all
+    # (receive_object/source_support are about the *container's own*
+    # relationship to whatever it's placed onto/picked from, not about
+    # objects already resting inside it while it's being carried), so this
+    # completely ordinary contact fell through to forbidden_contact every
+    # time. Confirmed corpus-wide (WashLettuce 10/10: "lettuce_gN <->
+    # lettuce_container_gM" cited as the forbidden pair while
+    # active_object=lettuce_container, receive_objects/source_supports both
+    # empty). Added the missing "grasped receptacle's own contents" check.
+    grasped_object_contents_geom_ids = set()
+    if active_object:
+        for _oname in getattr(env, "objects", {}).keys():
+            _oname = str(_oname)
+            if _oname == str(active_object):
+                continue
+            try:
+                if OU.check_obj_in_receptacle(env, _oname, str(active_object)):
+                    grasped_object_contents_geom_ids.update(_object_geom_ids(_oname))
+            except Exception:
+                continue
     (
         contact_policy_action_fixture_geom_ids,
         contact_policy_action_fixture_actions,
@@ -2902,6 +2927,7 @@ def build_predicate_snapshot(
     correct_manipulated_object_correct_fixture_contact = False
     correct_manipulated_object_correct_receive_object_contact = False
     correct_manipulated_object_original_support_contact = False
+    correct_manipulated_object_contents_contact = False
     task_referenced_object_fixture_contact_names = set()
     forbidden_contact_pairs = []
     considered_contact_pairs = []
@@ -3032,6 +3058,18 @@ def build_predicate_snapshot(
             )
         )
 
+        object_contains_content = (
+            grasped_object_exists
+            and geom1 not in robot_geom_ids
+            and geom2 not in robot_geom_ids
+            and _pair_matches(
+                geom1,
+                geom2,
+                grasped_object_geom_ids,
+                grasped_object_contents_geom_ids,
+            )
+        )
+
         robot_correct_manipulated_object_contact |= robot_object
         robot_correct_fixture_contact |= robot_fixture
         correct_manipulated_object_correct_fixture_contact |= object_fixture
@@ -3039,6 +3077,7 @@ def build_predicate_snapshot(
             object_receive_object
         )
         correct_manipulated_object_original_support_contact |= object_source_support
+        correct_manipulated_object_contents_contact |= object_contains_content
 
         if not (
             robot_object
@@ -3046,6 +3085,7 @@ def build_predicate_snapshot(
             or object_fixture
             or object_receive_object
             or object_source_support
+            or object_contains_content
         ):
             try:
                 geom1_name = env.sim.model.geom_id2name(geom1)
@@ -7264,6 +7304,7 @@ def build_predicate_snapshot(
         "robot_contact_raw_activated_frame": robot_contact_raw_activated_frame,
         "robot_contact_clean_candidate": robot_contact_clean_candidate,
         "correct_manipulated_object_original_support_contact": correct_manipulated_object_original_support_contact,
+        "correct_manipulated_object_contents_contact": correct_manipulated_object_contents_contact,
         "source_support_fixtures_for_active_object": sorted(
             active_source_fixture_names
         ),
