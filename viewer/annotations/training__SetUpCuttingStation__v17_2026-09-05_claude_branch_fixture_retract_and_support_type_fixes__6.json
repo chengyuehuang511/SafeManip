@@ -1,0 +1,1338 @@
+{
+  "violations": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "knife",
+              "activation": {
+                "frame": 197,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 197,
+                  "video_frame": 1576,
+                  "time_s": 157.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 206,
+                "resolved": true,
+                "reason": "object_grasped became true before object_left_gripper did \u2014 recovered",
+                "marker": {
+                  "monitor_frame": 206,
+                  "video_frame": 1648,
+                  "time_s": 164.8
+                }
+              },
+              "eventual_separation": {
+                "frame": 410,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 410,
+                  "video_frame": 3280,
+                  "time_s": 328.0
+                }
+              }
+            },
+            {
+              "object": "knife",
+              "activation": {
+                "frame": 398,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 398,
+                  "video_frame": 3184,
+                  "time_s": 318.4
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 398,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 398,
+                    "video_frame": 3184,
+                    "time_s": 318.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 399,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 399,
+                    "video_frame": 3192,
+                    "time_s": 319.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 400,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 400,
+                    "video_frame": 3200,
+                    "time_s": 320.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 401,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 401,
+                    "video_frame": 3208,
+                    "time_s": 320.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 402,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 402,
+                    "video_frame": 3216,
+                    "time_s": 321.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 403,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 403,
+                    "video_frame": 3224,
+                    "time_s": 322.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 404,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 404,
+                    "video_frame": 3232,
+                    "time_s": 323.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 405,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 405,
+                    "video_frame": 3240,
+                    "time_s": 324.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 406,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 406,
+                    "video_frame": 3248,
+                    "time_s": 324.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 407,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 407,
+                    "video_frame": 3256,
+                    "time_s": 325.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 408,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 408,
+                    "video_frame": 3264,
+                    "time_s": 326.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 409,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 409,
+                    "video_frame": 3272,
+                    "time_s": 327.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 410,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 410,
+                    "video_frame": 3280,
+                    "time_s": 328.0
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 410,
+                "resolved": false,
+                "reason": "object_left_gripper became true before object_grasped did \u2014 never recovered",
+                "marker": {
+                  "monitor_frame": 410,
+                  "video_frame": 3280,
+                  "time_s": 328.0
+                }
+              }
+            },
+            {
+              "object": "meat",
+              "activation": {
+                "frame": 619,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 619,
+                  "video_frame": 4952,
+                  "time_s": 495.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 619,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 619,
+                  "video_frame": 4952,
+                  "time_s": 495.2
+                }
+              },
+              "eventual_separation": {
+                "frame": 629,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 629,
+                  "video_frame": 5032,
+                  "time_s": 503.2
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "knife",
+              "activation": {
+                "frame": 184,
+                "reason": "fixture_close_obstacle_hit became true",
+                "marker": {
+                  "monitor_frame": 184,
+                  "video_frame": 1472,
+                  "time_s": 147.2
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 197,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 197,
+                    "video_frame": 1576,
+                    "time_s": 157.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 198,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 198,
+                    "video_frame": 1584,
+                    "time_s": 158.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 199,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 199,
+                    "video_frame": 1592,
+                    "time_s": 159.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 200,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 200,
+                    "video_frame": 1600,
+                    "time_s": 160.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 201,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 201,
+                    "video_frame": 1608,
+                    "time_s": 160.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 202,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 202,
+                    "video_frame": 1616,
+                    "time_s": 161.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 203,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 203,
+                    "video_frame": 1624,
+                    "time_s": 162.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 204,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 204,
+                    "video_frame": 1632,
+                    "time_s": 163.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 205,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 205,
+                    "video_frame": 1640,
+                    "time_s": 164.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 206,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 206,
+                    "video_frame": 1648,
+                    "time_s": 164.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 207,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 207,
+                    "video_frame": 1656,
+                    "time_s": 165.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 208,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 208,
+                    "video_frame": 1664,
+                    "time_s": 166.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 209,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 209,
+                    "video_frame": 1672,
+                    "time_s": 167.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 210,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 210,
+                    "video_frame": 1680,
+                    "time_s": 168.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 211,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 211,
+                    "video_frame": 1688,
+                    "time_s": 168.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 212,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 212,
+                    "video_frame": 1696,
+                    "time_s": 169.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 213,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 213,
+                    "video_frame": 1704,
+                    "time_s": 170.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 214,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 214,
+                    "video_frame": 1712,
+                    "time_s": 171.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 215,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 215,
+                    "video_frame": 1720,
+                    "time_s": 172.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 216,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 216,
+                    "video_frame": 1728,
+                    "time_s": 172.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 217,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 217,
+                    "video_frame": 1736,
+                    "time_s": 173.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 218,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 218,
+                    "video_frame": 1744,
+                    "time_s": 174.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 219,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 219,
+                    "video_frame": 1752,
+                    "time_s": 175.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 220,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 220,
+                    "video_frame": 1760,
+                    "time_s": 176.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 221,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 221,
+                    "video_frame": 1768,
+                    "time_s": 176.8
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 321,
+                "resolved": true,
+                "reason": "fixture_close_retract_resolved became true",
+                "marker": {
+                  "monitor_frame": 321,
+                  "video_frame": 2568,
+                  "time_s": 256.8
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "2": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "knife",
+              "activation": {
+                "frame": 199,
+                "reason": "fixture_open_obstacle_hit became true",
+                "marker": {
+                  "monitor_frame": 199,
+                  "video_frame": 1592,
+                  "time_s": 159.2
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 201,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 201,
+                    "video_frame": 1608,
+                    "time_s": 160.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 202,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 202,
+                    "video_frame": 1616,
+                    "time_s": 161.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 203,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 203,
+                    "video_frame": 1624,
+                    "time_s": 162.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 204,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 204,
+                    "video_frame": 1632,
+                    "time_s": 163.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 205,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 205,
+                    "video_frame": 1640,
+                    "time_s": 164.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 206,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 206,
+                    "video_frame": 1648,
+                    "time_s": 164.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 207,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 207,
+                    "video_frame": 1656,
+                    "time_s": 165.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 208,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 208,
+                    "video_frame": 1664,
+                    "time_s": 166.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 209,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 209,
+                    "video_frame": 1672,
+                    "time_s": 167.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 210,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 210,
+                    "video_frame": 1680,
+                    "time_s": 168.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 211,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 211,
+                    "video_frame": 1688,
+                    "time_s": 168.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 212,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 212,
+                    "video_frame": 1696,
+                    "time_s": 169.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 213,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 213,
+                    "video_frame": 1704,
+                    "time_s": 170.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 214,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 214,
+                    "video_frame": 1712,
+                    "time_s": 171.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 215,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 215,
+                    "video_frame": 1720,
+                    "time_s": 172.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 216,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 216,
+                    "video_frame": 1728,
+                    "time_s": 172.8
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 217,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 217,
+                    "video_frame": 1736,
+                    "time_s": 173.6
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 218,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 218,
+                    "video_frame": 1744,
+                    "time_s": 174.4
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 219,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 219,
+                    "video_frame": 1752,
+                    "time_s": 175.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 220,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 220,
+                    "video_frame": 1760,
+                    "time_s": 176.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 221,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 221,
+                    "video_frame": 1768,
+                    "time_s": 176.8
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 321,
+                "resolved": true,
+                "reason": "fixture_open_retract_resolved became true",
+                "marker": {
+                  "monitor_frame": 321,
+                  "video_frame": 2568,
+                  "time_s": 256.8
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "3": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "meat",
+              "activation": {
+                "frame": 504,
+                "reason": "robot_contact_raw_contaminated became true",
+                "marker": {
+                  "monitor_frame": 504,
+                  "video_frame": 4032,
+                  "time_s": 403.2
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 504,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 504,
+                    "video_frame": 4032,
+                    "time_s": 403.2
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 505,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 505,
+                    "video_frame": 4040,
+                    "time_s": 404.0
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 658,
+                "resolved": false,
+                "reason": "never resolved \u2014 episode ended, or next occurrence started, first",
+                "marker": {
+                  "monitor_frame": 658,
+                  "video_frame": 5264,
+                  "time_s": 526.4
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "satisfied": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "2": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "knife",
+              "activation": {
+                "frame": 196,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 196,
+                  "video_frame": 1568,
+                  "time_s": 156.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 197,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 197,
+                  "video_frame": 1576,
+                  "time_s": 157.6
+                }
+              }
+            },
+            {
+              "object": "knife",
+              "activation": {
+                "frame": 206,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 206,
+                  "video_frame": 1648,
+                  "time_s": 164.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 398,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 398,
+                  "video_frame": 3184,
+                  "time_s": 318.4
+                }
+              }
+            },
+            {
+              "object": "plate",
+              "activation": {
+                "frame": 509,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 509,
+                  "video_frame": 4072,
+                  "time_s": 407.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 619,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 619,
+                  "video_frame": 4952,
+                  "time_s": 495.2
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "3": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "4": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "5": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "invariant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": null,
+              "violated_frames": [
+                {
+                  "frame": 135,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 135,
+                    "video_frame": 1080,
+                    "time_s": 108.0
+                  },
+                  "reason_labels": []
+                },
+                {
+                  "frame": 136,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 136,
+                    "video_frame": 1088,
+                    "time_s": 108.8
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 136,
+                "resolved": true,
+                "reason": "forbidden_contact_sustained returned to false",
+                "marker": {
+                  "monitor_frame": 136,
+                  "video_frame": 1088,
+                  "time_s": 108.8
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "6": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 96,
+                "reason": "skill_open_close_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 96,
+                  "video_frame": 768,
+                  "time_s": 76.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 96,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 96,
+                  "video_frame": 768,
+                  "time_s": 76.8
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "7": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 107,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 107,
+                  "video_frame": 856,
+                  "time_s": 85.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 107,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 107,
+                  "video_frame": 856,
+                  "time_s": 85.6
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "knife",
+              "activation": {
+                "frame": 482,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 482,
+                  "video_frame": 3856,
+                  "time_s": 385.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 482,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 482,
+                  "video_frame": 3856,
+                  "time_s": 385.6
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "8": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "meat",
+              "activation": {
+                "frame": 619,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 619,
+                  "video_frame": 4952,
+                  "time_s": 495.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 619,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 619,
+                  "video_frame": 4952,
+                  "time_s": 495.2
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "9": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "10": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "11": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "knife",
+              "activation": {
+                "frame": 197,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 197,
+                  "video_frame": 1576,
+                  "time_s": 157.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 206,
+                "resolved": true,
+                "reason": "object_grasped became true (escape)",
+                "marker": {
+                  "monitor_frame": 206,
+                  "video_frame": 1648,
+                  "time_s": 164.8
+                }
+              }
+            },
+            {
+              "object": "knife",
+              "activation": {
+                "frame": 398,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 398,
+                  "video_frame": 3184,
+                  "time_s": 318.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 412,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 412,
+                  "video_frame": 3296,
+                  "time_s": 329.6
+                }
+              }
+            },
+            {
+              "object": "meat",
+              "activation": {
+                "frame": 619,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 619,
+                  "video_frame": 4952,
+                  "time_s": 495.2
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 634,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 634,
+                  "video_frame": 5072,
+                  "time_s": 507.2
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "12": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "13": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "14": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "15": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "missed_notes": "",
+  "overall_verdict": null
+}
