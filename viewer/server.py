@@ -85,11 +85,38 @@ TRAINING_PRIVILEGED_DIR_SAMPLED = Path(__file__).parent.parent / "SafeManip" / "
 _VERSION_DIR_RE = re.compile(r"^v(\d+)_")
 
 
+def _version_dir_is_finished(version_dir):
+    """A vN_.../ dir is only "finished" -- and therefore only shown as a
+    selectable method -- once every episode extract_privileged_from_dataset.py
+    wrote a raw privileged_information_<n>.json for also has its
+    ..._monitor.json sibling (i.e. the monitor pass has caught up with
+    extraction, not still running in the background), and at least one
+    episode exists at all. This is a live, per-call check (see
+    _discover_training_monitor_methods's docstring) specifically so an
+    in-progress run (like a corpus-wide re-extract via SLURM) doesn't show up
+    as a half-populated, confusing method choice while it's still writing --
+    it simply appears the moment the last _monitor.json lands, no server
+    restart needed."""
+    raw_count = 0
+    monitor_count = 0
+    for f in version_dir.glob("*/privileged_information_*.json"):
+        if f.name.endswith("_monitor.json"):
+            monitor_count += 1
+        else:
+            raw_count += 1
+    return raw_count > 0 and raw_count == monitor_count
+
+
 def _discover_training_monitor_methods():
     """Build the method selector: one entry per vN_<date>_<description>/
-    directory under monitor/output/ (labeled v0/v1/v2/...), plus "sampled"
-    if present. Falls back to the bare TRAINING_PRIVILEGED_DIR itself
-    (pre-versioning layout) if no vN_ dirs are found at all."""
+    directory under monitor/output/ (labeled v0/v1/v2/...) that has finished
+    monitoring (see _version_dir_is_finished), plus "sampled" if present.
+    Falls back to the bare TRAINING_PRIVILEGED_DIR itself (pre-versioning
+    layout) if no finished vN_ dirs are found at all.
+
+    Called fresh on every request (see _training_monitor_state) rather than
+    cached once at import time, so a new version -- or an in-progress one
+    finishing -- becomes browsable immediately, with no viewer restart."""
     # Dict keys stay as the real directory names (used for path lookups /
     # the ?method= query param); "label" is what the UI actually renders as
     # a button, kept short (v0/v1/v2/Sampled) so the icons don't blow up --
@@ -99,7 +126,7 @@ def _discover_training_monitor_methods():
     if TRAINING_PRIVILEGED_DIR.is_dir():
         version_dirs = [
             p for p in TRAINING_PRIVILEGED_DIR.iterdir()
-            if p.is_dir() and _VERSION_DIR_RE.match(p.name)
+            if p.is_dir() and _VERSION_DIR_RE.match(p.name) and _version_dir_is_finished(p)
         ]
         version_dirs.sort(key=lambda p: int(_VERSION_DIR_RE.match(p.name).group(1)))
         for version_dir in version_dirs:
@@ -112,18 +139,24 @@ def _discover_training_monitor_methods():
     return methods
 
 
-TRAINING_MONITOR_METHODS = _discover_training_monitor_methods()
-# Latest version (highest vN) by default, so the viewer always shows the
-# newest predicates.py results without needing this file edited per version.
-# Not just "last dict key" -- "sampled" is inserted last but should never be
-# the default.
-_version_method_keys = [k for k in TRAINING_MONITOR_METHODS if _VERSION_DIR_RE.match(k)]
-if _version_method_keys:
-    DEFAULT_TRAINING_MONITOR_METHOD = _version_method_keys[-1]
-elif TRAINING_MONITOR_METHODS:
-    DEFAULT_TRAINING_MONITOR_METHOD = next(iter(TRAINING_MONITOR_METHODS))
-else:
-    DEFAULT_TRAINING_MONITOR_METHOD = "scaled"
+def _training_monitor_state():
+    """Live (uncached) (methods, default_method) pair -- call this instead of
+    reading module-level globals so newly-finished versions appear without a
+    viewer restart. Cheap enough to recompute per request: a handful of
+    directory globs over the ~50 per-version task dirs, not a deep walk."""
+    methods = _discover_training_monitor_methods()
+    # Latest version (highest vN) by default, so the viewer always shows the
+    # newest predicates.py results without needing this file edited per
+    # version. Not just "last dict key" -- "sampled" is inserted last but
+    # should never be the default.
+    version_keys = [k for k in methods if _VERSION_DIR_RE.match(k)]
+    if version_keys:
+        default = version_keys[-1]
+    elif methods:
+        default = next(iter(methods))
+    else:
+        default = "scaled"
+    return methods, default
 
 DEFAULT_ROOT = (
     "/nethome/chuang475/testnvme/projects/SafeManip/results/evals/"
@@ -688,6 +721,9 @@ def list_training_episodes(task, property_filter=None):
     episodes = []
     if not out_dir.is_dir():
         return episodes
+    # computed once per call (not once per episode inside the loop below) --
+    # still live/uncached per request, just not re-globbed 10x for nothing.
+    _methods, _default_method = _training_monitor_state()
     for p in sorted(out_dir.glob("episode_*_reconstructed.mp4")):
         m = re.match(r"episode_(\d+)_reconstructed\.mp4$", p.name)
         if not m:
@@ -712,7 +748,7 @@ def list_training_episodes(task, property_filter=None):
         # monitor output. None (not False/0) if not yet processed, so the
         # frontend can distinguish "not run yet" from "run and clean".
         # success/num_violations shown in the sidebar row reflect the
-        # default method (DEFAULT_TRAINING_MONITOR_METHOD); "methods"
+        # default method (see _training_monitor_state); "methods"
         # reports the same pair for *every* method that has been run for
         # this episode, so the frontend's method selector can show results
         # from either without a second round-trip guess about what's
@@ -720,7 +756,7 @@ def list_training_episodes(task, property_filter=None):
         entry["success"] = None
         entry["num_violations"] = None
         entry["methods"] = {}
-        for method_key, method_info in TRAINING_MONITOR_METHODS.items():
+        for method_key, method_info in _methods.items():
             monitor_path = method_info["dir"] / task / f"privileged_information_{ep}_monitor.json"
             if not monitor_path.is_file():
                 continue
@@ -739,7 +775,7 @@ def list_training_episodes(task, property_filter=None):
             except Exception:
                 continue
             entry["methods"][method_key] = {"success": m_success, "num_violations": m_num_violations}
-            if method_key == DEFAULT_TRAINING_MONITOR_METHOD:
+            if method_key == _default_method:
                 entry["success"] = m_success
                 entry["num_violations"] = m_num_violations
         episodes.append(entry)
@@ -760,7 +796,8 @@ def training_violation_counts(method):
     the same episode -- see monitor/output/CHANGELOG.md."""
     by_task = {}
     by_property = {}
-    method_info = TRAINING_MONITOR_METHODS.get(method)
+    methods, _default_method = _training_monitor_state()
+    method_info = methods.get(method)
     if method_info is None:
         return {"by_task": by_task, "by_property": by_property}
     base_dir = method_info["dir"]
@@ -1911,22 +1948,23 @@ def api_episode(task, episode):
     }
 
 
-def api_training_monitor(task, episode, method=DEFAULT_TRAINING_MONITOR_METHOD):
+def api_training_monitor(task, episode, method=None):
     """Training-data-tab counterpart to `api_episode`: same violations/
     satisfied/predicate-breakdown shape (built by the same `load_monitor_view`
     helper), sourced from SafeManip/monitor/extract_privileged_from_dataset*.py's
     output instead of a live eval rollout, with video coming from the
     *existing* ground-truth reconstruction (reconstruct_training_data.py) --
     this endpoint never renders video itself. `method` selects which of
-    TRAINING_MONITOR_METHODS' independently-computed result sets to read
+    _training_monitor_state()'s independently-computed result sets to read
     (see that dict) -- both stay browsable side by side, neither is treated
     as canonical. Returns an `error` (not a raised exception) if either the
     reconstruction video or the privileged/monitor json don't exist yet, so
     the UI can show "not processed yet" rather than a raw stack trace: this
     pipeline runs as an explicit separate batch step, not automatically
     alongside video reconstruction."""
-    if method not in TRAINING_MONITOR_METHODS:
-        method = DEFAULT_TRAINING_MONITOR_METHOD
+    methods, default_method = _training_monitor_state()
+    if method is None or method not in methods:
+        method = default_method
 
     video_path = training_episode_paths(task, episode)["video"]
     if not video_path.is_file():
@@ -1946,7 +1984,7 @@ def api_training_monitor(task, episode, method=DEFAULT_TRAINING_MONITOR_METHOD):
     fps, video_duration = ffprobe_info(video_path)
     fps = fps or fallback_fps
 
-    base_dir = TRAINING_MONITOR_METHODS[method]["dir"] / task
+    base_dir = methods[method]["dir"] / task
     mv = load_monitor_view(base_dir, episode, fps, video_duration)
     if mv is None:
         return {
@@ -1954,7 +1992,7 @@ def api_training_monitor(task, episode, method=DEFAULT_TRAINING_MONITOR_METHOD):
             "video_url": f"/td_video?task={quote(task)}&episode={episode}",
             "fps": fps, "video_duration": video_duration,
             "error": f"no privileged_information_<episode>_monitor.json for this episode/method "
-                     f"({TRAINING_MONITOR_METHODS[method]['label']}) yet -- run "
+                     f"({methods[method]['label']}) yet -- run "
                      f"SafeManip/monitor/extract_privileged_from_dataset{'_sampled' if method == 'sampled' else ''}.py "
                      f"(with --run_monitor, the default) first",
         }
@@ -2220,13 +2258,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json({"properties": sorted(PROPERTY_META.keys())})
 
         if parsed.path == "/api/training_violation_counts":
-            method = qs.get("method", [DEFAULT_TRAINING_MONITOR_METHOD])[0]
+            _methods, _default_method = _training_monitor_state()
+            method = qs.get("method", [_default_method])[0]
             return self._send_json(training_violation_counts(method))
 
         if parsed.path == "/api/training_monitor":
             task = qs.get("task", [None])[0]
             episode = qs.get("episode", [None])[0]
-            method = qs.get("method", [DEFAULT_TRAINING_MONITOR_METHOD])[0]
+            _methods, _default_method = _training_monitor_state()
+            method = qs.get("method", [_default_method])[0]
             if not task or episode is None:
                 return self._send_json({"error": "missing task/episode"}, 400)
             result = api_training_monitor(task, int(episode), method=method)
@@ -2235,9 +2275,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(body, status)
 
         if parsed.path == "/api/training_monitor_methods":
+            _methods, _default_method = _training_monitor_state()
             return self._send_json({
-                "default": DEFAULT_TRAINING_MONITOR_METHOD,
-                "methods": {k: {"label": v["label"]} for k, v in TRAINING_MONITOR_METHODS.items()},
+                "default": _default_method,
+                "methods": {k: {"label": v["label"]} for k, v in _methods.items()},
             })
 
         if parsed.path == "/td_video":
