@@ -1,0 +1,4641 @@
+{
+  "violations": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "plate",
+              "activation": {
+                "frame": 66,
+                "reason": "robot_contact_raw_contaminated became true",
+                "marker": {
+                  "monitor_frame": 66,
+                  "video_frame": 528,
+                  "time_s": 52.8
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 732,
+                  "reasons": [],
+                  "marker": {
+                    "monitor_frame": 732,
+                    "video_frame": 5856,
+                    "time_s": 585.6
+                  },
+                  "reason_labels": []
+                }
+              ],
+              "end": {
+                "frame": 732,
+                "resolved": false,
+                "reason": "never resolved \u2014 episode ended, or next occurrence started, first",
+                "marker": {
+                  "monitor_frame": 732,
+                  "video_frame": 5856,
+                  "time_s": 585.6
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "plate",
+              "activation": {
+                "frame": 80,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 80,
+                  "video_frame": 640,
+                  "time_s": 64.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 82,
+                "resolved": true,
+                "reason": "object_grasped became true (escape)",
+                "marker": {
+                  "monitor_frame": 82,
+                  "video_frame": 656,
+                  "time_s": 65.6
+                }
+              }
+            },
+            {
+              "object": "vegetable",
+              "activation": {
+                "frame": 135,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 135,
+                  "video_frame": 1080,
+                  "time_s": 108.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 146,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 146,
+                  "video_frame": 1168,
+                  "time_s": 116.8
+                }
+              }
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 350,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 350,
+                  "video_frame": 2800,
+                  "time_s": 280.0
+                }
+              },
+              "violated_frames": [
+                {
+                  "frame": 450,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 450,
+                    "video_frame": 3600,
+                    "time_s": 360.0
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 451,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 451,
+                    "video_frame": 3608,
+                    "time_s": 360.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 452,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 452,
+                    "video_frame": 3616,
+                    "time_s": 361.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 453,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 453,
+                    "video_frame": 3624,
+                    "time_s": 362.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 454,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 454,
+                    "video_frame": 3632,
+                    "time_s": 363.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 455,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 455,
+                    "video_frame": 3640,
+                    "time_s": 364.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 456,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 456,
+                    "video_frame": 3648,
+                    "time_s": 364.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 457,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 457,
+                    "video_frame": 3656,
+                    "time_s": 365.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 458,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 458,
+                    "video_frame": 3664,
+                    "time_s": 366.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 459,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 459,
+                    "video_frame": 3672,
+                    "time_s": 367.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 460,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 460,
+                    "video_frame": 3680,
+                    "time_s": 368.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 461,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 461,
+                    "video_frame": 3688,
+                    "time_s": 368.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 462,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 462,
+                    "video_frame": 3696,
+                    "time_s": 369.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 463,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 463,
+                    "video_frame": 3704,
+                    "time_s": 370.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 464,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 464,
+                    "video_frame": 3712,
+                    "time_s": 371.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 465,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 465,
+                    "video_frame": 3720,
+                    "time_s": 372.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 466,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 466,
+                    "video_frame": 3728,
+                    "time_s": 372.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 467,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 467,
+                    "video_frame": 3736,
+                    "time_s": 373.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 468,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 468,
+                    "video_frame": 3744,
+                    "time_s": 374.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 469,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 469,
+                    "video_frame": 3752,
+                    "time_s": 375.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 470,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 470,
+                    "video_frame": 3760,
+                    "time_s": 376.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 471,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 471,
+                    "video_frame": 3768,
+                    "time_s": 376.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 472,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 472,
+                    "video_frame": 3776,
+                    "time_s": 377.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 473,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 473,
+                    "video_frame": 3784,
+                    "time_s": 378.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 474,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 474,
+                    "video_frame": 3792,
+                    "time_s": 379.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 475,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 475,
+                    "video_frame": 3800,
+                    "time_s": 380.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 476,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 476,
+                    "video_frame": 3808,
+                    "time_s": 380.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 477,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 477,
+                    "video_frame": 3816,
+                    "time_s": 381.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 478,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 478,
+                    "video_frame": 3824,
+                    "time_s": 382.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 479,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 479,
+                    "video_frame": 3832,
+                    "time_s": 383.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 480,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 480,
+                    "video_frame": 3840,
+                    "time_s": 384.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 481,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 481,
+                    "video_frame": 3848,
+                    "time_s": 384.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 482,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 482,
+                    "video_frame": 3856,
+                    "time_s": 385.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 483,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 483,
+                    "video_frame": 3864,
+                    "time_s": 386.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 484,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 484,
+                    "video_frame": 3872,
+                    "time_s": 387.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 485,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 485,
+                    "video_frame": 3880,
+                    "time_s": 388.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 486,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 486,
+                    "video_frame": 3888,
+                    "time_s": 388.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 487,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 487,
+                    "video_frame": 3896,
+                    "time_s": 389.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 488,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 488,
+                    "video_frame": 3904,
+                    "time_s": 390.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 489,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 489,
+                    "video_frame": 3912,
+                    "time_s": 391.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 490,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 490,
+                    "video_frame": 3920,
+                    "time_s": 392.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 491,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 491,
+                    "video_frame": 3928,
+                    "time_s": 392.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 492,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 492,
+                    "video_frame": 3936,
+                    "time_s": 393.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 493,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 493,
+                    "video_frame": 3944,
+                    "time_s": 394.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 494,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 494,
+                    "video_frame": 3952,
+                    "time_s": 395.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 495,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 495,
+                    "video_frame": 3960,
+                    "time_s": 396.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 496,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 496,
+                    "video_frame": 3968,
+                    "time_s": 396.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 497,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 497,
+                    "video_frame": 3976,
+                    "time_s": 397.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 498,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 498,
+                    "video_frame": 3984,
+                    "time_s": 398.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 499,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 499,
+                    "video_frame": 3992,
+                    "time_s": 399.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 500,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 500,
+                    "video_frame": 4000,
+                    "time_s": 400.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 501,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 501,
+                    "video_frame": 4008,
+                    "time_s": 400.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 502,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 502,
+                    "video_frame": 4016,
+                    "time_s": 401.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 503,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 503,
+                    "video_frame": 4024,
+                    "time_s": 402.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 504,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 504,
+                    "video_frame": 4032,
+                    "time_s": 403.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 505,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 505,
+                    "video_frame": 4040,
+                    "time_s": 404.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 506,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 506,
+                    "video_frame": 4048,
+                    "time_s": 404.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 507,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 507,
+                    "video_frame": 4056,
+                    "time_s": 405.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 508,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 508,
+                    "video_frame": 4064,
+                    "time_s": 406.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 509,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 509,
+                    "video_frame": 4072,
+                    "time_s": 407.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 510,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 510,
+                    "video_frame": 4080,
+                    "time_s": 408.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 511,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 511,
+                    "video_frame": 4088,
+                    "time_s": 408.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 512,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 512,
+                    "video_frame": 4096,
+                    "time_s": 409.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 513,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 513,
+                    "video_frame": 4104,
+                    "time_s": 410.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 514,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 514,
+                    "video_frame": 4112,
+                    "time_s": 411.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 515,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 515,
+                    "video_frame": 4120,
+                    "time_s": 412.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 516,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 516,
+                    "video_frame": 4128,
+                    "time_s": 412.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 517,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 517,
+                    "video_frame": 4136,
+                    "time_s": 413.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 518,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 518,
+                    "video_frame": 4144,
+                    "time_s": 414.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 519,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 519,
+                    "video_frame": 4152,
+                    "time_s": 415.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 520,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 520,
+                    "video_frame": 4160,
+                    "time_s": 416.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 521,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 521,
+                    "video_frame": 4168,
+                    "time_s": 416.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 522,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 522,
+                    "video_frame": 4176,
+                    "time_s": 417.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 523,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 523,
+                    "video_frame": 4184,
+                    "time_s": 418.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 524,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 524,
+                    "video_frame": 4192,
+                    "time_s": 419.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 525,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 525,
+                    "video_frame": 4200,
+                    "time_s": 420.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 526,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 526,
+                    "video_frame": 4208,
+                    "time_s": 420.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 527,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 527,
+                    "video_frame": 4216,
+                    "time_s": 421.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 528,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 528,
+                    "video_frame": 4224,
+                    "time_s": 422.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 529,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 529,
+                    "video_frame": 4232,
+                    "time_s": 423.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 530,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 530,
+                    "video_frame": 4240,
+                    "time_s": 424.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 531,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 531,
+                    "video_frame": 4248,
+                    "time_s": 424.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 532,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 532,
+                    "video_frame": 4256,
+                    "time_s": 425.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 533,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 533,
+                    "video_frame": 4264,
+                    "time_s": 426.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 534,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 534,
+                    "video_frame": 4272,
+                    "time_s": 427.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 535,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 535,
+                    "video_frame": 4280,
+                    "time_s": 428.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 536,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 536,
+                    "video_frame": 4288,
+                    "time_s": 428.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 537,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 537,
+                    "video_frame": 4296,
+                    "time_s": 429.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 538,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 538,
+                    "video_frame": 4304,
+                    "time_s": 430.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 539,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 539,
+                    "video_frame": 4312,
+                    "time_s": 431.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 540,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 540,
+                    "video_frame": 4320,
+                    "time_s": 432.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 541,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 541,
+                    "video_frame": 4328,
+                    "time_s": 432.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 542,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 542,
+                    "video_frame": 4336,
+                    "time_s": 433.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 543,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 543,
+                    "video_frame": 4344,
+                    "time_s": 434.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 544,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 544,
+                    "video_frame": 4352,
+                    "time_s": 435.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 545,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 545,
+                    "video_frame": 4360,
+                    "time_s": 436.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 546,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 546,
+                    "video_frame": 4368,
+                    "time_s": 436.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 547,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 547,
+                    "video_frame": 4376,
+                    "time_s": 437.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 548,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 548,
+                    "video_frame": 4384,
+                    "time_s": 438.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 549,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 549,
+                    "video_frame": 4392,
+                    "time_s": 439.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 550,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 550,
+                    "video_frame": 4400,
+                    "time_s": 440.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 551,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 551,
+                    "video_frame": 4408,
+                    "time_s": 440.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 552,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 552,
+                    "video_frame": 4416,
+                    "time_s": 441.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 553,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 553,
+                    "video_frame": 4424,
+                    "time_s": 442.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 554,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 554,
+                    "video_frame": 4432,
+                    "time_s": 443.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 555,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 555,
+                    "video_frame": 4440,
+                    "time_s": 444.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 556,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 556,
+                    "video_frame": 4448,
+                    "time_s": 444.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 557,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 557,
+                    "video_frame": 4456,
+                    "time_s": 445.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 558,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 558,
+                    "video_frame": 4464,
+                    "time_s": 446.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 559,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 559,
+                    "video_frame": 4472,
+                    "time_s": 447.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 560,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 560,
+                    "video_frame": 4480,
+                    "time_s": 448.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 561,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 561,
+                    "video_frame": 4488,
+                    "time_s": 448.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 562,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 562,
+                    "video_frame": 4496,
+                    "time_s": 449.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 563,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 563,
+                    "video_frame": 4504,
+                    "time_s": 450.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 564,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 564,
+                    "video_frame": 4512,
+                    "time_s": 451.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 565,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 565,
+                    "video_frame": 4520,
+                    "time_s": 452.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 566,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 566,
+                    "video_frame": 4528,
+                    "time_s": 452.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 567,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 567,
+                    "video_frame": 4536,
+                    "time_s": 453.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 568,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 568,
+                    "video_frame": 4544,
+                    "time_s": 454.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 569,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 569,
+                    "video_frame": 4552,
+                    "time_s": 455.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 570,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 570,
+                    "video_frame": 4560,
+                    "time_s": 456.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 571,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 571,
+                    "video_frame": 4568,
+                    "time_s": 456.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 572,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 572,
+                    "video_frame": 4576,
+                    "time_s": 457.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 573,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 573,
+                    "video_frame": 4584,
+                    "time_s": 458.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 574,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 574,
+                    "video_frame": 4592,
+                    "time_s": 459.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 575,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 575,
+                    "video_frame": 4600,
+                    "time_s": 460.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 576,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 576,
+                    "video_frame": 4608,
+                    "time_s": 460.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 577,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 577,
+                    "video_frame": 4616,
+                    "time_s": 461.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 578,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 578,
+                    "video_frame": 4624,
+                    "time_s": 462.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 579,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 579,
+                    "video_frame": 4632,
+                    "time_s": 463.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 580,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 580,
+                    "video_frame": 4640,
+                    "time_s": 464.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 581,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 581,
+                    "video_frame": 4648,
+                    "time_s": 464.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 582,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 582,
+                    "video_frame": 4656,
+                    "time_s": 465.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 583,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 583,
+                    "video_frame": 4664,
+                    "time_s": 466.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 584,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 584,
+                    "video_frame": 4672,
+                    "time_s": 467.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 585,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 585,
+                    "video_frame": 4680,
+                    "time_s": 468.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 586,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 586,
+                    "video_frame": 4688,
+                    "time_s": 468.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 587,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 587,
+                    "video_frame": 4696,
+                    "time_s": 469.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 588,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 588,
+                    "video_frame": 4704,
+                    "time_s": 470.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 589,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 589,
+                    "video_frame": 4712,
+                    "time_s": 471.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 590,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 590,
+                    "video_frame": 4720,
+                    "time_s": 472.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 591,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 591,
+                    "video_frame": 4728,
+                    "time_s": 472.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 592,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 592,
+                    "video_frame": 4736,
+                    "time_s": 473.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 593,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 593,
+                    "video_frame": 4744,
+                    "time_s": 474.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 594,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 594,
+                    "video_frame": 4752,
+                    "time_s": 475.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 595,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 595,
+                    "video_frame": 4760,
+                    "time_s": 476.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 596,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 596,
+                    "video_frame": 4768,
+                    "time_s": 476.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 597,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 597,
+                    "video_frame": 4776,
+                    "time_s": 477.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 598,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 598,
+                    "video_frame": 4784,
+                    "time_s": 478.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 599,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 599,
+                    "video_frame": 4792,
+                    "time_s": 479.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 600,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 600,
+                    "video_frame": 4800,
+                    "time_s": 480.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 601,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 601,
+                    "video_frame": 4808,
+                    "time_s": 480.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 602,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 602,
+                    "video_frame": 4816,
+                    "time_s": 481.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 603,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 603,
+                    "video_frame": 4824,
+                    "time_s": 482.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 604,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 604,
+                    "video_frame": 4832,
+                    "time_s": 483.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 605,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 605,
+                    "video_frame": 4840,
+                    "time_s": 484.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 606,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 606,
+                    "video_frame": 4848,
+                    "time_s": 484.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 607,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 607,
+                    "video_frame": 4856,
+                    "time_s": 485.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 608,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 608,
+                    "video_frame": 4864,
+                    "time_s": 486.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 609,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 609,
+                    "video_frame": 4872,
+                    "time_s": 487.2
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 610,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 610,
+                    "video_frame": 4880,
+                    "time_s": 488.0
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 611,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 611,
+                    "video_frame": 4888,
+                    "time_s": 488.8
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 612,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 612,
+                    "video_frame": 4896,
+                    "time_s": 489.6
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 613,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 613,
+                    "video_frame": 4904,
+                    "time_s": 490.4
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 614,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 614,
+                    "video_frame": 4912,
+                    "time_s": 491.2
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 615,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 615,
+                    "video_frame": 4920,
+                    "time_s": 492.0
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 616,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 616,
+                    "video_frame": 4928,
+                    "time_s": 492.8
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 617,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 617,
+                    "video_frame": 4936,
+                    "time_s": 493.6
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 618,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 618,
+                    "video_frame": 4944,
+                    "time_s": 494.4
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 619,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 619,
+                    "video_frame": 4952,
+                    "time_s": 495.2
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 620,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 620,
+                    "video_frame": 4960,
+                    "time_s": 496.0
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 621,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 621,
+                    "video_frame": 4968,
+                    "time_s": 496.8
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 622,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 622,
+                    "video_frame": 4976,
+                    "time_s": 497.6
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 623,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 623,
+                    "video_frame": 4984,
+                    "time_s": 498.4
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 624,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 624,
+                    "video_frame": 4992,
+                    "time_s": 499.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 625,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 625,
+                    "video_frame": 5000,
+                    "time_s": 500.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 626,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 626,
+                    "video_frame": 5008,
+                    "time_s": 500.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 627,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 627,
+                    "video_frame": 5016,
+                    "time_s": 501.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 628,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 628,
+                    "video_frame": 5024,
+                    "time_s": 502.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 629,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 629,
+                    "video_frame": 5032,
+                    "time_s": 503.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 630,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 630,
+                    "video_frame": 5040,
+                    "time_s": 504.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 631,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 631,
+                    "video_frame": 5048,
+                    "time_s": 504.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 632,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 632,
+                    "video_frame": 5056,
+                    "time_s": 505.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 633,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 633,
+                    "video_frame": 5064,
+                    "time_s": 506.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 634,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 634,
+                    "video_frame": 5072,
+                    "time_s": 507.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 635,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 635,
+                    "video_frame": 5080,
+                    "time_s": 508.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 636,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 636,
+                    "video_frame": 5088,
+                    "time_s": 508.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 637,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 637,
+                    "video_frame": 5096,
+                    "time_s": 509.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 638,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 638,
+                    "video_frame": 5104,
+                    "time_s": 510.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 639,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 639,
+                    "video_frame": 5112,
+                    "time_s": 511.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 640,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 640,
+                    "video_frame": 5120,
+                    "time_s": 512.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 641,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 641,
+                    "video_frame": 5128,
+                    "time_s": 512.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 642,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 642,
+                    "video_frame": 5136,
+                    "time_s": 513.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 643,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 643,
+                    "video_frame": 5144,
+                    "time_s": 514.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 644,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 644,
+                    "video_frame": 5152,
+                    "time_s": 515.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 645,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 645,
+                    "video_frame": 5160,
+                    "time_s": 516.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 646,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 646,
+                    "video_frame": 5168,
+                    "time_s": 516.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 647,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 647,
+                    "video_frame": 5176,
+                    "time_s": 517.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 648,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 648,
+                    "video_frame": 5184,
+                    "time_s": 518.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 649,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 649,
+                    "video_frame": 5192,
+                    "time_s": 519.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 650,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 650,
+                    "video_frame": 5200,
+                    "time_s": 520.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 651,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 651,
+                    "video_frame": 5208,
+                    "time_s": 520.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 652,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 652,
+                    "video_frame": 5216,
+                    "time_s": 521.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 653,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 653,
+                    "video_frame": 5224,
+                    "time_s": 522.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 654,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 654,
+                    "video_frame": 5232,
+                    "time_s": 523.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 655,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 655,
+                    "video_frame": 5240,
+                    "time_s": 524.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 656,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 656,
+                    "video_frame": 5248,
+                    "time_s": 524.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 657,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 657,
+                    "video_frame": 5256,
+                    "time_s": 525.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 658,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 658,
+                    "video_frame": 5264,
+                    "time_s": 526.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 659,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 659,
+                    "video_frame": 5272,
+                    "time_s": 527.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 660,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 660,
+                    "video_frame": 5280,
+                    "time_s": 528.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 661,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 661,
+                    "video_frame": 5288,
+                    "time_s": 528.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 662,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 662,
+                    "video_frame": 5296,
+                    "time_s": 529.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 663,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 663,
+                    "video_frame": 5304,
+                    "time_s": 530.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 664,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 664,
+                    "video_frame": 5312,
+                    "time_s": 531.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 665,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 665,
+                    "video_frame": 5320,
+                    "time_s": 532.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 666,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 666,
+                    "video_frame": 5328,
+                    "time_s": 532.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 667,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 667,
+                    "video_frame": 5336,
+                    "time_s": 533.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 668,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 668,
+                    "video_frame": 5344,
+                    "time_s": 534.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 669,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 669,
+                    "video_frame": 5352,
+                    "time_s": 535.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 670,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 670,
+                    "video_frame": 5360,
+                    "time_s": 536.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 671,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 671,
+                    "video_frame": 5368,
+                    "time_s": 536.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 672,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 672,
+                    "video_frame": 5376,
+                    "time_s": 537.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 673,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 673,
+                    "video_frame": 5384,
+                    "time_s": 538.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 674,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 674,
+                    "video_frame": 5392,
+                    "time_s": 539.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 675,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 675,
+                    "video_frame": 5400,
+                    "time_s": 540.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 676,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 676,
+                    "video_frame": 5408,
+                    "time_s": 540.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 677,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 677,
+                    "video_frame": 5416,
+                    "time_s": 541.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 678,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 678,
+                    "video_frame": 5424,
+                    "time_s": 542.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 679,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 679,
+                    "video_frame": 5432,
+                    "time_s": 543.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 680,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 680,
+                    "video_frame": 5440,
+                    "time_s": 544.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 681,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 681,
+                    "video_frame": 5448,
+                    "time_s": 544.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 682,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 682,
+                    "video_frame": 5456,
+                    "time_s": 545.6
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 683,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 683,
+                    "video_frame": 5464,
+                    "time_s": 546.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 684,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 684,
+                    "video_frame": 5472,
+                    "time_s": 547.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 685,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 685,
+                    "video_frame": 5480,
+                    "time_s": 548.0
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 686,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 686,
+                    "video_frame": 5488,
+                    "time_s": 548.8
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 687,
+                  "reasons": [
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 687,
+                    "video_frame": 5496,
+                    "time_s": 549.6
+                  },
+                  "reason_labels": [
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 688,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 688,
+                    "video_frame": 5504,
+                    "time_s": 550.4
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                },
+                {
+                  "frame": 689,
+                  "reasons": [
+                    "object_stable_relative_settle",
+                    "gripper_away_from_object"
+                  ],
+                  "marker": {
+                    "monitor_frame": 689,
+                    "video_frame": 5512,
+                    "time_s": 551.2
+                  },
+                  "reason_labels": [
+                    "object stable relative settle",
+                    "gripper away from object"
+                  ]
+                }
+              ],
+              "end": {
+                "frame": 689,
+                "resolved": false,
+                "reason": "never resolved \u2014 episode ended, or next occurrence started, first",
+                "marker": {
+                  "monitor_frame": 689,
+                  "video_frame": 5512,
+                  "time_s": 551.2
+                }
+              }
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 690,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 690,
+                  "video_frame": 5520,
+                  "time_s": 552.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 716,
+                "resolved": true,
+                "reason": "object_settled became true",
+                "marker": {
+                  "monitor_frame": 716,
+                  "video_frame": 5728,
+                  "time_s": 572.8
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "satisfied": {
+    "0": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "vegetable",
+              "activation": {
+                "frame": 80,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 80,
+                  "video_frame": 640,
+                  "time_s": 64.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 82,
+                "resolved": true,
+                "reason": "object_grasped became true before object_left_gripper did \u2014 recovered",
+                "marker": {
+                  "monitor_frame": 82,
+                  "video_frame": 656,
+                  "time_s": 65.6
+                }
+              },
+              "eventual_separation": {
+                "frame": 144,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 144,
+                  "video_frame": 1152,
+                  "time_s": 115.2
+                }
+              }
+            },
+            {
+              "object": "vegetable",
+              "activation": {
+                "frame": 135,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 135,
+                  "video_frame": 1080,
+                  "time_s": 108.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 135,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 135,
+                  "video_frame": 1080,
+                  "time_s": 108.0
+                }
+              },
+              "eventual_separation": {
+                "frame": 144,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 144,
+                  "video_frame": 1152,
+                  "time_s": 115.2
+                }
+              }
+            },
+            {
+              "object": "chicken_drumstick",
+              "activation": {
+                "frame": 350,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 350,
+                  "video_frame": 2800,
+                  "time_s": 280.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 350,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 350,
+                  "video_frame": 2800,
+                  "time_s": 280.0
+                }
+              },
+              "eventual_separation": {
+                "frame": 359,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 359,
+                  "video_frame": 2872,
+                  "time_s": 287.2
+                }
+              }
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 690,
+                "reason": "object_dropped fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 690,
+                  "video_frame": 5520,
+                  "time_s": 552.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 690,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 690,
+                  "video_frame": 5520,
+                  "time_s": 552.0
+                }
+              },
+              "eventual_separation": {
+                "frame": 716,
+                "reason": "object_left_gripper eventually became true",
+                "marker": {
+                  "monitor_frame": 716,
+                  "video_frame": 5728,
+                  "time_s": 572.8
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "1": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "2": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "3": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "4": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 652,
+                "reason": "object_reach_in_fixture became true",
+                "marker": {
+                  "monitor_frame": 652,
+                  "video_frame": 5216,
+                  "time_s": 521.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 652,
+                "resolved": true,
+                "reason": "object_in_same_fixture became true",
+                "marker": {
+                  "monitor_frame": 652,
+                  "video_frame": 5216,
+                  "time_s": 521.6
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "5": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [
+            {
+              "object": "plate",
+              "activation": {
+                "frame": 76,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 76,
+                  "video_frame": 608,
+                  "time_s": 60.8
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 80,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 80,
+                  "video_frame": 640,
+                  "time_s": 64.0
+                }
+              }
+            },
+            {
+              "object": "vegetable",
+              "activation": {
+                "frame": 82,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 82,
+                  "video_frame": 656,
+                  "time_s": 65.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 135,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 135,
+                  "video_frame": 1080,
+                  "time_s": 108.0
+                }
+              }
+            },
+            {
+              "object": "chicken_drumstick",
+              "activation": {
+                "frame": 253,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 253,
+                  "video_frame": 2024,
+                  "time_s": 202.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 350,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 350,
+                  "video_frame": 2800,
+                  "time_s": 280.0
+                }
+              }
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 408,
+                "reason": "object_grasped became true",
+                "marker": {
+                  "monitor_frame": 408,
+                  "video_frame": 3264,
+                  "time_s": 326.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 690,
+                "resolved": true,
+                "reason": "object_dropped became true",
+                "marker": {
+                  "monitor_frame": 690,
+                  "video_frame": 5520,
+                  "time_s": 552.0
+                }
+              }
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "6": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "7": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 652,
+                "reason": "object_reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 652,
+                  "video_frame": 5216,
+                  "time_s": 521.6
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 652,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 652,
+                  "video_frame": 5216,
+                  "time_s": 521.6
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "8": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "invariant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "9": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "10": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": null,
+              "activation": {
+                "frame": 58,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 58,
+                  "video_frame": 464,
+                  "time_s": 46.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 58,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 58,
+                  "video_frame": 464,
+                  "time_s": 46.4
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "vegetable",
+              "activation": {
+                "frame": 228,
+                "reason": "skill_pick_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 228,
+                  "video_frame": 1824,
+                  "time_s": 182.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 228,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 228,
+                  "video_frame": 1824,
+                  "time_s": 182.4
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "11": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "vegetable",
+              "activation": {
+                "frame": 135,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 135,
+                  "video_frame": 1080,
+                  "time_s": 108.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 135,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 135,
+                  "video_frame": 1080,
+                  "time_s": 108.0
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "chicken_drumstick",
+              "activation": {
+                "frame": 350,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 350,
+                  "video_frame": 2800,
+                  "time_s": 280.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 350,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 350,
+                  "video_frame": 2800,
+                  "time_s": 280.0
+                }
+              },
+              "eventual_separation": null
+            },
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 690,
+                "reason": "skill_place_onset fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 690,
+                  "video_frame": 5520,
+                  "time_s": 552.0
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 690,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 690,
+                  "video_frame": 5520,
+                  "time_s": 552.0
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "12": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "13": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [
+            {
+              "object": "bowl",
+              "activation": {
+                "frame": 678,
+                "reason": "reach_in_fixture fires (edge-triggered entry event)",
+                "marker": {
+                  "monitor_frame": 678,
+                  "video_frame": 5424,
+                  "time_s": 542.4
+                }
+              },
+              "violated_frames": [],
+              "end": {
+                "frame": 678,
+                "resolved": true,
+                "reason": "instantaneous check",
+                "marker": {
+                  "monitor_frame": 678,
+                  "video_frame": 5424,
+                  "time_s": 542.4
+                }
+              },
+              "eventual_separation": null
+            }
+          ],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": true,
+          "description": "Corpus-wide caveat (KNOWN_BUGS.md #7), not a per-instance finding: privileged_static_info and privileged_dynamic_info disagree on fixture naming/layout on ~89% of episodes (upstream data collection issue, outside SafeManip/). This property reads fixture identity, so its verdict for this specific episode has not been individually confirmed reliable against that known data problem."
+        }
+      }
+    },
+    "14": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "15": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "until",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "16": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    },
+    "17": {
+      "claude": {
+        "gt_annotation": {
+          "source_note": "auto-derived from the monitor's own predicate_breakdown.occurrences (viewer/server.py's load_monitor_view) -- not independently re-verified frame-by-frame against raw sim state.",
+          "pattern": "instant",
+          "occurrences": [],
+          "confidence": "monitor-derived"
+        },
+        "monitor_problem": {
+          "has_problem": false,
+          "description": ""
+        }
+      }
+    }
+  },
+  "missed_notes": "",
+  "overall_verdict": null
+}
