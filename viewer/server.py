@@ -1002,6 +1002,23 @@ def _active_object_by_frame(raw_frames, object_names=None):
     return out
 
 
+def _settle_obj_name_by_frame(raw_frames, object_names=None):
+    """Same shape as _active_object_by_frame, but reads settle_obj_name
+    (violation_evidence.settle_obj_name) instead of the generic
+    role_sets.active_object -- for rc_released_object_eventually_settles
+    specifically, this is the one object its own single watched slot is
+    actually tracking, which is what an occurrence box should be labeled
+    with, not whatever's generically grasped at that same frame (2026-09-05,
+    per explicit user direction -- see categorical_keys' own comment)."""
+    object_names = object_names or {}
+    out = []
+    for frame in raw_frames:
+        preds = (frame.get("data") or {}).get("predicates") or {}
+        name = (preds.get("violation_evidence") or {}).get("settle_obj_name")
+        out.append(object_names.get(name, name) if name else name)
+    return out
+
+
 def compute_occurrences(meta, traces, active_object_by_frame, episode_last_frame):
     """All occurrences of one property's trigger condition in the episode —
     not just the first. For each occurrence: which frame activated it, which
@@ -1102,36 +1119,110 @@ def compute_occurrences(meta, traces, active_object_by_frame, episode_last_frame
             esc_res_dict = dict(esc_res) if esc_res is not None else {}
             esc_bad_value = escape_meta["obligation_kind"] != "hold_true"
 
+        def _branch_outcome(o_dict, r_dict, bad_val, start, end):
+            """First-event-wins per-frame race for a single `obligation U
+            resolve` branch: resolve becoming true this frame closes the
+            branch successfully *here*, regardless of the obligation's own
+            value this same frame (real Until semantics: Y holding at t
+            satisfies X U Y at t outright). But if the obligation goes bad
+            on an *earlier* frame, before resolve ever fired, the branch has
+            already permanently failed there -- a resolve on some *later*
+            frame cannot retroactively repair it (an interrupted Until does
+            not restart). Returns (resolved_frame, failed_frame) with the
+            other always None; both None means neither happened by `end`
+            (still open/undetermined within this window)."""
+            for f in range(start, end + 1):
+                if r_dict.get(f) is True:
+                    return (f, None)
+                if o_dict.get(f) is bad_val:
+                    return (None, f)
+            return (None, None)
+
         occurrences = []
         for i, start in enumerate(starts):
             next_start = starts[i + 1] if i + 1 < len(starts) else None
             search_end = (next_start - 1) if next_start is not None else episode_last_frame
-            end_frame = None
-            end_reason = None
-            for f in range(start, search_end + 1):
-                primary_resolved = res_dict.get(f) is True
-                escape_resolved = escape_meta is not None and esc_res_dict.get(f) is True
-                if primary_resolved or escape_resolved:
-                    end_frame = f
-                    end_reason = (
-                        f"{meta['resolve']} became true" if primary_resolved
-                        else f"{escape_meta['resolve']} became true (escape)"
-                    )
-                    break
-            # the frame either resolve atom becomes true satisfies its own U
-            # outright regardless of either obligation's value on that same
-            # frame, so it's excluded from the violation range (only frames
-            # strictly before resolution count).
-            violated_range_end = end_frame if end_frame is not None else search_end + 1
-            violated = [
-                {"frame": f, "reasons": false_children(reason_atom, f)}
-                for f in range(start, violated_range_end)
-                if obl_dict.get(f) is bad_value
-                and (
-                    escape_meta is None
-                    or esc_obl_dict.get(f) is esc_bad_value
+
+            primary_resolved, primary_failed = _branch_outcome(
+                obl_dict, res_dict, bad_value, start, search_end
+            )
+            if escape_meta:
+                esc_resolved, esc_failed = _branch_outcome(
+                    esc_obl_dict, esc_res_dict, esc_bad_value, start, search_end
                 )
-            ]
+            else:
+                esc_resolved, esc_failed = (None, None)
+
+            # Resolved (the OR is satisfied) the instant *either* branch
+            # resolves, whichever comes first -- a branch that's already
+            # failed doesn't block the other one from still succeeding.
+            resolved_candidates = [f for f in (primary_resolved, esc_resolved) if f is not None]
+            end_frame = min(resolved_candidates) if resolved_candidates else None
+            if end_frame is not None:
+                end_reason = (
+                    f"{meta['resolve']} became true" if end_frame == primary_resolved
+                    else f"{escape_meta['resolve']} became true (escape)"
+                )
+            else:
+                end_reason = None
+
+            # Genuinely violated (the OR is refuted) only once *both*
+            # branches (or the lone primary branch, if there's no escape)
+            # have conclusively failed -- as long as one branch is still
+            # open, the formula hasn't been refuted yet, matching the real
+            # DFA only confirming a trap once every escape is exhausted.
+            if end_frame is None:
+                if escape_meta is None:
+                    fail_frame = primary_failed
+                elif primary_failed is not None and esc_failed is not None:
+                    fail_frame = max(primary_failed, esc_failed)
+                else:
+                    fail_frame = None  # at least one branch still open
+                # Neither branch may ever conclusively resolve *or* fail
+                # within this window if the episode itself just ends first
+                # (e.g. a *_settle_timeout flag that would eventually fire,
+                # but the trace runs out before it does) -- under finite-
+                # trace semantics an Until that's still open when the trace
+                # ends is deemed unresolved (a real violation), matching
+                # what the primary DFA itself reports for exactly this
+                # case. Only applies to the occurrence actually reaching
+                # true episode end, not one truncated early by the next
+                # trigger.
+                if (
+                    fail_frame is None
+                    and next_start is None
+                    and search_end == episode_last_frame
+                ):
+                    fail_frame = search_end
+            else:
+                fail_frame = None
+
+            violated_range_end = end_frame if end_frame is not None else search_end + 1
+            if fail_frame is not None:
+                # Both branches have already permanently failed as of
+                # fail_frame -- the compound OR stays refuted for the rest
+                # of the window regardless of either obligation atom's own
+                # momentary value afterward (a branch that's already dead
+                # doesn't come back), so every frame from fail_frame onward
+                # counts, unconditionally.
+                violated = [
+                    {"frame": f, "reasons": false_children(reason_atom, f)}
+                    for f in range(fail_frame, violated_range_end)
+                ]
+            else:
+                # No branch has conclusively failed yet (still resolved, or
+                # still open with no escape defined) -- fall back to the
+                # original per-frame proxy, only frames where the tracked
+                # obligation(s) are simultaneously bad.
+                violated = [
+                    {"frame": f, "reasons": false_children(reason_atom, f)}
+                    for f in range(start, violated_range_end)
+                    if obl_dict.get(f) is bad_value
+                    and (
+                        escape_meta is None
+                        or esc_obl_dict.get(f) is esc_bad_value
+                    )
+                ]
             occurrences.append({
                 "object": obj_at(start),
                 "activation": {"frame": start, "reason": f"{meta['trigger']} became true"},
@@ -1549,8 +1640,11 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
         if meta:
             full_traces_for_meta = {k: boolean_trace(raw_frames, k, 0, episode_last) for k in display_keys}
             object_names = load_object_display_names(base_dir, episode)
-            active_object_by_frame = _active_object_by_frame(raw_frames, object_names)
-            occurrences = compute_occurrences(meta, full_traces_for_meta, active_object_by_frame, episode_last)
+            if property_name == "rc_released_object_eventually_settles":
+                occ_object_by_frame = _settle_obj_name_by_frame(raw_frames, object_names)
+            else:
+                occ_object_by_frame = _active_object_by_frame(raw_frames, object_names)
+            occurrences = compute_occurrences(meta, full_traces_for_meta, occ_object_by_frame, episode_last)
             for occ in occurrences:
                 if occ.get("activation") and occ["activation"].get("frame") is not None:
                     occ["activation"]["marker"] = to_video_time(occ["activation"]["frame"])
@@ -1621,17 +1715,26 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
             })
         # Categorical rows: which object each predicate above is actually
         # about, at each frame -- not a boolean, the object's *name* (e.g.
-        # "bread" vs "basket"). active_object is shown for every property;
-        # settle_obj_name only where it's genuinely a different concept
-        # (rc_released_object_eventually_settles -- see object_settled's
-        # settle_obj_name-vs-active_object distinction in PROPERTY_META).
+        # "bread" vs "basket"). Default to active_object (the generic
+        # currently-grasped/manipulated object), but for properties that
+        # track their own dedicated single watched-object slot internally
+        # (settle_obj_name for rc_released_object_eventually_settles),
+        # show *only* that instead of also showing active_object --
+        # active_object tracks whatever's currently grasped in general,
+        # which is a different, broader concept than "the specific object
+        # this pending obligation is about" and just adds visual noise/
+        # confusion once a dedicated slot already exists (2026-09-05, per
+        # explicit user direction: track the LTL-activated object, not the
+        # grasped/manipulated object, for properties that already have
+        # their own such slot).
         # No breakdown for older saved episodes that predate the
         # settle_obj_name export -- categorical_trace/node_for below just
         # come back empty for those, same "not present" handling as any
         # other missing key.
-        categorical_keys = ["active_object"]
         if property_name == "rc_released_object_eventually_settles":
-            categorical_keys.append("settle_obj_name")
+            categorical_keys = ["settle_obj_name"]
+        else:
+            categorical_keys = ["active_object"]
         for cat_key in categorical_keys:
             cat_trace = categorical_trace(raw_frames, cat_key, start, end)
             if all(v is None for _, v in cat_trace):
