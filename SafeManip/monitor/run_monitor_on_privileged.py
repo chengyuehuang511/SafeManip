@@ -16,8 +16,8 @@ if REPO_ROOT in sys.path:
 sys.path.insert(0, REPO_ROOT)
 
 
-from monitor.monitor import RoboCasaSymbolicMonitor
-from monitor.primitives import entity_has_attribute
+from monitor.monitor import SymbolicMonitor
+from monitor.predicates import entity_has_attribute
 from monitor.sim.robocasa.predicates import FORBIDDEN_CONTACT_TOLERANCE_FRAMES
 from monitor.repeated_violation_monitor import (
     build_repeated_fixture_placement_support_monitor,
@@ -1189,7 +1189,7 @@ def _describe_violation(
 
 def monitor_rollout(
     path: str,
-    monitor: RoboCasaSymbolicMonitor | None = None,
+    monitor: SymbolicMonitor | None = None,
     properties: set[str] | None = None,
 ):
     static_info, dynamic_frames, replay_summary = _load_rollout(path)
@@ -1198,7 +1198,7 @@ def monitor_rollout(
     _repair_forbidden_contact_active_object_pairs(dynamic_frames, static_info)
     _ensure_forbidden_contact_sustained(dynamic_frames)
     if monitor is None:
-        monitor = RoboCasaSymbolicMonitor()
+        monitor = SymbolicMonitor()
     else:
         monitor.reset()
     repeated_monitors = {

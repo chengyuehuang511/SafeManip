@@ -1,493 +1,859 @@
-"""Canonical RoboCasa predicate wrappers from ``docs/new/4ltls.txt``."""
+from __future__ import annotations
 
-from functools import partial
+from copy import deepcopy as _deepcopy
+from functools import lru_cache as _lru_cache
 
-import monitor.primitives as P
+try:
+    from monitor.sim.robocasa.attributes import (
+        external_object_categories as _external_object_categories,
+        object_is_receptacle_category as _object_is_receptacle_category,
+    )
+except Exception:  # pragma: no cover - keeps import robust in partial checkouts.
+    _external_object_categories = None
 
-from monitor.SymbolicEntity import SymbolicEntity
-
-
-OBJECT = SymbolicEntity("object", base_filter=lambda node: True)
-SUPPORT = SymbolicEntity("support", base_filter=lambda node: True)
-FIXTURE = SymbolicEntity("fixture", base_filter=lambda node: True)
-TARGET_OBJECT = SymbolicEntity("target_object", base_filter=lambda node: True)
-
-
-def with_attribute(entity, attribute_name):
-    return partial(P.entity_has_attribute, entity, attribute_name)
-
-
-def forbidden_contact(entity=None, support=None, fixture=None):
-    return partial(P.forbidden_contact, entity, support, fixture)
+    def _object_is_receptacle_category(category: str, extra_attrs=()) -> bool:  # type: ignore[misc]
+        _FALLBACK = {"bowl", "cup", "mug", "pot", "pan", "tray", "container", "tupperware", "bottle", "can"}
+        return str(category).lower() in _FALLBACK or bool(set(extra_attrs) & _FALLBACK)
 
 
-def forbidden_contact_sustained(entity=None, support=None, fixture=None):
-    return partial(P.forbidden_contact_sustained, entity, support, fixture)
+def _resolve_entity(entity: Any, kwargs: Dict[str, Any]) -> Any:
+    if entity is None:
+        return kwargs.get("obj") or kwargs.get("object") or kwargs.get("entity")
+    bindings = kwargs.get("bindings") or {}
+    role_name = getattr(entity, "name", None)
+    if role_name in bindings:
+        return bindings[role_name]
+    return entity
 
 
-def allowed_contact(entity=None, support=None, fixture=None):
-    return partial(P.allowed_contact, entity, support, fixture)
+def _privileged(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    return kwargs.get("privileged") or kwargs.get("privileged_info") or {}
 
 
-def robot_correct_manipulated_object_contact(entity=None):
-    return partial(P.robot_correct_manipulated_object_contact, entity)
+def _dynamic_info(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    privileged = _privileged(kwargs)
+    return kwargs.get("dynamic_info") or privileged.get("dynamic") or privileged.get("dynamic_info") or {}
 
 
-def robot_correct_fixture_contact(fixture=None):
-    return partial(P.robot_correct_fixture_contact, fixture)
+def _static_info(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    privileged = _privileged(kwargs)
+    return kwargs.get("static_info") or privileged.get("static") or privileged.get("static_info") or {}
 
 
-def correct_manipulated_object_correct_fixture_contact(entity=None, fixture=None):
-    return partial(P.correct_manipulated_object_correct_fixture_contact, entity, fixture)
+def _scene_objects(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    return ((_dynamic_info(kwargs).get("scene") or {}).get("objects") or {})
 
 
-def correct_manipulated_object_correct_receive_object_contact(entity=None, target_object=None):
-    return partial(P.correct_manipulated_object_correct_receive_object_contact, entity, target_object)
+def _static_objects(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    static = _static_info(kwargs)
+    return (
+        (static.get("objects") or {})
+        or ((static.get("scene") or {}).get("objects") or {})
+        or ((static.get("scene_layout") or {}).get("objects") or {})
+    )
 
 
-def grasped_object_exists(entity=None):
-    return partial(P.grasped_object_exists, entity)
+def _object_dynamic(name: Any, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    return (_scene_objects(kwargs).get(str(name)) or {}) if name is not None else {}
 
 
-def object_grasped(entity=None):
-    return partial(P.object_grasped, entity)
+def _object_static(name: Any, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    return (_static_objects(kwargs).get(str(name)) or {}) if name is not None else {}
 
 
-def object_stable(entity=None):
-    return partial(P.object_stable, entity)
+def _object_category(name: Any, kwargs: Dict[str, Any]) -> Optional[str]:
+    for entry in (_object_static(name, kwargs), _object_dynamic(name, kwargs)):
+        for key in ("category", "type", "object_type"):
+            value = entry.get(key)
+            if value:
+                return str(value).lower()
+    return str(name).lower() if name is not None else None
 
 
-def object_stable_relative(entity=None):
-    return partial(P.object_stable_relative, entity)
+@_lru_cache(maxsize=1)
+def _external_object_metadata() -> Dict[str, Dict[str, Any]]:
+    if _external_object_categories is None:
+        return {}
+    try:
+        return _external_object_categories()
+    except Exception:
+        return {}
 
 
-def object_sync(entity=None):
-    return partial(P.object_sync, entity)
+def _metadata_attributes(name: Any, kwargs: Dict[str, Any]) -> set[str]:
+    category = _object_category(name, kwargs)
+    if not category:
+        return set()
+    entry = _external_object_metadata().get(category) or {}
+    attrs = set(str(attr).lower() for attr in (entry.get("attributes") or []))
+    types = set(str(kind).lower() for kind in (entry.get("types") or []))
+    return attrs | types | {category}
 
 
-def object_upright(entity=None):
-    return partial(P.object_upright, entity)
+def _object_has_attribute(obj: Any, attribute_name: str, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    attribute = str(attribute_name).lower()
+    explicit = (
+        (_object_static(obj, kwargs).get("attributes") or {})
+        or (_object_dynamic(obj, kwargs).get("attributes") or {})
+    )
+    if isinstance(explicit, dict) and attribute in explicit:
+        return bool(explicit[attribute])
+    if isinstance(explicit, (list, tuple, set)) and attribute in {str(v).lower() for v in explicit}:
+        return True
+
+    attrs = _metadata_attributes(obj, kwargs)
+    if attribute in attrs:
+        return True
+    if attribute == "ready_to_eat":
+        return bool(attrs & {"ready_to_eat", "cooked_food", "fruit", "vegetable", "dairy", "bread_food", "pastry"})
+    if attribute == "raw":
+        return bool(attrs & {"raw", "meat", "fish", "seafood"})
+    return False
 
 
-def object_grasped_safe(entity=None):
-    return partial(P.object_grasped_safe, entity)
+def entity_has_attribute(entity: Any, attribute_name: str, **kwargs) -> bool:
+    return _object_has_attribute(_resolve_entity(entity, kwargs), attribute_name, **kwargs)
 
 
-def object_dropped(entity=None):
-    return partial(P.object_dropped, entity)
+def _predicate_value(name: str, default: bool = False, **kwargs) -> bool:
+    for source_name in ("predicate_values", "predicates"):
+        source = kwargs.get(source_name) or {}
+        if name in source:
+            value = source[name]
+            if isinstance(value, dict):
+                value = value.get("value", default)
+            return bool(value)
+
+    for root in (kwargs, _privileged(kwargs), _dynamic_info(kwargs)):
+        if not isinstance(root, dict):
+            continue
+        roots = [root]
+        embedded = root.get("predicates")
+        if isinstance(embedded, dict):
+            roots.append(embedded)
+        for candidate in roots:
+            sections = candidate.get("sections") or {}
+            predicates = (sections.get("predicates") or {}) if isinstance(sections, dict) else {}
+            if name in predicates:
+                entry = predicates[name]
+                return bool(entry.get("value", default) if isinstance(entry, dict) else entry)
+    return bool(default)
 
 
-def object_left_gripper(entity=None):
-    return partial(P.object_left_gripper, entity)
+# ---------------------------------------------------------------------------
+# Predicate terms: read the value sim/robocasa/predicates.py already baked
+# into dynamic_info for this frame (see _predicate_value above). Called
+# directly by specs.py's COMMON_PREDICATES -- no per-role currying, since
+# there's no deferred composition to build (unlike SceneFlowLang's own
+# SG_Primitives.py, which composes several graph operations lazily): each of
+# these is a single, already-computed lookup by name.
+# ---------------------------------------------------------------------------
+
+def forbidden_contact(obj: Any = None, support: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("forbidden_contact", False, **kwargs)
 
 
-def object_released(entity=None):
-    return partial(P.object_released, entity)
+def forbidden_contact_sustained(obj: Any = None, support: Any = None, fixture: Any = None, **kwargs) -> bool:
+    """Same shape as forbidden_contact -- see predicates.py's
+    FORBIDDEN_CONTACT_TOLERANCE_FRAMES comment. True only once forbidden_contact
+    has persisted past the tolerance window, not on every raw touch."""
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("forbidden_contact_sustained", False, **kwargs)
 
 
-def object_supported(entity=None, support=None):
-    return partial(P.object_supported, entity, support)
+def allowed_contact(obj: Any = None, support: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("allowed_contact", False, **kwargs)
 
 
-def object_supported_on_correct(entity=None, support=None):
-    return partial(P.object_supported_on_correct, entity, support)
+def robot_correct_manipulated_object_contact(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("robot_correct_manipulated_object_contact", False, **kwargs)
 
 
-def gripper_away_from_object(entity=None):
-    return partial(P.gripper_away_from_object, entity)
+def robot_correct_fixture_contact(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("robot_correct_fixture_contact", False, **kwargs)
 
 
-def gripper_is_opening(entity=None):
-    return partial(P.gripper_is_opening, entity)
+def correct_manipulated_object_correct_fixture_contact(obj: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("correct_manipulated_object_correct_fixture_contact", False, **kwargs)
 
 
-def object_settled(entity=None, support=None):
-    return partial(P.object_settled, entity, support)
+def correct_manipulated_object_correct_receive_object_contact(obj: Any = None, target: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(target, kwargs))
+    return _predicate_value("correct_manipulated_object_correct_receive_object_contact", False, **kwargs)
 
 
-def object_settle_timeout(entity=None, support=None):
-    return partial(P.object_settle_timeout, entity, support)
+def grasped_object_exists(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("grasped_object_exists", False, **kwargs)
 
 
-def release_object_settle_timeout(entity=None, support=None):
-    return partial(P.release_object_settle_timeout, entity, support)
+def object_grasped(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_grasped", False, **kwargs)
 
 
-def sanitized(entity=None, support=None, fixture=None):
-    return partial(P.sanitized, entity, support, fixture)
+def object_stable(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_stable", False, **kwargs)
 
 
-def robot_contact_raw_contaminated(entity=None, support=None, fixture=None):
-    return partial(P.robot_contact_raw_contaminated, entity, support, fixture)
+def object_stable_relative(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_stable_relative", False, **kwargs)
 
 
-def object_is_rte(entity=None):
-    return partial(P.object_is_rte, entity)
+def object_sync(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_sync", False, **kwargs)
 
 
-def robot_contact_clean(entity=None):
-    return partial(P.robot_contact_clean, entity)
+def object_upright(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_upright", False, **kwargs)
+
+
+def object_grasped_safe(obj: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    return _predicate_value(
+        "object_grasped_safe",
+        object_grasped(obj, **kwargs) and object_sync(obj, **kwargs),
+        **kwargs,
+    )
+
+
+def object_dropped(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_dropped", False, **kwargs)
+
+
+def object_left_gripper(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_left_gripper", False, **kwargs)
+
+
+def object_released(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_released", False, **kwargs)
+
+
+def object_supported(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("object_supported", False, **kwargs)
+
+
+def object_supported_on_correct(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("object_supported_on_correct", False, **kwargs)
+
+
+def gripper_away_from_object(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("gripper_away_from_object", False, **kwargs)
+
+
+def gripper_is_opening(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("gripper_is_opening", False, **kwargs)
+
+
+def object_settled(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    support = _resolve_entity(support, kwargs)
+    return _predicate_value(
+        "object_settled",
+        object_supported(obj, support, **kwargs)
+        and support_type_matches_object(obj, support, **kwargs)
+        and object_stable(obj, **kwargs)
+        and gripper_away_from_object(obj, **kwargs),
+        **kwargs,
+    )
+
+
+def object_settle_timeout(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("object_settle_timeout", False, **kwargs)
+
+
+def release_object_settle_timeout(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("release_object_settle_timeout", False, **kwargs)
+
+
+def sanitized(obj: Any = None, support: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("sanitized", False, **kwargs)
+
+
+def robot_contact_raw_contaminated(obj: Any = None, support: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("robot_contact_raw_contaminated", False, **kwargs)
+
+
+def object_is_rte(obj: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_is_rte", _object_has_attribute(obj, "ready_to_eat", **kwargs), **kwargs)
+
+
+def robot_contact_clean(obj: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    return _predicate_value("robot_contact_clean", False, **kwargs)
 
 
 # ---------------------------------------------------------------------------
 # Intended-safety onset and preconditions (intended_safety.txt)
 # ---------------------------------------------------------------------------
 
-def gripper_is_closing(entity=None):
-    return partial(P.gripper_is_closing, entity)
+def gripper_is_closing(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("gripper_is_closing", False, **kwargs)
 
 
-def gripper_near_object(entity=None):
-    return partial(P.gripper_near_object, entity)
+def gripper_near_object(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("gripper_near_object", False, **kwargs)
 
 
-def skill_pick_onset(entity=None):
-    return partial(P.skill_pick_onset, entity)
+def skill_pick_onset(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("skill_pick_onset", False, **kwargs)
 
 
-def skill_place_onset(entity=None):
-    return partial(P.skill_place_onset, entity)
+def skill_place_onset(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("skill_place_onset", False, **kwargs)
 
 
-def object_region_clear(entity=None):
-    return partial(P.object_region_clear, entity)
+def object_region_clear(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_region_clear", False, **kwargs)
 
 
-def object_upright_if_receptacle(entity=None):
-    return partial(P.object_upright_if_receptacle, entity)
+def _object_is_receptacle(obj: Any, kwargs: Dict[str, Any]) -> bool:
+    category = _object_category(obj, kwargs) or ""
+    extra_attrs = _metadata_attributes(obj, kwargs)
+    return _object_is_receptacle_category(category, extra_attrs)
 
 
-def preconditions_satisfied_pick(entity=None):
-    return partial(P.preconditions_satisfied_pick, entity)
+def object_upright_if_receptacle(obj: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    default = (not _object_is_receptacle(obj, kwargs)) or object_upright(obj, **kwargs)
+    return _predicate_value("object_upright_if_receptacle", default, **kwargs)
 
 
-def pick_precondition_escape(entity=None):
-    return partial(P.pick_precondition_escape, entity)
+def preconditions_satisfied_pick(obj: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    return _predicate_value(
+        "preconditions_satisfied_pick",
+        object_region_clear(obj, **kwargs)
+        and object_stable(obj, **kwargs)
+        and object_upright_if_receptacle(obj, **kwargs),
+        **kwargs,
+    )
 
 
-def support_region_clear(support=None):
-    return partial(P.support_region_clear, support)
+def pick_precondition_escape(obj: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    return _predicate_value("pick_precondition_escape", False, **kwargs)
 
 
-def support_stable(support=None):
-    return partial(P.support_stable, support)
+def support_region_clear(support: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(support, kwargs)
+    return _predicate_value("support_region_clear", False, **kwargs)
 
 
-def support_geometry_valid(support=None):
-    return partial(P.support_geometry_valid, support)
+def support_stable(support: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(support, kwargs)
+    return _predicate_value("support_stable", False, **kwargs)
 
 
-def support_type_matches_object(entity=None, support=None):
-    return partial(P.support_type_matches_object, entity, support)
+def support_geometry_valid(support: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(support, kwargs)
+    return _predicate_value("support_geometry_valid", False, **kwargs)
 
 
-def dump_support_geometry_valid(entity=None, support=None):
-    return partial(P.dump_support_geometry_valid, entity, support)
+def support_type_matches_object(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("support_type_matches_object", True, **kwargs)
 
 
-def dump_support_type_matches_content(entity=None, support=None):
-    return partial(P.dump_support_type_matches_content, entity, support)
+def dump_support_geometry_valid(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("dump_support_geometry_valid", True, **kwargs)
 
 
-def dump_support_hygienic_for_content(entity=None, support=None):
-    return partial(P.dump_support_hygienic_for_content, entity, support)
+def dump_support_type_matches_content(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("dump_support_type_matches_content", True, **kwargs)
 
 
-def dump_support_objects_clean_for_content(entity=None, support=None):
-    return partial(P.dump_support_objects_clean_for_content, entity, support)
+def dump_support_hygienic_for_content(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("dump_support_hygienic_for_content", True, **kwargs)
 
 
-def dump_support_not_cluttered_for_fragile_content(entity=None, support=None):
-    return partial(P.dump_support_not_cluttered_for_fragile_content, entity, support)
+def dump_support_objects_clean_for_content(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("dump_support_objects_clean_for_content", True, **kwargs)
 
 
-def support_hygienic_for_manipulated_object(entity=None, support=None):
-    return partial(P.support_hygienic_for_manipulated_object, entity, support)
+def dump_support_not_cluttered_for_fragile_content(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("dump_support_not_cluttered_for_fragile_content", True, **kwargs)
 
 
-def support_objects_clean_for_manipulated_object(entity=None, support=None):
-    return partial(P.support_objects_clean_for_manipulated_object, entity, support)
+def support_hygienic_for_manipulated_object(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("support_hygienic_for_manipulated_object", True, **kwargs)
 
 
-def support_not_cluttered_for_fragile_manipulated_object(entity=None, support=None):
-    return partial(P.support_not_cluttered_for_fragile_manipulated_object, entity, support)
+def support_objects_clean_for_manipulated_object(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("support_objects_clean_for_manipulated_object", True, **kwargs)
 
 
-def preconditions_satisfied_place(entity=None, support=None):
-    return partial(P.preconditions_satisfied_place, entity, support)
-
-
-def place_precondition_escape(entity=None, support=None):
-    return partial(P.place_precondition_escape, entity, support)
-
-
-def skill_press_onset(target=None):
-    return partial(P.skill_press_onset, target)
-
-
-def skill_turn_onset(target=None):
-    return partial(P.skill_turn_onset, target)
-
-
-def skill_slide_onset(target=None):
-    return partial(P.skill_slide_onset, target)
-
-
-def skill_twist_onset(target=None):
-    return partial(P.skill_twist_onset, target)
-
-
-def skill_open_close_onset(target=None):
-    return partial(P.skill_open_close_onset, target)
-
-
-def skill_dump_onset(entity=None):
-    return partial(P.skill_dump_onset, entity)
-
-
-def target_region_clear(target=None):
-    return partial(P.target_region_clear, target)
-
-
-def target_stable(target=None):
-    return partial(P.target_stable, target)
-
-
-def fixture_ready_for_press(target=None):
-    return partial(P.fixture_ready_for_press, target)
-
-
-def fixture_ready_for_turn(target=None):
-    return partial(P.fixture_ready_for_turn, target)
-
-
-def fixture_ready_for_slide(target=None):
-    return partial(P.fixture_ready_for_slide, target)
-
-
-def fixture_ready_for_twist(target=None):
-    return partial(P.fixture_ready_for_twist, target)
-
-
-def fixture_ready_for_open_close(target=None):
-    return partial(P.fixture_ready_for_open_close, target)
-
-
-def slide_path_clear(target=None):
-    return partial(P.slide_path_clear, target)
-
-
-def target_receptacle_upright_if_has_contents(target=None):
-    return partial(P.target_receptacle_upright_if_has_contents, target)
-
-
-def articulation_path_clear(target=None):
-    return partial(P.articulation_path_clear, target)
-
-
-def preconditions_satisfied_press(target=None):
-    return partial(P.preconditions_satisfied_press, target)
-
-
-def preconditions_satisfied_turn(target=None):
-    return partial(P.preconditions_satisfied_turn, target)
-
-
-def preconditions_satisfied_slide(target=None):
-    return partial(P.preconditions_satisfied_slide, target)
-
-
-def preconditions_satisfied_twist(target=None):
-    return partial(P.preconditions_satisfied_twist, target)
-
-
-def preconditions_satisfied_open_close(target=None):
-    return partial(P.preconditions_satisfied_open_close, target)
-
-
-def preconditions_satisfied_dump(entity=None, support=None):
-    return partial(P.preconditions_satisfied_dump, entity, support)
-
-
-def dump_precondition_escape(entity=None, support=None):
-    return partial(P.dump_precondition_escape, entity, support)
+def support_not_cluttered_for_fragile_manipulated_object(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("support_not_cluttered_for_fragile_manipulated_object", True, **kwargs)
 
 
 # ---------------------------------------------------------------------------
 # Mechanism safety: fixture open/close obstacle recovery (mechanism_safety.txt)
 # ---------------------------------------------------------------------------
 
-def robot_fixture_contact(fixture=None):
-    return partial(P.robot_fixture_contact, fixture)
+def robot_fixture_contact(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("robot_fixture_contact", False, **kwargs)
 
 
-def fixture_is_opening(fixture=None):
-    return partial(P.fixture_is_opening, fixture)
+def fixture_is_opening(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_is_opening", False, **kwargs)
 
 
-def fixture_is_closing(fixture=None):
-    return partial(P.fixture_is_closing, fixture)
+def fixture_is_closing(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_is_closing", False, **kwargs)
 
 
-def fixture_fully_open(fixture=None):
-    return partial(P.fixture_fully_open, fixture)
+def fixture_fully_open(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_fully_open", False, **kwargs)
 
 
-def fixture_fully_closed(fixture=None):
-    return partial(P.fixture_fully_closed, fixture)
+def fixture_fully_closed(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_fully_closed", False, **kwargs)
 
 
-def fixture_obstacle_contact(fixture=None):
-    return partial(P.fixture_obstacle_contact, fixture)
+def fixture_obstacle_contact(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_obstacle_contact", False, **kwargs)
 
 
-def continue_fixture_open(fixture=None):
-    return partial(P.continue_fixture_open, fixture)
+def continue_fixture_open(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("continue_fixture_open", False, **kwargs)
 
 
-def continue_fixture_close(fixture=None):
-    return partial(P.continue_fixture_close, fixture)
+def continue_fixture_close(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("continue_fixture_close", False, **kwargs)
 
 
-def fixture_open_retract_path_clear(fixture=None):
-    return partial(P.fixture_open_retract_path_clear, fixture)
+def fixture_open_retract_path_clear(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_open_retract_path_clear", True, **kwargs)
 
 
-def fixture_close_retract_path_clear(fixture=None):
-    return partial(P.fixture_close_retract_path_clear, fixture)
+def fixture_close_retract_path_clear(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_close_retract_path_clear", True, **kwargs)
 
 
-def fixture_open_obstacle_hit(fixture=None):
-    return partial(P.fixture_open_obstacle_hit, fixture)
+def fixture_open_obstacle_hit(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_open_obstacle_hit", False, **kwargs)
 
 
-def fixture_close_obstacle_hit(fixture=None):
-    return partial(P.fixture_close_obstacle_hit, fixture)
+def fixture_close_obstacle_hit(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_close_obstacle_hit", False, **kwargs)
 
 
-def fixture_open_retracting(fixture=None):
-    return partial(P.fixture_open_retracting, fixture)
+def fixture_open_retracting(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_open_retracting", False, **kwargs)
 
 
-def fixture_close_retracting(fixture=None):
-    return partial(P.fixture_close_retracting, fixture)
+def fixture_close_retracting(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_close_retracting", False, **kwargs)
 
 
-def fixture_open_retract_resolved(fixture=None):
-    return partial(P.fixture_open_retract_resolved, fixture)
+def fixture_open_retract_resolved(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_open_retract_resolved", False, **kwargs)
 
 
-def fixture_close_retract_resolved(fixture=None):
-    return partial(P.fixture_close_retract_resolved, fixture)
+def fixture_close_retract_resolved(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_close_retract_resolved", False, **kwargs)
+
+
+def preconditions_satisfied_place(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    support = _resolve_entity(support, kwargs)
+    return _predicate_value(
+        "preconditions_satisfied_place",
+        support_region_clear(support, **kwargs)
+        and support_stable(support, **kwargs)
+        and support_geometry_valid(support, **kwargs)
+        and support_type_matches_object(obj, support, **kwargs)
+        and support_hygienic_for_manipulated_object(obj, support, **kwargs)
+        and support_objects_clean_for_manipulated_object(obj, support, **kwargs)
+        and support_not_cluttered_for_fragile_manipulated_object(obj, support, **kwargs),
+        **kwargs,
+    )
+
+
+def place_precondition_escape(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    support = _resolve_entity(support, kwargs)
+    return _predicate_value("place_precondition_escape", False, **kwargs)
+
+
+def skill_press_onset(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("skill_press_onset", False, **kwargs)
+
+
+def skill_turn_onset(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("skill_turn_onset", False, **kwargs)
+
+
+def skill_slide_onset(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("skill_slide_onset", False, **kwargs)
+
+
+def skill_twist_onset(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("skill_twist_onset", False, **kwargs)
+
+
+def skill_open_close_onset(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("skill_open_close_onset", False, **kwargs)
+
+
+def skill_dump_onset(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("skill_dump_onset", False, **kwargs)
+
+
+def target_region_clear(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("target_region_clear", False, **kwargs)
+
+
+def target_stable(target: Any = None, **kwargs) -> bool:
+    target = _resolve_entity(target, kwargs)
+    return _predicate_value("target_stable", object_stable(target, **kwargs), **kwargs)
+
+
+def fixture_ready_for_press(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("fixture_ready_for_press", True, **kwargs)
+
+
+def fixture_ready_for_turn(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("fixture_ready_for_turn", True, **kwargs)
+
+
+def fixture_ready_for_slide(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("fixture_ready_for_slide", True, **kwargs)
+
+
+def fixture_ready_for_twist(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("fixture_ready_for_twist", True, **kwargs)
+
+
+def fixture_ready_for_open_close(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("fixture_ready_for_open_close", True, **kwargs)
+
+
+def slide_path_clear(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("slide_path_clear", False, **kwargs)
+
+
+def target_receptacle_upright_if_has_contents(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("target_receptacle_upright_if_has_contents", True, **kwargs)
+
+
+def articulation_path_clear(target: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(target, kwargs)
+    return _predicate_value("articulation_path_clear", False, **kwargs)
+
+
+def preconditions_satisfied_press(target: Any = None, **kwargs) -> bool:
+    target = _resolve_entity(target, kwargs)
+    return _predicate_value(
+        "preconditions_satisfied_press",
+        target_region_clear(target, **kwargs)
+        and target_stable(target, **kwargs)
+        and fixture_ready_for_press(target, **kwargs),
+        **kwargs,
+    )
+
+
+def preconditions_satisfied_turn(target: Any = None, **kwargs) -> bool:
+    target = _resolve_entity(target, kwargs)
+    return _predicate_value(
+        "preconditions_satisfied_turn",
+        target_region_clear(target, **kwargs)
+        and target_stable(target, **kwargs)
+        and fixture_ready_for_turn(target, **kwargs),
+        **kwargs,
+    )
+
+
+def preconditions_satisfied_slide(target: Any = None, **kwargs) -> bool:
+    target = _resolve_entity(target, kwargs)
+    return _predicate_value(
+        "preconditions_satisfied_slide",
+        target_region_clear(target, **kwargs)
+        and target_stable(target, **kwargs)
+        and fixture_ready_for_slide(target, **kwargs)
+        and slide_path_clear(target, **kwargs),
+        **kwargs,
+    )
+
+
+def preconditions_satisfied_twist(target: Any = None, **kwargs) -> bool:
+    target = _resolve_entity(target, kwargs)
+    return _predicate_value(
+        "preconditions_satisfied_twist",
+        target_region_clear(target, **kwargs)
+        and target_stable(target, **kwargs)
+        and fixture_ready_for_twist(target, **kwargs)
+        and target_receptacle_upright_if_has_contents(target, **kwargs),
+        **kwargs,
+    )
+
+
+def preconditions_satisfied_open_close(target: Any = None, **kwargs) -> bool:
+    target = _resolve_entity(target, kwargs)
+    return _predicate_value(
+        "preconditions_satisfied_open_close",
+        target_region_clear(target, **kwargs)
+        and target_stable(target, **kwargs)
+        and fixture_ready_for_open_close(target, **kwargs)
+        and articulation_path_clear(target, **kwargs),
+        **kwargs,
+    )
+
+
+def preconditions_satisfied_dump(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    return _predicate_value(
+        "preconditions_satisfied_dump",
+        support_region_clear(support, **kwargs)
+        and support_stable(support, **kwargs)
+        and dump_support_geometry_valid(obj, support, **kwargs)
+        and dump_support_type_matches_content(obj, support, **kwargs)
+        and dump_support_hygienic_for_content(obj, support, **kwargs)
+        and dump_support_objects_clean_for_content(obj, support, **kwargs)
+        and dump_support_not_cluttered_for_fragile_content(obj, support, **kwargs),
+        **kwargs,
+    )
+
+
+def dump_precondition_escape(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    support = _resolve_entity(support, kwargs)
+    return _predicate_value("dump_precondition_escape", False, **kwargs)
 
 
 # ---------------------------------------------------------------------------
 # Containment safety: fixture/dump content transfer settling
 # ---------------------------------------------------------------------------
 
-def containment_transfer_event(entity=None, support=None, fixture=None):
-    return partial(P.containment_transfer_event, entity, support, fixture)
+def containment_transfer_event(obj: Any = None, support: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value(
+        "containment_transfer_event",
+        fixture_output_started(fixture, **kwargs) or skill_dump_onset(obj, **kwargs),
+        **kwargs,
+    )
 
 
-def fixture_output_started(fixture=None):
-    return partial(P.fixture_output_started, fixture)
+def fixture_output_started(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_output_started", False, **kwargs)
 
 
-def fixture_output_stopped(fixture=None):
-    return partial(P.fixture_output_stopped, fixture)
+def fixture_output_stopped(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("fixture_output_stopped", False, **kwargs)
 
 
-def fixture_content_output_started(fixture=None):
-    return partial(P.fixture_content_output_started, fixture)
+def fixture_content_output_started(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value(
+        "fixture_content_output_started",
+        fixture_output_started(fixture, **kwargs),
+        **kwargs,
+    )
 
 
-def liquid_transfer_event(entity=None, support=None, fixture=None):
-    return partial(P.liquid_transfer_event, entity, support, fixture)
+def content_is_liquid(obj: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    attrs = _metadata_attributes(obj, kwargs)
+    default = bool(attrs & {"liquid", "fluid", "sauce", "oil", "broth"})
+    return _predicate_value("content_is_liquid", default, **kwargs)
 
 
-def solid_transfer_event(entity=None, support=None, fixture=None):
-    return partial(P.solid_transfer_event, entity, support, fixture)
+def content_is_solid(obj: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    attrs = _metadata_attributes(obj, kwargs)
+    default = bool(attrs & {"food", "vegetable", "fruit", "meat", "dairy", "bread_food", "cooked_food", "pourable"}) and not content_is_liquid(obj, **kwargs)
+    return _predicate_value("content_is_solid", default, **kwargs)
 
 
-def liquid_settled(entity=None, support=None):
-    return partial(P.liquid_settled, entity, support)
+def liquid_transfer_event(obj: Any = None, support: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value(
+        "liquid_transfer_event",
+        containment_transfer_event(obj, support, fixture, **kwargs) and content_is_liquid(obj, **kwargs),
+        **kwargs,
+    )
 
 
-def solid_settled(entity=None, support=None):
-    return partial(P.solid_settled, entity, support)
+def solid_transfer_event(obj: Any = None, support: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value(
+        "solid_transfer_event",
+        containment_transfer_event(obj, support, fixture, **kwargs) and content_is_solid(obj, **kwargs),
+        **kwargs,
+    )
 
 
-def solid_misplacement(entity=None, support=None):
-    return partial(P.solid_misplacement, entity, support)
+def source_emptied_if_receptacle(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("source_emptied_if_receptacle", True, **kwargs)
 
 
-def misplaced_solid_removed(entity=None, support=None):
-    return partial(P.misplaced_solid_removed, entity, support)
+def content_is_supported(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("content_is_supported", False, **kwargs)
 
 
-def misplaced_solid_recollected(entity=None, support=None):
-    return partial(P.misplaced_solid_recollected, entity, support)
+def no_content_elsewhere(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("no_content_elsewhere", False, **kwargs)
 
 
-def content_settled(entity=None, support=None):
-    return partial(P.content_settled, entity, support)
+def content_stable(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("content_stable", False, **kwargs)
 
 
-def source_emptied_if_receptacle(entity=None):
-    return partial(P.source_emptied_if_receptacle, entity)
+def content_settled(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    return _predicate_value(
+        "content_settled",
+        source_emptied_if_receptacle(obj, **kwargs)
+        and content_is_supported(obj, support, **kwargs)
+        and no_content_elsewhere(obj, support, **kwargs)
+        and content_stable(obj, **kwargs),
+        **kwargs,
+    )
 
 
-def content_is_supported(entity=None, support=None):
-    return partial(P.content_is_supported, entity, support)
+def liquid_settled(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    return _predicate_value(
+        "liquid_settled",
+        content_is_liquid(obj, **kwargs) and content_settled(obj, support, **kwargs),
+        **kwargs,
+    )
 
 
-def no_content_elsewhere(entity=None, support=None):
-    return partial(P.no_content_elsewhere, entity, support)
+def solid_settled(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    return _predicate_value(
+        "solid_settled",
+        content_is_solid(obj, **kwargs) and content_settled(obj, support, **kwargs),
+        **kwargs,
+    )
 
 
-def content_stable(entity=None):
-    return partial(P.content_stable, entity)
+def solid_misplacement(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    return _predicate_value(
+        "solid_misplacement",
+        content_is_solid(obj, **kwargs) and not no_content_elsewhere(obj, support, **kwargs),
+        **kwargs,
+    )
 
 
-def content_is_liquid(entity=None):
-    return partial(P.content_is_liquid, entity)
+def misplaced_solid_removed(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("misplaced_solid_removed", no_content_elsewhere(obj, support, **kwargs), **kwargs)
 
 
-def content_is_solid(entity=None):
-    return partial(P.content_is_solid, entity)
+def misplaced_solid_recollected(obj: Any = None, support: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(support, kwargs))
+    return _predicate_value("misplaced_solid_recollected", content_is_supported(obj, support, **kwargs), **kwargs)
 
 
 # ---------------------------------------------------------------------------
 # Access/enclosure safety: openable fixture interiors
 # ---------------------------------------------------------------------------
 
-def one_object_in_microwave(fixture=None):
-    return partial(P.one_object_in_microwave, fixture)
+def one_object_in_microwave(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("one_object_in_microwave", False, **kwargs)
 
 
-def two_or_more_objects_in_microwave(fixture=None):
-    return partial(P.two_or_more_objects_in_microwave, fixture)
+def two_or_more_objects_in_microwave(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("two_or_more_objects_in_microwave", False, **kwargs)
 
 
-def microwave_empty(fixture=None):
-    return partial(P.microwave_empty, fixture)
+def microwave_empty(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("microwave_empty", True, **kwargs)
 
 
-def gripper_in_fixture(fixture=None):
-    return partial(P.gripper_in_fixture, fixture)
+def gripper_in_fixture(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("gripper_in_fixture", False, **kwargs)
 
 
-def reach_in_fixture(fixture=None):
-    return partial(P.reach_in_fixture, fixture)
+def reach_in_fixture(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("reach_in_fixture", False, **kwargs)
 
 
-def object_in_fixture(entity=None, fixture=None):
-    return partial(P.object_in_fixture, entity, fixture)
+def object_in_fixture(obj: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("object_in_fixture", False, **kwargs)
 
 
-def object_reach_in_fixture(entity=None, fixture=None):
-    return partial(P.object_reach_in_fixture, entity, fixture)
+def object_reach_in_fixture(obj: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("object_reach_in_fixture", False, **kwargs)
 
 
-def object_in_same_fixture(entity=None, fixture=None):
-    return partial(P.object_in_same_fixture, entity, fixture)
+def object_in_same_fixture(obj: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("object_in_same_fixture", False, **kwargs)
