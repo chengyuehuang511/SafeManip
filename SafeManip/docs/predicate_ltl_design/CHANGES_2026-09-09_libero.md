@@ -153,3 +153,140 @@ naive re-extraction into the same output root silently changes nothing
 force genuine re-simulation, since `manipulated_objects`/predicate values
 like `object_settled`/`gripper_in_fixture` are computed at *extraction* time
 (needs the live env), not re-derivable from a cheap monitor-only rerun.
+
+# Part 2 (same day, continued): closing the gap to/below RoboCasa's own per-property rates
+
+Follow-up goal: every (task, LTL property) pair was already below 6/10, but a
+few properties still had a *higher corpus-wide rate* than the same property's
+rate on RoboCasa's own corpus (v21) -- expected to be similar or lower, since
+LIBERO has no raw/RTE food objects (`rc_raw_robot_contact_blocks_rte_grasp_
+until_sanitized` should be ~0%) and a much smaller, cleaner scene (`rc_no_
+forbidden_contact` should be low too) -- both true already; `rc_dropped_
+object_was_released` (0.6% RoboCasa), `rc_grasp_remains_synced_until_dropped`
+(1.8%), and `rc_released_object_eventually_settles` (0.2%) were still higher
+on LIBERO (128 -> 68 -> 28 -> 15 -> 9 -> 4 total violations across this
+session's iterations).
+
+## 6. `object_released`: two more branches ported from RoboCasa, verbatim
+
+`prev_gripper_is_opening` (closes a one-frame sign-check dip in `gripper_is_
+opening` itself) and `active is not None and object_supported` (a release
+where the object is already resting on solid support by the time contact
+breaks, without the gripper necessarily opening past threshold first) --
+confirmed on `KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it`:
+`object_supported` was already `True` several frames *before* the grasp
+ended (the pot touches the stove before release), and `gripper_frac` never
+dipped below threshold at the drop frame at all (this demo's release motion
+doesn't fully open the gripper immediately) -- a real, deliberate,
+already-safe placement the original gripper-only check couldn't recognize.
+
+## 7. `object_sync`: RoboCasa's grasp-slip-baseline pattern, ported
+
+Previously compared the current (obj - eef) offset against `state["prev_
+offsets"][active]`, updated for *every* movable object on *every* frame
+regardless of grasp state -- on the very first frame of a brand-new grasp,
+that "previous" offset reflected wherever the object was sitting *before*
+ever being grasped (e.g. the gripper mid-approach from elsewhere), so the eef
+finally reaching the object at grasp onset read as a huge, spurious "slip".
+New `sync_baseline_object`/`sync_baseline_offset` in `state`, re-seeded fresh
+on every NEW grasp *event* (`object_grasped` just became `True` -- not just
+"the active object's name changed", which misses a same-object drop-then-
+regrasp: `active` never clears on drop, only reassigns on the *next* actual
+grasp), refreshed every frame thereafter (per-frame drift, not accumulated-
+since-onset, matching RoboCasa's own `_object_grasp_slip` rationale).
+Confirmed on two real cases: `KITCHEN_SCENE3` ep2 (brand-new grasp) and
+`KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_...` ep0 (drop-then-
+regrasp of the same bowl).
+
+## 8. `SETTLE_TIMEOUT_FRAMES`: 60 -> 100
+
+Simply too short -- confirmed directly: `put_the_wine_bottle_on_the_rack`
+ep0 genuinely settles (supported+stable+gripper-away) ~80 raw frames after
+release, timing out at 60 with the object already correctly at rest by 100.
+RoboCasa's own value is 100; both engines call this once per raw ~20Hz
+frame (confirmed via each engine's own `control_freq` default), so this is
+now a straight match, not a guess.
+
+## 9. `object_settled`'s task_success escape: widened to cover object_stable too
+
+Was `object_supported and support_type_matches_object and object_stable and
+(gripper_away or task_success)` -- only `gripper_away` had an escape.
+Confirmed on `STUDY_SCENE1_pick_up_the_book_...`: `object_stable`, not
+`gripper_away`, was the one still pending when the ~5-frame-remaining
+episode ended (`task.success` already `True`, `object_supported` already
+`True`) -- the same recording-truncation artifact, just landing on a
+different conjunct. Now `object_supported and support_type_matches_object
+and (task_success or (object_stable and gripper_away))`.
+
+## 10. `_check_grasp_any`: AND bilateral contact with gripper-closed-enough
+
+Mirrors RoboCasa's own `_object_is_grasped` (bilateral contact AND `OU.
+check_obj_grasped`) -- a second, independent raw signal (`_gripper_closed_
+fraction(env) >= GRIPPER_OPEN_FRACTION_THRESHOLD`) alongside robosuite's own
+`_check_grasp`, so a one-frame bilateral-contact-only dropout (gripper still
+genuinely closed, object frozen) no longer registers as a real grasp-loss.
+Fixed the majority (17/22) of a corpus-wide one-frame-flicker pattern in
+`rc_dropped_object_was_released` at the raw-signal level -- not a debounce.
+
+## 11. `object_left_gripper`: AABB overlap, not mesh distance (explicit user correction)
+
+First attempt used real mesh/geom distance (`_gripper_object_geom_min_
+distance`, already built for `gripper_away_from_object`) with `left_gripper
+= mesh_dist > 0.0`. User correction: RoboCasa's *actual* mechanism for this
+exact predicate is bounding-box overlap (`_aabb_intersects`/`_object_contact_
+aabb`/`_gripper_aabb`), deliberately coarser than exact mesh distance -- a
+real one-frame position micro-jitter can put a hair of daylight between two
+meshes while the object is still clearly within the gripper's enclosing
+volume; AABB overlap tolerates that, exact mesh distance doesn't. Ported
+`_geom_aabb`/`_geom_ids_aabb`/`_aabb_intersects` verbatim from RoboCasa's own
+predicates.py. Combined with #10, this resolved the residual one-frame-
+flicker cases *without* an intermediate debounce that had been added and
+then explicitly removed per user direction ("if robocasa don't use debounce
+to solve a problem, don't use debounce for libero... get rid of the
+smoothing as much as possible unless necessary") -- confirmed by re-running
+without it once the AABB fix alone proved sufficient.
+
+## 12. Threshold alignment with RoboCasa's own tuned constants
+
+Explicit user request: make the two simulators' hyperparameters the same
+wherever genuinely comparable (both confirmed `control_freq=20` by default,
+so frame-counts carry over 1:1; RoboCasa's velocity-based stability
+thresholds converted to LIBERO's per-frame-delta convention via `* dt`,
+`dt = 1/20s`). Left `GRIPPER_OPEN_FRACTION_THRESHOLD`/`GRIPPER_CLOSED_
+THRESHOLD` unaligned (genuinely different quantities -- a normalized 0-1
+fraction vs. a raw joint qpos value specific to RoboCasa's own gripper
+model, no valid conversion). `MESH_GRIPPER_FAR_THRESHOLD` 0.02->0.01,
+`SYNC_RELATIVE_DELTA_THRESHOLD` 0.01->0.03, `STABLE_LINEAR_DELTA_THRESHOLD`
+0.004->0.0025, `STABLE_ANGULAR_DELTA_THRESHOLD` 0.05->0.0125, `SKILL_ONSET_
+FRAMES` 5->8, `FORBIDDEN_CONTACT_TOLERANCE_FRAMES` 10->20, `FIXTURE_RETRACT_
+RESOLVE_TIMEOUT_FRAMES` 60->100.
+
+## Final result
+
+9 -> 4 total corpus violations after item 12 (`rc_grasp_remains_synced_
+until_dropped` and `rc_pick_preconditions_safe` both dropped to 0%, some
+prior violations were borderline cases the widened stability/sync
+thresholds correctly absorb). Every property now at or below RoboCasa's own
+rate except `rc_released_object_eventually_settles` (0.8% vs 0.2%, 3/400
+episodes) -- all three confirmed genuine task failures (`task.success ==
+False` at episode end: the object was never actually placed correctly, or
+never settled because the demo itself failed), not predicate bugs.
+
+## Viewer fixes found along the way
+
+- **Per-episode violation-count badge missing for LIBERO** (`viewer/server.
+  py`'s `list_libero_training_episodes`): returned flat `success`/`num_
+  violations` fields, but the shared frontend rendering code
+  (`loadTrainingEpisodes` in `app.js`) reads `ep.methods[currentMethod]`/
+  `(ep.annotated || {})[currentMethod]` regardless of sim -- LIBERO episodes
+  showed only the success badge, never a violation-count badge, and always
+  read as "not annotated". Fixed by nesting under `methods`/`annotated`
+  dicts keyed by method, matching RoboCasa's `list_training_episodes` shape
+  exactly; also threaded `method=` through the frontend's `/api/td_episodes`
+  fetch (previously always silently used LIBERO's own default method
+  regardless of the dropdown's actual selection).
+- **Stale running viewer process**: the running server had been serving
+  pre-LIBERO-support code for several minutes after the "Add LIBERO
+  simulator support" commit landed on disk (never restarted) -- explained a
+  separate report ("clicking a task under an LTL property switches to the
+  RoboCasa panel"). Restarted it.
