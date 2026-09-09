@@ -130,6 +130,20 @@ header h1 { font-size: 18px; margin: 0; }
 .tree-caret { width: 12px; flex-shrink: 0; color: var(--text-muted); cursor: pointer; text-align: center; }
 .tree-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-count { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+
+/* Section divider between LIBERO benchmark suites (libero_10/goal/object/
+   spatial) in the Task tree -- see app.js's renderTaskTree(). */
+.tree-divider {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 6px 4px 2px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.tree-divider:first-child { margin-top: 0; border-top: none; }
 .tree-count.nonzero { color: var(--warn-text); font-weight: 600; }
 .tree-children { margin-left: 16px; }
 .tree-children.hidden { display: none; }
@@ -255,6 +269,18 @@ video {
 .video-col-wide video { max-width: none; }
 @media (max-width: 900px) {
   .video-row-wide { flex-wrap: wrap; }
+}
+
+/* LIBERO's Original column when the Reconstructed column is hidden (no
+   re-render pipeline exists for LIBERO -- see app.js's selectTrainingEpisode)
+   -- without this, .video-col-wide's flex:1 (from .video-col) has nothing
+   to share the row with and stretches to the full row width, making the
+   video render at roughly double RoboCasa's side-by-side size. Pins it to
+   the same ~half-row width it would occupy if both columns were visible. */
+.video-col-wide.video-col-half { flex: 0 1 50%; max-width: 50%; }
+.video-col-wide.video-col-half video { max-width: 100%; }
+@media (max-width: 900px) {
+  .video-col-wide.video-col-half { flex: 1 1 auto; max-width: none; }
 }
 
 .frame-readout {

@@ -92,6 +92,19 @@
            extract_privileged_from_dataset_sampled.py. Selecting a method
            here also rescopes the violation counts in the Task/LTL trees
            below (see /api/training_violation_counts). -->
+      <!-- Simulator selector (2026-09-08): RoboCasa's own training dataset,
+           or LIBERO's (monitor/output/vN_..._libero_.../, no separate video
+           reconstruction step yet -- see server.py's PREDICATES_PY_PATH_LIBERO
+           comment). Switching this re-fetches everything below (method list,
+           task tree, episode list) scoped to the new sim; same 20 LTL
+           properties either way. -->
+      <div class="picker" id="td-sim-picker">
+        <label>Simulator</label>
+        <select id="td-sim-select">
+          <option value="robocasa" selected>RoboCasa</option>
+          <option value="libero">LIBERO</option>
+        </select>
+      </div>
       <div class="picker" id="td-method-picker">
         <label>Postprocess method</label>
         <select id="td-method-select"><option>loading…</option></select>
@@ -123,15 +136,26 @@
           <button id="td-sync-play-btn" class="sync-play-btn">▶ Play both</button>
           <span class="sync-hint">plays/pauses/seeks both videos together, however you control either one</span>
         </div>
-        <div class="video-row video-row-wide">
-          <div class="video-col video-col-wide">
-            <div class="video-col-label">Original (from the training dataset — robot0_agentview_left | robot0_agentview_right | robot0_eye_in_hand)</div>
+        <!-- Reconstructed column hidden for LIBERO (no ground-truth video
+             re-render pipeline exists yet -- see server.py's
+             ensure_libero_original_video docstring); the Original column
+             still shows (LIBERO's own recorded demonstration frames, see
+             ensure_libero_original_video) -- see the sim toggle handler in
+             app.js. -->
+        <div class="video-row video-row-wide" id="td-video-row">
+          <div class="video-col video-col-wide" id="td-original-video-col">
+            <div class="video-col-label" id="td-original-video-label">Original (from the training dataset — robot0_agentview_left | robot0_agentview_right | robot0_eye_in_hand)</div>
             <video id="td-original-video" controls preload="metadata"></video>
           </div>
-          <div class="video-col video-col-wide">
+          <div class="video-col video-col-wide" id="td-recon-video-col">
             <div class="video-col-label">Reconstructed (ground-truth state playback — same 3 camera views)</div>
             <video id="td-video" controls preload="metadata"></video>
           </div>
+        </div>
+        <div id="td-video-unavailable" class="card-hint hidden">
+          No video for this LIBERO episode yet — its source hdf5 wasn't found under
+          LIBERO_DATASET_ROOT on this machine. The monitor verdicts below come straight from the
+          extracted privileged-state replay either way, independent of video.
         </div>
 
         <!-- Postprocess symbolic-monitor panel: privileged_information_<N>.json /

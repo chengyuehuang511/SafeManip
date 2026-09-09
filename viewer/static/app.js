@@ -25,6 +25,17 @@ const reconVideo = el("#recon-video");
 // recorded language instruction). See server.py's api_training_* /
 // replay/official_playback/README.md.
 const tdState = { task: null, episode: null, loaded: false, monitorMethod: null, property: null };
+// Which simulator's training data the tab is currently showing ("robocasa" |
+// "libero") -- see server.py's sim= query param on /api/td_tasks,
+// /api/td_episodes, /api/training_monitor, /api/training_monitor_methods.
+// LIBERO has no ground-truth video reconstruction yet (see server.py's
+// PREDICATES_PY_PATH_LIBERO comment) and no violation-count tree endpoint
+// yet (/api/training_violation_counts stays RoboCasa-only) -- both are
+// handled by branching on tdSim below, not by pretending LIBERO has them.
+let tdSim = "robocasa";
+function tdSimQS() {
+  return `&sim=${encodeURIComponent(tdSim)}`;
+}
 const tdTaskTree = el("#td-task-tree");
 const tdPropertyTree = el("#td-property-tree");
 const tdEpisodeList = el("#td-episode-list");
@@ -140,20 +151,61 @@ let tdPropertiesList = [];
 // method is currently selected -- see server.py's training_violation_counts.
 let tdViolationCounts = { by_task: {}, by_property: {} };
 
+// Bumped at the start of every initTrainingData() call (initial tab load AND
+// every sim switch); each call captures its own snapshot at entry and
+// re-checks it after every await, bailing out silently if a newer call has
+// since started. Fixes a real, confirmed race: /api/training_violation_counts
+// for RoboCasa's 50-task corpus can take ~30s (no caching, scans every
+// episode's monitor json fresh each time) -- switching to LIBERO well before
+// that resolves used to leave the correct (empty) LIBERO render on screen
+// only until the stale RoboCasa fetch finally completed and unconditionally
+// overwrote tdViolationCounts/tdTasksList/etc. + re-rendered with RoboCasa's
+// real numbers, ~30s after the switch, with no visible cause -- confirmed via
+// a scripted repro (switch sim at t=0.5s, RoboCasa's real 119-violation tree
+// reappeared at t=35s). A plain tdSim-at-call-time comparison isn't quite
+// enough on its own (two rapid switches back to the same sim string would
+// look "not stale" by that check alone) -- a monotonic generation counter
+// is the standard fix for this class of async race.
+let tdLoadGeneration = 0;
+
 async function initTrainingData() {
-  const data = await fetchJSON("/api/td_tasks");
+  const myGeneration = ++tdLoadGeneration;
+  const data = await fetchJSON(`/api/td_tasks?sim=${encodeURIComponent(tdSim)}`);
+  if (myGeneration !== tdLoadGeneration) return;  // superseded by a newer tab-load/sim-switch
   roots.training = data.dataset_root;
   el("#root-path").textContent = data.dataset_root;
   tdTasksList = data.tasks;
   await ensureTrainingMonitorMethods();  // need a method selected before the trees can show violation counts
+  if (myGeneration !== tdLoadGeneration) return;
   await initTrainingLtlPropertyList();
+  if (myGeneration !== tdLoadGeneration) return;
   await refreshViolationCounts();
+  if (myGeneration !== tdLoadGeneration) return;
   renderTaskTree();
   renderPropertyTree();
   if (tdTasksList.length) {
     loadTrainingEpisodes(tdTasksList[0].task);
+  } else {
+    tdEmptyState.textContent = tdSim === "libero"
+      ? "No LIBERO training-data output found yet under monitor/output/ (run monitor/extract_privileged_from_dataset_libero.py)."
+      : "Pick a task, then an episode, to view its ground-truth reconstruction.";
+    tdEmptyState.classList.remove("hidden");
+    tdEpisodeView.classList.add("hidden");
   }
 }
+
+// Sim toggle: re-fetch everything scoped to the newly-selected simulator.
+// Method list is sim-specific (RoboCasa's vN_.../ vs LIBERO's vN_..._libero_.../
+// under the same monitor/output/ dir), so it must reload too, not just the
+// task list.
+el("#td-sim-select").addEventListener("change", async (e) => {
+  tdSim = e.target.value;
+  tdState.task = null;
+  tdState.episode = null;
+  tdState.monitorMethod = null;
+  tdMethodsLoaded = false;
+  await initTrainingData();
+});
 
 // LTL property list: scopes both the left-column per-episode violation
 // badges (server-side, via /api/td_episodes?property=...) and the main
@@ -183,10 +235,13 @@ function selectTrainingProperty(property) {
 // time (see the "Method scope" decision: currently-selected method only,
 // not summed across methods).
 async function refreshViolationCounts() {
-  if (!tdState.monitorMethod) return;
+  if (!tdState.monitorMethod) {
+    tdViolationCounts = { by_task: {}, by_property: {} };
+    return;
+  }
   try {
     tdViolationCounts = await fetchJSON(
-      `/api/training_violation_counts?method=${encodeURIComponent(tdState.monitorMethod)}`
+      `/api/training_violation_counts?sim=${encodeURIComponent(tdSim)}&method=${encodeURIComponent(tdState.monitorMethod)}`
     );
   } catch (e) {
     tdViolationCounts = { by_task: {}, by_property: {} };
@@ -260,21 +315,61 @@ function buildTreeRow(label, total, isActive, onSelect, children, annotated) {
   return wrap;
 }
 
+// Fixed display order for LIBERO's 4 in-scope benchmark suites (not
+// alphabetical -- matches the order extract_privileged_from_dataset_libero.py
+// processes them in). "Other" catches a task whose source hdf5 wasn't found
+// (suite is None -- e.g. LIBERO_DATASET_ROOT not populated on this machine),
+// so a task is never silently dropped from the tree just because its suite
+// couldn't be determined.
+const LIBERO_SUITE_ORDER = ["libero_10", "libero_goal", "libero_object", "libero_spatial"];
+const LIBERO_SUITE_LABELS = {
+  libero_10: "LIBERO-10", libero_goal: "LIBERO-Goal",
+  libero_object: "LIBERO-Object", libero_spatial: "LIBERO-Spatial",
+};
+
+function taskTreeRow(t) {
+  const counts = tdViolationCounts.by_task[t.task] || { total: 0, by_property: {} };
+  const children = Object.entries(counts.by_property)
+    .sort((a, b) => b[1] - a[1])
+    .map(([prop, count]) => ({ label: prop, count }));
+  // n_reconstructed (RoboCasa: reconstructed-video count) vs. n_extracted/
+  // n_monitored (LIBERO: no video-reconstruction step -- see
+  // ensure_libero_original_video's docstring -- so "extracted"/"monitored"
+  // episode counts are the meaningful progress numbers instead).
+  const label = tdSim === "libero"
+    ? `${t.task} (${t.n_monitored}/${t.n_extracted} monitored)`
+    : `${t.task} (${t.n_reconstructed} reconstructed)`;
+  return buildTreeRow(label, counts.total, t.task === tdState.task, () => loadTrainingEpisodes(t.task), children);
+}
+
 function renderTaskTree() {
   tdTaskTree.innerHTML = "";
   if (!tdTasksList.length) {
     tdTaskTree.innerHTML = "<div class='muted'>no tasks found</div>";
     return;
   }
+  if (tdSim !== "libero") {
+    for (const t of tdTasksList) {
+      tdTaskTree.appendChild(taskTreeRow(t));
+    }
+    return;
+  }
+  // LIBERO: grouped by benchmark suite with a divider header per group,
+  // instead of one flat 40-task list.
+  const bySuite = {};
   for (const t of tdTasksList) {
-    const counts = tdViolationCounts.by_task[t.task] || { total: 0, by_property: {} };
-    const children = Object.entries(counts.by_property)
-      .sort((a, b) => b[1] - a[1])
-      .map(([prop, count]) => ({ label: prop, count }));
-    const label = `${t.task} (${t.n_reconstructed} reconstructed)`;
-    tdTaskTree.appendChild(
-      buildTreeRow(label, counts.total, t.task === tdState.task, () => loadTrainingEpisodes(t.task), children)
-    );
+    const key = t.suite || "other";
+    (bySuite[key] = bySuite[key] || []).push(t);
+  }
+  const suiteKeys = [...LIBERO_SUITE_ORDER.filter((s) => bySuite[s]), ...Object.keys(bySuite).filter((s) => !LIBERO_SUITE_ORDER.includes(s))];
+  for (const suite of suiteKeys) {
+    const header = document.createElement("div");
+    header.className = "tree-divider";
+    header.textContent = `${LIBERO_SUITE_LABELS[suite] || suite} (${bySuite[suite].length})`;
+    tdTaskTree.appendChild(header);
+    for (const t of bySuite[suite]) {
+      tdTaskTree.appendChild(taskTreeRow(t));
+    }
   }
 }
 
@@ -338,7 +433,7 @@ async function loadTrainingEpisodes(task, targetEpisode) {
   tdEpisodeList.innerHTML = "<div class='loading'>loading episodes…</div>";
   await ensureTrainingMonitorMethods();  // so tdMethodLabel() has short labels ready for the badges below
   const propertyParam = tdState.property ? `&property=${encodeURIComponent(tdState.property)}` : "";
-  const data = await fetchJSON(`/api/td_episodes?task=${encodeURIComponent(task)}${propertyParam}`);
+  const data = await fetchJSON(`/api/td_episodes?task=${encodeURIComponent(task)}${propertyParam}${tdSimQS()}`);
   tdEpisodeList.innerHTML = "";
   if (!data.episodes.length) {
     tdEpisodeList.innerHTML = "<div class='muted'>no reconstructed episodes yet for this task"
@@ -440,6 +535,48 @@ function selectTrainingEpisode(task, ep, rowEl) {
   el("#td-ep-meta").textContent =
     `fps=${orUnknown(ep.fps)} · frames=${orUnknown(ep.n_frames)} · cameras: ${cams || "?"}`;
 
+  const tdVideoRow = el("#td-video-row");
+  const tdVideoUnavailable = el("#td-video-unavailable");
+  const tdSyncRow = el("#td-sync-row");
+  const tdReconCol = el("#td-recon-video-col");
+  const tdOriginalLabel = el("#td-original-video-label");
+  if (tdSim === "libero") {
+    // No re-rendered "reconstruction" for LIBERO yet (see server.py's
+    // ensure_libero_original_video docstring) -- hide just the reconstructed
+    // <video>'s column and the original/reconstructed sync row (nothing to
+    // sync against), NOT the whole video row (that would also hide the
+    // Original column). The ORIGINAL (ground-truth demonstration) video IS
+    // available, straight from the LIBERO hdf5's own recorded camera
+    // frames -- show it whenever ep.original_video_url is present.
+    tdVideo.removeAttribute("src");
+    tdReconCol.classList.add("hidden");
+    tdSyncRow.classList.add("hidden");
+    // Reconstructed column is hidden, so the Original column would
+    // otherwise stretch to fill the whole row (flex:1 with no sibling to
+    // share it with) -- pin it to the same ~half-row width RoboCasa's
+    // side-by-side pair uses instead.
+    el("#td-original-video-col").classList.add("video-col-half");
+    tdOriginalLabel.textContent = "Original (from the LIBERO demo hdf5 — agentview | eye_in_hand)";
+    if (ep.original_video_url) {
+      tdVideoRow.classList.remove("hidden");
+      tdVideoUnavailable.classList.add("hidden");
+      tdOriginalVideo.src = ep.original_video_url;
+      tdOriginalVideo.load();
+      wireFrameReadoutFor(tdOriginalVideo, "td-original-frame-readout", 20, 1, ep.n_frames, ep.n_frames);
+    } else {
+      tdVideoRow.classList.add("hidden");
+      tdVideoUnavailable.classList.remove("hidden");
+      tdOriginalVideo.removeAttribute("src");
+    }
+    loadTrainingMonitor(task, ep.episode, tdState.monitorMethod);
+    return;
+  }
+  tdVideoRow.classList.remove("hidden");
+  tdVideoUnavailable.classList.add("hidden");
+  tdReconCol.classList.remove("hidden");
+  el("#td-original-video-col").classList.remove("video-col-half");
+  tdOriginalLabel.textContent = "Original (from the training dataset — robot0_agentview_left | robot0_agentview_right | robot0_eye_in_hand)";
+
   tdVideo.src = `/td_video?task=${encodeURIComponent(task)}&episode=${ep.episode}`;
   tdVideo.load();
 
@@ -454,7 +591,6 @@ function selectTrainingEpisode(task, ep, rowEl) {
   const reconRatio = (ep.fps || 10) / 20;
   wireFrameReadoutFor(tdVideo, "td-frame-readout", ep.fps || 10, reconRatio, null, ep.n_frames);
 
-  const tdSyncRow = el("#td-sync-row");
   if (ep.original_video_url) {
     // lazily ffmpeg-concatenated server-side on first request (see
     // server.py's ensure_original_concat) -- first load of a given episode
@@ -493,12 +629,35 @@ function tdMethodLabel(key) {
   return tdMethodLabels[key] || key;
 }
 
+// Attached exactly once (module load) rather than inside
+// ensureTrainingMonitorMethods() itself -- that function re-runs on every
+// sim switch (tdMethodsLoaded gets reset), and re-attaching a listener each
+// time on the same persistent <select> would stack up N duplicate handlers
+// after N switches, each independently re-fetching/re-rendering on the next
+// method change. Reads tdSim/tdState fresh at fire time regardless, so a
+// single, permanently-attached listener is both correct and sufficient.
+el("#td-method-select").addEventListener("change", async () => {
+  const select = el("#td-method-select");
+  tdState.monitorMethod = select.value;
+  // Same generation-guard pattern as initTrainingData() (see its comment) --
+  // a method change and a sim switch can race the same way a fast sim
+  // double-switch can.
+  const myGeneration = ++tdLoadGeneration;
+  await refreshViolationCounts();
+  if (myGeneration !== tdLoadGeneration) return;
+  renderTaskTree();
+  renderPropertyTree();
+  if (tdState.task && tdState.episode != null) {
+    loadTrainingMonitor(tdState.task, tdState.episode, tdState.monitorMethod);
+  }
+});
+
 async function ensureTrainingMonitorMethods() {
   if (tdMethodsLoaded) return;
   tdMethodsLoaded = true;
   const select = el("#td-method-select");
   try {
-    const data = await fetchJSON("/api/training_monitor_methods");
+    const data = await fetchJSON(`/api/training_monitor_methods?sim=${encodeURIComponent(tdSim)}`);
     tdState.monitorMethod = tdState.monitorMethod || data.default;
     select.innerHTML = "";
     for (const [key, info] of Object.entries(data.methods)) {
@@ -509,18 +668,6 @@ async function ensureTrainingMonitorMethods() {
       if (key === tdState.monitorMethod) opt.selected = true;
       select.appendChild(opt);
     }
-    select.addEventListener("change", async () => {
-      tdState.monitorMethod = select.value;
-      // Violation counts in the Task/LTL trees are scoped to one method at
-      // a time (see refreshViolationCounts) -- re-fetch and re-render both
-      // whenever the selected method changes.
-      await refreshViolationCounts();
-      renderTaskTree();
-      renderPropertyTree();
-      if (tdState.task && tdState.episode != null) {
-        loadTrainingMonitor(tdState.task, tdState.episode, tdState.monitorMethod);
-      }
-    });
   } catch (e) {
     select.innerHTML = "<option>failed to load methods</option>";
   }
@@ -539,7 +686,7 @@ async function loadTrainingMonitor(task, episode, method) {
   let detail;
   try {
     detail = await fetchJSON(
-      `/api/training_monitor?task=${encodeURIComponent(task)}&episode=${episode}&method=${encodeURIComponent(method)}`
+      `/api/training_monitor?task=${encodeURIComponent(task)}&episode=${episode}&method=${encodeURIComponent(method)}${tdSimQS()}`
     );
   } catch (e) {
     missing.textContent = `failed to load monitor results: ${e}`;

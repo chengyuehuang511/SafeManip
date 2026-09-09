@@ -62,6 +62,19 @@ TRAINING_OUTPUT_DIR = Path(__file__).parent.parent / "replay" / "official_playba
 TRAINING_DATASET_ROOT = Path.home() / "flash" / "datasets" / "robocasa" / "v1.0" / "target"
 DEFAULT_TRAINING_CAMERAS = ["robot0_agentview_left", "robot0_agentview_right", "robot0_eye_in_hand"]
 
+# LIBERO original (ground-truth demonstration) video -- NOT a re-rendered
+# "reconstruction" (no simulator/camera re-render pipeline exists for LIBERO
+# yet, see PREDICATES_PY_PATH_LIBERO's module comment); this is just the
+# already-recorded obs/agentview_rgb + obs/eye_in_hand_rgb frame arrays
+# already sitting in the official LIBERO demo hdf5s, hstacked and encoded to
+# mp4 once per episode then cached forever (source hdf5s are immutable
+# training data, same "generate on first request" pattern as
+# ensure_original_concat below). Independent of any monitor/extraction run --
+# only needs the raw dataset copy, not privileged_information_<N>.json.
+LIBERO_DATASET_ROOT = Path.home() / "flash" / "datasets" / "libero_raw"
+LIBERO_SUITES = ("libero_10", "libero_goal", "libero_object", "libero_spatial")
+LIBERO_ORIGINAL_VIDEO_DIR = Path(__file__).parent.parent / "replay" / "libero_original_video" / "output"
+
 # Training-data "postprocess monitor" panel: privileged_information_<N>.json /
 # _monitor.json written by SafeManip/monitor/extract_privileged_from_dataset.py
 # from ground-truth training-dataset state replay (NOT a live rollout -- see
@@ -81,6 +94,21 @@ DEFAULT_TRAINING_CAMERAS = ["robot0_agentview_left", "robot0_agentview_right", "
 # default choice.
 TRAINING_PRIVILEGED_DIR = Path(__file__).parent.parent / "SafeManip" / "monitor" / "output"
 TRAINING_PRIVILEGED_DIR_SAMPLED = Path(__file__).parent.parent / "SafeManip" / "monitor" / "output_sampled"
+
+# LIBERO training-data source (2026-09-08): same 20 TASK_AGNOSTIC_PROPERTY_SPECS
+# (specs.py is shared/simulator-agnostic, no LIBERO-specific copy needed), but
+# a different simulator-side predicates.py (monitor/sim/libero/predicates.py)
+# and a different privileged-info extraction pipeline
+# (monitor/extract_privileged_from_dataset_libero.py), writing into the SAME
+# monitor/output/ dir as RoboCasa's vN_.../ versions (distinguished by a
+# "libero" substring in the version dir's <description> part -- see
+# _discover_libero_training_dirs -- rather than a separate directory, so both
+# simulators' output history lives in one place/one CHANGELOG). Unlike
+# RoboCasa's training tab, there is (yet) no separate ground-truth video
+# reconstruction step for LIBERO -- privileged_information_<N>.json's own
+# existence is the source of truth for "this episode exists", and there is no
+# video to show (video_url is None; the frontend should tolerate that).
+PREDICATES_PY_PATH_LIBERO = Path(__file__).parent.parent / "SafeManip" / "monitor" / "sim" / "libero" / "predicates.py"
 
 _VERSION_DIR_RE = re.compile(r"^v(\d+)_")
 
@@ -516,6 +544,31 @@ PATTERN_BLURB = {
 # no tooltip text; the raw key name is always shown regardless (see
 # node_for below).
 _PREDICATE_FORMULAS = predicate_derive.derive_all_formulas(PREDICATES_PY_PATH)
+
+# LIBERO analog of _PREDICATE_FORMULAS/_EXPORTED_KEYS above, parsed from
+# monitor/sim/libero/predicates.py instead of RoboCasa's. NOT currently wired
+# into PROPERTY_META's "children"/formula tooltips (those stay RoboCasa-
+# flavored for both simulators in this first pass -- the top-level
+# violated/satisfied verdict shown for a LIBERO episode is always the real
+# one from that episode's own _monitor.json, only the "why" breakdown
+# tooltip text would be RoboCasa's own sub-component composition, which can
+# genuinely differ from LIBERO's -- a known, cosmetic-only limitation, not a
+# correctness issue). predicate_derive.py expects predicates.py to build its
+# per-frame dict via a single `predicates = {...}` dict *literal*;
+# monitor/sim/libero/predicates.py instead does per-key `predicates["x"] = ...`
+# subscript assignments, a different shape _collect_exported doesn't
+# recognize -- so _EXPORTED_KEYS_LIBERO comes back empty and
+# _DERIVED_CHILDREN_LIBERO's entries are all None. That's expected/non-fatal
+# (see predicate_derive.py's own docstring: "None means nothing safe to
+# show"), not a bug to fix here.
+try:
+    _EXPORTED_KEYS_LIBERO = predicate_derive.collect_exported_key_names(PREDICATES_PY_PATH_LIBERO)
+    _PREDICATE_FORMULAS_LIBERO = predicate_derive.derive_all_formulas(PREDICATES_PY_PATH_LIBERO)
+    _DERIVED_CHILDREN_LIBERO = predicate_derive.derive_all(PREDICATES_PY_PATH_LIBERO, list(_DERIVED_CHILDREN.keys()))
+except Exception:
+    _EXPORTED_KEYS_LIBERO = set()
+    _PREDICATE_FORMULAS_LIBERO = {}
+    _DERIVED_CHILDREN_LIBERO = {}
 
 _raw_info_cache = {}
 _raw_info_lock = threading.Lock()
@@ -2326,6 +2379,405 @@ def api_training_monitor(task, episode, method=None):
 
 
 # --------------------------------------------------------------------------
+# "Training Data" tab, LIBERO source (2026-09-08). Parallel to the RoboCasa
+# block just above, but simpler: no separate ground-truth video-reconstruction
+# step exists yet for LIBERO (see PREDICATES_PY_PATH_LIBERO's module comment),
+# so privileged_information_<N>.json's own presence -- written directly by
+# monitor/extract_privileged_from_dataset_libero.py -- is the one and only
+# source of truth for "this episode exists". video_url is always None here;
+# the frontend must tolerate that (no video player shown for this sim).
+# Selected via the shared /api/td_tasks|td_episodes|training_monitor routes'
+# `sim=libero` query param (default remains `sim=robocasa`, unchanged
+# behavior for every existing caller that never passes `sim` at all).
+# --------------------------------------------------------------------------
+
+_libero_hdf5_cache = {}
+
+
+def find_libero_hdf5_for_task(task):
+    """<LIBERO_DATASET_ROOT>/<suite>/<task>_demo.hdf5 across the 4 in-scope
+    suites -- mirrors monitor/extract_privileged_from_dataset_libero.py's own
+    find_hdf5_for_task, reimplemented here so the viewer doesn't need that
+    script's heavier import chain (h5py + a conda env with the right
+    robosuite are still needed for the actual frame read below, but not the
+    env-construction/replay machinery)."""
+    if task in _libero_hdf5_cache:
+        return _libero_hdf5_cache[task]
+    result = None
+    for suite in LIBERO_SUITES:
+        candidate = LIBERO_DATASET_ROOT / suite / f"{task}_demo.hdf5"
+        if candidate.is_file():
+            result = candidate
+            break
+    _libero_hdf5_cache[task] = result
+    return result
+
+
+def libero_original_video_path(task, episode):
+    return LIBERO_ORIGINAL_VIDEO_DIR / task / f"episode_{episode}_original.mp4"
+
+
+_libero_video_locks_guard = threading.Lock()
+_libero_video_locks = {}
+
+
+def ensure_libero_original_video(task, episode):
+    """Build the original (ground-truth demonstration) video for one LIBERO
+    episode on first request from the raw hdf5's own obs/agentview_rgb +
+    obs/eye_in_hand_rgb frame arrays (hstacked side by side, top-to-bottom
+    row order flipped -- see LIBERO's own env_wrapper.py, which flips the
+    same arrays with [::-1] before cv2.imshow, confirming these arrays are
+    stored bottom-to-top like raw MuJoCo offscreen-render buffers), then
+    caches the mp4 forever after. Returns None if the source hdf5/demo isn't
+    found (e.g. LIBERO_DATASET_ROOT not populated on this machine)."""
+    out_path = libero_original_video_path(task, episode)
+    if out_path.is_file():
+        return out_path
+
+    key = (task, episode)
+    with _libero_video_locks_guard:
+        lock = _libero_video_locks.setdefault(key, threading.Lock())
+    with lock:
+        if out_path.is_file():
+            return out_path
+        hdf5_path = find_libero_hdf5_for_task(task)
+        if hdf5_path is None:
+            return None
+        import h5py
+        import numpy as np
+
+        with h5py.File(hdf5_path, "r") as f:
+            demo_key = f"demo_{episode}"
+            data_grp = f.get("data")
+            if data_grp is None or demo_key not in data_grp:
+                return None
+            obs = data_grp[demo_key]["obs"]
+            agentview = np.asarray(obs["agentview_rgb"])[:, ::-1]
+            frames = agentview
+            if "eye_in_hand_rgb" in obs:
+                eye_in_hand = np.asarray(obs["eye_in_hand_rgb"])[:, ::-1]
+                if eye_in_hand.shape[0] == frames.shape[0]:
+                    frames = np.concatenate([frames, eye_in_hand], axis=2)
+            try:
+                env_args = json.loads(data_grp.attrs.get("env_args", "{}"))
+                fps = int(env_args.get("env_kwargs", {}).get("control_freq", 20))
+            except Exception:
+                fps = 20
+
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = out_path.with_suffix(".mp4.tmp")
+        h, w = int(frames.shape[1]), int(frames.shape[2])
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}", "-r", str(fps),
+            "-i", "-",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-f", "mp4",
+            str(tmp_path),
+        ]
+        result = subprocess.run(cmd, input=frames.tobytes(), capture_output=True, timeout=120)
+        if result.returncode != 0 or not tmp_path.is_file():
+            tmp_path.unlink(missing_ok=True)
+            raise RuntimeError(f"ffmpeg raw-frame encode failed: {result.stderr[-2000:]}")
+        tmp_path.rename(out_path)
+        return out_path
+
+
+def _discover_libero_training_dirs():
+    """Every vN_<date>_<description>/ directory under TRAINING_PRIVILEGED_DIR
+    (same parent dir RoboCasa's versions live in -- one shared output/ tree,
+    one shared CHANGELOG.md) whose <description> contains "libero"
+    (case-insensitive), keyed by directory name, sorted newest-version-first
+    for the default. Unlike RoboCasa's _discover_training_monitor_methods,
+    does NOT require _version_dir_is_finished -- a LIBERO extraction run is
+    expected to still be actively writing episodes/tasks when this viewer is
+    used against it (per explicit user request: browse progressively, don't
+    wait for 100% completion), so a partially-populated version dir is still
+    shown, just with however many tasks/episodes currently exist under it."""
+    methods = {}
+    if not TRAINING_PRIVILEGED_DIR.is_dir():
+        return methods
+    version_dirs = []
+    for p in TRAINING_PRIVILEGED_DIR.iterdir():
+        if not p.is_dir():
+            continue
+        m = _VERSION_DIR_RE.match(p.name)
+        if not m or "libero" not in p.name.lower():
+            continue
+        version_dirs.append((int(m.group(1)), p))
+    version_dirs.sort(key=lambda t: t[0], reverse=True)
+    for n, version_dir in version_dirs:
+        methods[version_dir.name] = {"dir": version_dir, "label": f"v{n}"}
+    return methods
+
+
+def _libero_training_monitor_state():
+    """(methods, default_method) -- live/uncached, same pattern as
+    _training_monitor_state, so a still-running extraction's newly-finished
+    tasks/episodes (or a brand new libero version dir) show up without a
+    viewer restart."""
+    methods = _discover_libero_training_dirs()
+    default_method = next(iter(methods), None)
+    return methods, default_method
+
+
+def list_libero_training_tasks(base_dir):
+    """Task dirs directly under `base_dir` that have at least one raw
+    privileged_information_<N>.json (extraction has started for that task),
+    annotated with how many episodes are extracted vs. already monitored so
+    far -- mirrors RoboCasa's list_training_tasks()'s "n_reconstructed"
+    progressive-count idea, just against a different source of truth (raw
+    json existence, not a reconstructed mp4). "suite" (libero_10/libero_goal/
+    libero_object/libero_spatial, or None if the source hdf5 isn't found e.g.
+    on a machine without LIBERO_DATASET_ROOT populated) is which of the 4
+    in-scope LIBERO benchmark suites this task belongs to -- lets the
+    frontend group the task tree with a divider per suite instead of one
+    flat 40-task list."""
+    tasks = []
+    if not base_dir.is_dir():
+        return tasks
+    for p in sorted(base_dir.iterdir()):
+        if not p.is_dir():
+            continue
+        raw = [f for f in p.glob("privileged_information_*.json") if not f.name.endswith("_monitor.json")]
+        if not raw:
+            continue
+        monitored = sum(1 for f in raw if (p / f"{f.stem}_monitor.json").is_file())
+        hdf5_path = find_libero_hdf5_for_task(p.name)
+        suite = hdf5_path.parent.name if hdf5_path is not None else None
+        tasks.append({"task": p.name, "n_extracted": len(raw), "n_monitored": monitored, "suite": suite})
+    return tasks
+
+
+def list_libero_training_episodes(base_dir, task, property_filter=None):
+    """Parallel to list_training_episodes, but episodes are discovered from
+    privileged_information_<N>.json directly (no reconstructed-video glob to
+    key off -- see this block's module comment)."""
+    out_dir = base_dir / task
+    episodes = []
+    if not out_dir.is_dir():
+        return episodes
+    for p in sorted(out_dir.glob("privileged_information_*.json")):
+        if p.name.endswith("_monitor.json"):
+            continue
+        m = re.match(r"privileged_information_(\d+)\.json$", p.name)
+        if not m:
+            continue
+        ep = int(m.group(1))
+        entry = {"episode": ep}
+        mon_path = out_dir / f"privileged_information_{ep}_monitor.json"
+        entry["success"] = None
+        entry["num_violations"] = None
+        entry["lang"] = None
+        entry["n_frames"] = None
+        if mon_path.is_file():
+            try:
+                mon = json.loads(mon_path.read_text())
+                rs = mon.get("replay_summary") or {}
+                entry["success"] = rs.get("success")
+                entry["lang"] = rs.get("task_description") or mon.get("task_description")
+                entry["n_frames"] = mon.get("num_frames")
+                if property_filter:
+                    status = _property_status_for(mon, property_filter)
+                    entry["num_violations"] = 1 if status is True else (0 if status is False else None)
+                else:
+                    entry["num_violations"] = mon.get("num_violated_instances")
+            except Exception:
+                pass
+        else:
+            # not monitored yet -- still show the episode (extracted, just
+            # not scored), same "exists but not processed" distinction
+            # RoboCasa's list_training_episodes makes via None vs 0/False.
+            try:
+                raw = json.loads(p.read_text())
+                rs = raw.get("replay_summary") or {}
+                entry["lang"] = rs.get("task_description")
+                entry["n_frames"] = len(raw.get("privileged_dynamic_info") or []) or None
+            except Exception:
+                pass
+        entry["annotated"] = has_human_annotation(f"libero_training__{task}", ep)
+        # Ground-truth demonstration video (not a re-rendered
+        # "reconstruction" -- see ensure_libero_original_video's docstring),
+        # available whenever the source LIBERO hdf5 for this task is found
+        # under LIBERO_DATASET_ROOT. None (not a 404-prone URL) if the raw
+        # dataset copy isn't present on this machine.
+        entry["original_video_url"] = (
+            f"/td_libero_original_video?task={quote(task)}&episode={ep}"
+            if find_libero_hdf5_for_task(task) is not None else None
+        )
+        episodes.append(entry)
+    episodes.sort(key=lambda e: e["episode"])
+    return episodes
+
+
+def libero_training_violation_counts(base_dir):
+    """LIBERO analog of training_violation_counts -- same {by_task,
+    by_property} shape for the sidebar's expandable Task/LTL-property trees,
+    but keyed off privileged_information_<N>_monitor.json existence directly
+    (no reconstructed-video glob to iterate -- see this block's module
+    comment on why LIBERO has no such step yet), scoped to one already-
+    resolved `base_dir` (a specific vN_..._libero_.../ method directory)
+    rather than taking a method name and re-resolving it, since the caller
+    already has it. Was a hand-stubbed always-empty placeholder before
+    2026-09-09 (documented as a known gap); now real, now that the actual
+    400-episode LIBERO extraction+monitor run exists to aggregate over."""
+    by_task = {}
+    by_property = {}
+    if not base_dir.is_dir():
+        return {"by_task": by_task, "by_property": by_property}
+    for task_dir in sorted(base_dir.iterdir()):
+        if not task_dir.is_dir():
+            continue
+        task = task_dir.name
+        task_by_property = {}
+        task_total = 0
+        for p in sorted(task_dir.glob("privileged_information_*.json")):
+            if p.name.endswith("_monitor.json"):
+                continue
+            m = re.match(r"privileged_information_(\d+)\.json$", p.name)
+            if not m:
+                continue
+            ep = int(m.group(1))
+            monitor_path = task_dir / f"privileged_information_{ep}_monitor.json"
+            if not monitor_path.is_file():
+                continue
+            try:
+                mon = json.loads(monitor_path.read_text())
+            except Exception:
+                continue
+            for idx, v in enumerate(mon.get("violations") or []):
+                prop = v.get("property_name")
+                if not prop:
+                    continue
+                task_by_property[prop] = task_by_property.get(prop, 0) + 1
+                task_total += 1
+                prop_entry = by_property.setdefault(prop, {"total": 0, "annotated": 0, "by_task": {}})
+                prop_entry["total"] += 1
+                annotated = human_annotation_for_index(
+                    f"libero_training__{task}__{base_dir.name}", ep, "violations", idx
+                )
+                if annotated:
+                    prop_entry["annotated"] += 1
+                task_entry_for_prop = prop_entry["by_task"].setdefault(
+                    task, {"count": 0, "annotated": 0, "example_episode": ep}
+                )
+                task_entry_for_prop["count"] += 1
+                if annotated:
+                    task_entry_for_prop["annotated"] += 1
+        if task_total or task_by_property:
+            by_task[task] = {"total": task_total, "by_property": task_by_property}
+    return {"by_task": by_task, "by_property": by_property}
+
+
+def api_libero_training_tasks(method=None):
+    methods, default_method = _libero_training_monitor_state()
+    if method is None or method not in methods:
+        method = default_method
+    if method is None:
+        return {"dataset_root": str(TRAINING_PRIVILEGED_DIR), "tasks": [], "method": None}
+    return {
+        "dataset_root": str(methods[method]["dir"]),
+        "tasks": list_libero_training_tasks(methods[method]["dir"]),
+        "method": method,
+    }
+
+
+def api_libero_training_episodes(task, method=None, property_filter=None):
+    methods, default_method = _libero_training_monitor_state()
+    if method is None or method not in methods:
+        method = default_method
+    episodes = (
+        list_libero_training_episodes(methods[method]["dir"], task, property_filter=property_filter)
+        if method is not None else []
+    )
+    # {"task", "episodes"} shape, matching api_training_episodes -- the
+    # frontend's loadTrainingEpisodes reads data.episodes regardless of sim.
+    # original_video_url is set per-episode by list_libero_training_episodes
+    # when the raw LIBERO hdf5 is found (ground-truth demonstration video,
+    # not a re-rendered reconstruction -- see ensure_libero_original_video),
+    # else None; the frontend must treat None as "no original video", not an
+    # error.
+    return {"task": task, "episodes": episodes}
+
+
+def api_libero_training_monitor_methods():
+    methods, default_method = _libero_training_monitor_state()
+    return {
+        "default": default_method,
+        "methods": {k: {"label": v["label"]} for k, v in methods.items()},
+    }
+
+
+def api_libero_training_monitor(task, episode, method=None):
+    """LIBERO analog of api_training_monitor -- same load_monitor_view shape
+    (violations/satisfied/predicate-breakdown). Uses the real original
+    (ground-truth demonstration) video's own real fps/duration, exactly like
+    RoboCasa's ffprobe_info(video_path) call below, whenever
+    ensure_libero_original_video can build/locate it -- NOT a nominal
+    fps=10.0/video_duration=None guess like this used to be. That distinction
+    matters beyond cosmetics: load_monitor_view's `ratio` (mapping a monitor
+    frame index to a video-timeline position for violation-frame chips/marks)
+    falls back to a hardcoded RoboCasa-specific constant (8.0) whenever
+    video_duration is falsy -- silently wrong for LIBERO's real video (whose
+    frames correspond 1:1 to monitor frames, ratio should be ~1.0), which is
+    exactly why a real violation frame (e.g. rc_released_object_eventually_
+    settles) could compute a video-time far outside the actual video's
+    duration and never show up on the timeline (2026-09-09, confirmed via a
+    real KITCHEN_SCENE3 episode). Falls back to the old nominal values only
+    if the source hdf5 genuinely isn't found (no video to derive real numbers
+    from either way) -- monitor data still renders, just without a synced
+    <video> element, same as before in that case."""
+    methods, default_method = _libero_training_monitor_state()
+    if method is None or method not in methods:
+        method = default_method
+    if method is None:
+        return {"task": task, "episode": episode, "method": method,
+                "error": "no LIBERO training-data output found under monitor/output/ yet"}, 404
+
+    base_dir = methods[method]["dir"] / task
+    if not raw_info_path(base_dir, episode).is_file():
+        return {
+            "task": task, "episode": episode, "method": method,
+            "error": "no privileged_information_<episode>.json for this LIBERO episode yet -- "
+                     "run monitor/extract_privileged_from_dataset_libero.py first",
+        }, 404
+
+    video_url = None
+    fps = 20.0  # nominal fallback (LIBERO demo hdf5s' control_freq default) -- only used if no real video
+    video_duration = None
+    try:
+        video_path = ensure_libero_original_video(task, episode)
+    except Exception:
+        video_path = None
+    if video_path is not None and video_path.is_file():
+        real_fps, real_duration = ffprobe_info(video_path)
+        if real_fps and real_duration:
+            fps, video_duration = real_fps, real_duration
+            video_url = f"/td_libero_original_video?task={quote(task)}&episode={episode}"
+
+    mv = load_monitor_view(base_dir, episode, fps, video_duration)
+    if mv is None:
+        return {
+            "task": task, "episode": episode, "method": method,
+            "video_url": video_url,
+            "error": f"no privileged_information_<episode>_monitor.json for this episode/method "
+                     f"({methods[method]['label']}) yet -- extraction ran but monitoring hasn't (yet)",
+        }
+
+    ann = load_annotations(f"libero_training__{task}__{method}", episode)
+    return {
+        "task": task,
+        "episode": episode,
+        "method": method,
+        "video_url": video_url,
+        **mv,
+        "annotations": ann,
+        "reconstruction": None,
+        "annotation_task_key": f"libero_training__{task}__{method}",
+    }
+
+
+# --------------------------------------------------------------------------
 # HTTP handler
 # --------------------------------------------------------------------------
 
@@ -2451,6 +2903,23 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_file_range(video_path)
 
+    def _send_libero_original_video(self, task, episode):
+        try:
+            episode = int(episode)
+        except (TypeError, ValueError):
+            self.send_error(400, "bad episode")
+            return
+        try:
+            video_path = ensure_libero_original_video(task, episode)
+        except Exception as e:
+            self.send_error(500, f"failed to build LIBERO original video: {e}")
+            return
+        if video_path is None or not video_path.is_file():
+            self.send_error(404, "no LIBERO original video for this task/episode "
+                                  "(source hdf5 not found under LIBERO_DATASET_ROOT)")
+            return
+        self._send_file_range(video_path)
+
     def _send_file_range(self, video_path):
         stat = video_path.stat()
         file_size = stat.st_size
@@ -2555,36 +3024,60 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_reconstructed_video(task, episode)
 
         if parsed.path == "/api/td_tasks":
+            sim = qs.get("sim", ["robocasa"])[0]
+            if sim == "libero":
+                method = qs.get("method", [None])[0]
+                return self._send_json(api_libero_training_tasks(method=method))
             return self._send_json(api_training_tasks())
 
         if parsed.path == "/api/td_episodes":
+            sim = qs.get("sim", ["robocasa"])[0]
             task = qs.get("task", [None])[0]
             if not task:
                 return self._send_json({"error": "missing task"}, 400)
             property_filter = qs.get("property", [None])[0] or None
+            if sim == "libero":
+                method = qs.get("method", [None])[0]
+                return self._send_json(api_libero_training_episodes(task, method=method, property_filter=property_filter))
             return self._send_json(api_training_episodes(task, property_filter=property_filter))
 
         if parsed.path == "/api/training_ltl_properties":
             return self._send_json({"properties": sorted(PROPERTY_META.keys())})
 
         if parsed.path == "/api/training_violation_counts":
+            sim = qs.get("sim", ["robocasa"])[0]
+            if sim == "libero":
+                methods, default_method = _libero_training_monitor_state()
+                method = qs.get("method", [default_method])[0]
+                if method is None or method not in methods:
+                    return self._send_json({"by_task": {}, "by_property": {}})
+                return self._send_json(libero_training_violation_counts(methods[method]["dir"]))
             _methods, _default_method = _training_monitor_state()
             method = qs.get("method", [_default_method])[0]
             return self._send_json(training_violation_counts(method))
 
         if parsed.path == "/api/training_monitor":
+            sim = qs.get("sim", ["robocasa"])[0]
             task = qs.get("task", [None])[0]
             episode = qs.get("episode", [None])[0]
-            _methods, _default_method = _training_monitor_state()
-            method = qs.get("method", [_default_method])[0]
             if not task or episode is None:
                 return self._send_json({"error": "missing task/episode"}, 400)
-            result = api_training_monitor(task, int(episode), method=method)
+            if sim == "libero":
+                _methods, _default_method = _libero_training_monitor_state()
+                method = qs.get("method", [_default_method])[0]
+                result = api_libero_training_monitor(task, int(episode), method=method)
+            else:
+                _methods, _default_method = _training_monitor_state()
+                method = qs.get("method", [_default_method])[0]
+                result = api_training_monitor(task, int(episode), method=method)
             status = result[1] if isinstance(result, tuple) else 200
             body = result[0] if isinstance(result, tuple) else result
             return self._send_json(body, status)
 
         if parsed.path == "/api/training_monitor_methods":
+            sim = qs.get("sim", ["robocasa"])[0]
+            if sim == "libero":
+                return self._send_json(api_libero_training_monitor_methods())
             _methods, _default_method = _training_monitor_state()
             return self._send_json({
                 "default": _default_method,
@@ -2612,6 +3105,13 @@ class Handler(BaseHTTPRequestHandler):
             if not task or episode is None:
                 return self.send_error(400, "missing task/episode")
             return self._send_training_original_concat_video(task, episode)
+
+        if parsed.path == "/td_libero_original_video":
+            task = qs.get("task", [None])[0]
+            episode = qs.get("episode", [None])[0]
+            if not task or episode is None:
+                return self.send_error(400, "missing task/episode")
+            return self._send_libero_original_video(task, episode)
 
         if parsed.path == "/":
             return self._send_static("index.html")
