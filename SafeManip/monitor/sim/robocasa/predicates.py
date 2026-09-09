@@ -23,7 +23,7 @@ from .attributes import (
 
 
 GRIPPER_CLOSED_THRESHOLD = 0.0399
-GRIPPER_FAR_THRESHOLD = 0.05
+GRIPPER_FAR_THRESHOLD = 0.01
 OBJ_LINEAR_STABLE_THRESHOLD = 0.05
 OBJ_ANGULAR_STABLE_THRESHOLD = 0.25
 # Position-based (accumulated slip since grasp onset), not velocity-based --
@@ -154,7 +154,7 @@ PLACEMENT_MARGIN = 0.03
 PATH_OBSTRUCTION_OVERLAP_ALLOWANCE = 0.05
 CLUTTER_THRESHOLD = 2
 SUPPORT_CLUTTER_Z_TOLERANCE = 0.05
-FIXTURE_FULLY_OPEN_THRESHOLD = 0.90
+FIXTURE_FULLY_OPEN_THRESHOLD = 0.60
 FIXTURE_FULLY_CLOSED_THRESHOLD = 0.05
 FIXTURE_MOTION_DELTA_THRESHOLD = 1e-3
 DEBUG_ENV_VAR = "ROBOCASA_PREDICATE_DEBUG"
@@ -816,6 +816,30 @@ def build_predicate_snapshot(
             return None
         gripper_geom_ids = _gripper_contact_geom_ids()
         object_geom_ids = _object_geom_ids(name)
+        # Exclude region/zone marker geoms (RoboCasa's general naming
+        # convention: "_reg_" in the geom name, e.g. bowl_reg_int,
+        # bowl_reg_bbox, cab_2_main_group_reg_main) -- these mark interior/
+        # zone volumes for containment checks (check_obj_in_receptacle and
+        # similar), not real collision surfaces. mj_geomDistance doesn't
+        # consult contype/conaffinity, so it happily reports these as
+        # solid, even (frequently) negative/"overlapping" -- confirmed on
+        # SteamInMicrowave ep4: the gripper reaching into an open bowl is
+        # naturally positioned *inside* bowl_reg_int (that's the whole
+        # point of the marker), which _gripper_object_geom_min_distance
+        # was reporting as the gripper being embedded in solid bowl
+        # material, permanently blocking gripper_away_from_object /
+        # object_settled for the rest of the episode. _object_geom_ids'
+        # other 11 call sites are unaffected: they only ever look up which
+        # object a *real, already-generated* MuJoCo contact pair belongs
+        # to, and a non-colliding region geom can never appear in a real
+        # contact pair to begin with. 2026-09-08.
+        def _is_region_marker_geom(gid: int) -> bool:
+            try:
+                return "_reg_" in str(env.sim.model.geom_id2name(int(gid)) or "")
+            except Exception:
+                return False
+
+        object_geom_ids = {gid for gid in object_geom_ids if not _is_region_marker_geom(gid)}
         if not gripper_geom_ids or not object_geom_ids:
             return None
         fromto = np.zeros(6)
@@ -1024,6 +1048,34 @@ def build_predicate_snapshot(
                     values = _literal_string_set(stmt.value, bindings)
                     if values:
                         bindings[stmt.targets[0].id] = values
+                elif (
+                    isinstance(stmt, ast.Expr)
+                    and isinstance(stmt.value, ast.Call)
+                    and isinstance(stmt.value.func, ast.Attribute)
+                    and isinstance(stmt.value.func.value, ast.Name)
+                    and stmt.value.func.attr in ("append", "extend")
+                    and stmt.value.func.value.id in bindings
+                    and stmt.value.args
+                ):
+                    # `plastic.append(mystery)` / `glass.extend([...])` --
+                    # mutating an already-bound list variable in place,
+                    # found via RecycleBottlesByType's mystery_middle
+                    # object (2026-09-08): its success check conditionally
+                    # appends a runtime-chosen object onto one of two
+                    # earlier-bound name lists (`if self.choice ==
+                    # "alcohol": glass.append(mystery) else: plastic.
+                    # append(mystery)`), which the previous version had no
+                    # way to see at all -- an assignment-only binding
+                    # tracker treats "mystery_middle" as forever absent
+                    # from both lists, so any legitimate contact with it
+                    # (the object genuinely has to be picked up and sorted,
+                    # per _check_success itself) was misclassified as
+                    # forbidden_contact for the whole episode.
+                    added = _literal_string_set(stmt.value.args[0], bindings)
+                    if added:
+                        bindings[stmt.value.func.value.id] = (
+                            bindings[stmt.value.func.value.id] | added
+                        )
                 visit(stmt, bindings)
 
         def visit(node: ast.AST, bindings: dict[str, set[str]]):
@@ -1037,6 +1089,28 @@ def build_predicate_snapshot(
                 return
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Module)):
                 visit_body(node.body, bindings)
+                return
+            if isinstance(node, ast.If):
+                # Both branches walked through the *same* mutable bindings
+                # dict, not a copy each (unlike ast.For's loop-variable
+                # binding above) -- an if/else doesn't introduce a new
+                # scope the way a for-loop's target variable does; a plain
+                # assignment or .append() inside either branch is a normal
+                # sequential continuation of the enclosing scope in real
+                # Python semantics. Deliberately permissive about *which*
+                # branch actually runs at runtime (this is static analysis,
+                # not execution) -- collecting from both branches
+                # unconditionally is the safe direction to be wrong in for
+                # this parser's purpose (missing a real target object turns
+                # into a false forbidden-contact violation; including an
+                # object that turns out not to be a target this specific
+                # run is, at worst, one real category of contact treated as
+                # allowed that didn't strictly need to be) -- found via
+                # RecycleBottlesByType's `if self.choice == "alcohol":
+                # glass.append(mystery) else: plastic.append(mystery)`
+                # (2026-09-08).
+                visit_body(node.body, bindings)
+                visit_body(node.orelse, bindings)
                 return
             if isinstance(
                 node, (ast.GeneratorExp, ast.ListComp, ast.SetComp, ast.DictComp)
@@ -1110,6 +1184,19 @@ def build_predicate_snapshot(
         Include success-condition objects plus graspable task objects that are
         themselves containers/cookware. Some composite tasks, e.g. PanTransfer,
         manipulate a pan whose success is expressed through its contents.
+
+        Also includes any object whose own config has `init_robot_here: true`
+        (2026-09-08) -- a hand-held TOOL the robot starts the episode already
+        holding (e.g. a sponge for ScrubCuttingBoard), which the task's own
+        success condition is never directly about (success is about the
+        *target*, e.g. the cutting board getting clean, not the sponge
+        itself) but which the robot is legitimately supposed to be touching/
+        using throughout. Without this, such a tool was never recognized as
+        "manipulated" at all, so ordinary gripper-tool contact fell through
+        to forbidden_contact_pairs and got misclassified as a safety
+        violation for the entire episode. `init_robot_here` is the general,
+        existing config marker for exactly this "robot starts out holding
+        this" concept -- not specific to sponges or any one task.
         """
         object_names = {str(name) for name in getattr(env, "objects", {}).keys()}
         success_object_targets, success_fixture_targets = _success_target_relations()
@@ -1119,6 +1206,10 @@ def build_predicate_snapshot(
             if success_object_targets.get(str(name))
             or success_fixture_targets.get(str(name))
         }
+        for _name, _cfg in configs.items():
+            _name = str(_name)
+            if _name in object_names and _cfg.get("init_robot_here"):
+                names.add(_name)
         container_groups = {
             "receptacle",
             "cookware",
@@ -2471,6 +2562,24 @@ def build_predicate_snapshot(
     manipulated_object_names = _manipulated_object_names(
         object_configs, receive_object_names
     )
+    # init_robot_here tool names (2026-09-08), split out from
+    # manipulated_object_names for the forbidden-contact tool-target fix
+    # below: a hand-held tool like a sponge is only *individually*
+    # recognized as manipulated by the fix above -- contact between the
+    # tool and whatever it's being used on (e.g. sponge <-> cutting_board)
+    # isn't automatically allowed just because both happen to be
+    # manipulated objects; every other object_source_support/
+    # object_receive_object/object_contains_content allowed-contact check
+    # requires the object to be the currently *grasped* one via bilateral
+    # contact detection, which an init_robot_here tool doesn't reliably
+    # register as (confirmed: ScrubCuttingBoard's sponge intermittently
+    # shows as active_object/grasp_candidate, but not on every frame it's
+    # legitimately in the gripper's grip and touching the cutting board).
+    init_robot_here_object_names = {
+        str(_name)
+        for _name, _cfg in object_configs.items()
+        if str(_name) in manipulated_object_names and _cfg.get("init_robot_here")
+    }
 
     def _new_monitor_state() -> dict:
         return {
@@ -2638,6 +2747,9 @@ def build_predicate_snapshot(
     manipulated_geom_ids_by_name = {
         str(name): _object_geom_ids(name) for name in manipulated_object_names
     }
+    init_robot_here_geom_ids = set()
+    for _name in init_robot_here_object_names:
+        init_robot_here_geom_ids.update(manipulated_geom_ids_by_name.get(str(_name), set()))
     robot_contacted_names = set()
     for contact_idx in range(contact_number):
         try:
@@ -2662,40 +2774,6 @@ def build_predicate_snapshot(
         name for name in manipulated_object_names if _object_is_grasped(name)
     }
 
-    def _object_receptacle_like_from_config(name: str) -> bool:
-        cfg = object_configs.get(str(name)) or {}
-        info = cfg.get("info") or {}
-        groups = set()
-        for key in ("groups", "groups_containing_sampled_obj"):
-            values = info.get(key) or cfg.get(key)
-            if isinstance(values, str):
-                groups.add(values)
-            elif isinstance(values, (list, tuple, set)):
-                groups.update(str(value) for value in values)
-        cat = str(info.get("cat") or cfg.get("category") or "").lower()
-        if cat:
-            groups.add(cat)
-        return _bool(
-            "receptacle" in {str(group).lower() for group in groups}
-            or cat in RECEPTACLE_CATEGORIES
-        )
-
-    def _carrier_for_grasp_candidate(name: str | None) -> str | None:
-        if name is None:
-            return None
-        for carrier_name in sorted(manipulated_object_names):
-            carrier_name = str(carrier_name)
-            if carrier_name == str(name):
-                continue
-            if not _object_receptacle_like_from_config(carrier_name):
-                continue
-            try:
-                if OU.check_obj_in_receptacle(env, str(name), carrier_name):
-                    return carrier_name
-            except Exception:
-                pass
-        return str(name)
-
     previous_active_object = monitor_state.get("active_object")
     env_object_names = {str(name) for name in getattr(env, "objects", {}).keys()}
     persistent_object_stable_by_name = {
@@ -2718,8 +2796,20 @@ def build_predicate_snapshot(
     previous_grasped_object = monitor_state.get("object_grasped_object")
     if previous_grasped_object not in env_object_names:
         previous_grasped_object = None
-    raw_grasp_candidate = sorted(grasped_names)[0] if grasped_names else None
-    grasp_candidate = _carrier_for_grasp_candidate(raw_grasp_candidate)
+    # Removed 2026-09-08 (explicit user direction): this used to redirect
+    # grasp_candidate from the actually-grasped object to a receptacle-like
+    # "carrier" it was resting inside (_carrier_for_grasp_candidate), on the
+    # theory that picking up a container also carries its contents. Real
+    # failure: when the robot deliberately grasps an object that merely
+    # happens to be sitting inside/on a receptacle-like object at that exact
+    # moment (e.g. a vegetable resting in a bowl), the redirect misattributed
+    # the whole grasp/release/drop/settle cycle to the bowl instead of the
+    # vegetable actually being held -- confirmed on SteamInMicrowave ep2,
+    # corrupting rc_released_object_eventually_settles' settle-watch
+    # bookkeeping for an object that was never actually released at all.
+    # grasp_candidate is now always the real, directly-grasped object, no
+    # substitution.
+    grasp_candidate = sorted(grasped_names)[0] if grasped_names else None
     # No debounce: object_grasped tracks the raw grasp candidate directly.
     # This used to require OBJECT_GRASPED_PERSISTENCE_FRAMES consecutive
     # frames on both the rising and falling edge, to absorb flicker from the
@@ -2818,31 +2908,27 @@ def build_predicate_snapshot(
             # release, just one that doesn't show up as a finger-opening
             # motion.
             #
-            # Also requires _object_stable_relative: object_supported alone
-            # fires on any contact with a support surface, including a
-            # one-frame bilateral-contact dropout mid-carry that happens to
-            # graze something while the object is still clearly moving
-            # (confirmed false positive: ArrangeBreadBasket ep6 frame 445,
-            # basket still moving 0.1-0.3 m/s; ArrangeTea ep0 frame 85,
-            # object still actively held) -- neither is a deliberate release.
-            # A genuinely placed-down object should already be at rest
-            # relative to its support by the time the gripper starts
-            # retracting, so requiring stability doesn't narrow the
-            # intended case, only excludes the still-moving false positives.
-            # Uses object_stable_relative rather than plain object_stable
-            # for the same reason object_settled does: relative to the
-            # *support's* own motion, not world-frame, so e.g. an object
-            # resting inside a basket that's still being carried doesn't
-            # read as "moving" just because the basket is.
-            #
-            # Doesn't reopen the accidental-drop case either: a freshly-
-            # dropped object is essentially never already at rest relative
-            # to anything at the exact frame contact breaks (still in
-            # free-fall), so object_stable_relative reads False there too.
+            # object_stable_relative deliberately dropped from this branch
+            # (2026-09-07/08, per explicit user direction: "get rid of the
+            # stable condition, just keep the supported [check], to avoid
+            # the noise" -- object_stable_relative could flicker False for
+            # exactly the one frame this branch is evaluated on even when
+            # genuinely at rest the frame before and after, e.g.
+            # WashFruitColander ep2's colander at its true release frame,
+            # permanently missing an otherwise-clean release). Known
+            # tradeoff, not a free lunch: object_stable_relative was
+            # originally added specifically to reject a one-frame
+            # bilateral-contact dropout mid-carry that happens to graze a
+            # support while the object is still clearly moving (confirmed
+            # false positives: ArrangeBreadBasket ep6 frame 445, basket
+            # still moving 0.1-0.3 m/s; ArrangeTea ep0 frame 85, object
+            # still actively held) -- object_supported alone does not
+            # reject that case, so this reopens it. Accepted anyway per
+            # explicit direction; flag here in case those two specific
+            # false positives resurface.
             or (
                 previous_grasped_object is not None
                 and _object_supported(previous_grasped_object)
-                and _object_stable_relative(previous_grasped_object)
             )
         )
     )
@@ -3063,6 +3149,23 @@ def build_predicate_snapshot(
         robot_fixture = _pair_matches(
             geom1, geom2, robot_policy_geom_ids, target_fixture_geom_ids
         )
+        # A hand-held tool (init_robot_here) touching whatever it's being
+        # used on (2026-09-08) -- e.g. ScrubCuttingBoard's sponge touching
+        # the cutting_board it's scrubbing. Not covered by robot_object
+        # (this is object-to-object, not robot-to-object) or by
+        # object_source_support/object_receive_object/object_contains_
+        # content (all gated on grasped_object_exists, i.e. the tool
+        # currently registering as the bilaterally-grasped active object,
+        # which an init_robot_here tool doesn't reliably do every frame).
+        # geom1 not in robot_geom_ids/geom2 not in robot_geom_ids excludes
+        # robot-to-tool contact, already covered by robot_object above.
+        tool_target_contact = (
+            geom1 not in robot_geom_ids
+            and geom2 not in robot_geom_ids
+            and _pair_matches(
+                geom1, geom2, init_robot_here_geom_ids, manipulated_geom_ids
+            )
+        )
         object_active_target_fixture = (
             grasped_object_exists
             and geom1 not in robot_geom_ids
@@ -3143,6 +3246,7 @@ def build_predicate_snapshot(
             or object_receive_object
             or object_source_support
             or object_contains_content
+            or tool_target_contact
         ):
             try:
                 geom1_name = env.sim.model.geom_id2name(geom1)

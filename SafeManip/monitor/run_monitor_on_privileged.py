@@ -1475,8 +1475,114 @@ def monitor_rollout(
             }
         )
 
+    # Persist the *repaired*, post-_repair_forbidden_contact_active_object_
+    # pairs/_ensure_forbidden_contact_sustained sequence for these two keys
+    # (2026-09-08) -- these are the values num_violated_instances/
+    # num_satisfied_instances above were actually computed from, but they're
+    # never written back into privileged_information_<N>.json itself (the
+    # repair only ever mutates the in-memory dynamic_frames this function
+    # was given, not the file on disk). Any other consumer that reads
+    # forbidden_contact/forbidden_contact_sustained straight out of that raw
+    # file instead (e.g. viewer/server.py, which is deliberately stdlib-only
+    # and can't import this module's simulation-dependent one to redo the
+    # repair itself) sees stale, already-corrected noise -- confirmed on
+    # ScrubCuttingBoard ep0 v19: forbidden_contact_sustained reads True for
+    # ~330 frames straight from the raw file (sponge/gripper touches later
+    # recognized as legitimate and repaired away), even though the real,
+    # repaired result here is 0 violated. Keyed by name so any future key
+    # needing the same raw-vs-repaired treatment can reuse this list without
+    # a second special case.
+    repaired_traces = {
+        key: [
+            _get_frame_predicate_value(frame.get("data") or {}, key)
+            if _has_frame_predicate_value(frame.get("data") or {}, key)
+            else None
+            for frame in dynamic_frames
+        ]
+        for key in ("forbidden_contact", "forbidden_contact_sustained")
+    }
+
+    # Per-property, per-frame `accepting` trace straight from the real DFA
+    # (2026-09-08) -- `history` above already computed exactly this for
+    # every single frame (that's what `final_event`/`ever_non_accepting`/
+    # `first_non_accepting_frame` are derived from a few lines up), but only
+    # ever kept the *last* event; the rest was discarded before this point.
+    # Persisting it lets the viewer draw its main satisfied/violated bar by
+    # directly reading the same state the real monitor computed, instead of
+    # re-deriving its own approximate version from raw predicate traces
+    # (compute_occurrences in viewer/server.py) -- a second, independent
+    # reimplementation that has repeatedly drifted from the real DFA's
+    # semantics (confirmed 2026-09-08: its "until" pattern handling
+    # mishandled a mid-occurrence recover-then-resolve case on
+    # PreSoakPan/rc_grasp_remains_synced_until_dropped). This is the single
+    # general fix for every property/pattern shape at once (invariant,
+    # until, instant, ...), not a per-property patch -- `accepting` is a
+    # generic DFA concept, computed identically regardless of which LTL
+    # shape a given property has.
+    #
+    # Flattened by property_name alone (dropping binding_key): every
+    # property in the current single-instance-per-episode design has
+    # exactly one binding, `{}` (confirmed empirically -- the earlier
+    # per-entity/multi-binding tracking redesign was reverted). If that ever
+    # changes, this needs a real per-binding key instead of silently
+    # collapsing multiple instances onto one trace.
+    accepting_by_property = {}
+    for (property_name, _binding_key_tuple), events in history.items():
+        trace = [None] * len(dynamic_frames)
+        for event in events:
+            idx = event["frame_index"]
+            if 0 <= idx < len(trace):
+                trace[idx] = bool(event["accepting"])
+        accepting_by_property[property_name] = trace
+
+    # For the subset of properties with a RepeatedViolationMonitor (2026-09-08),
+    # also persist ITS per-frame `not in_violation` trace -- a genuinely
+    # different, and often more useful, signal than accepting_by_property
+    # above. The primary DFA's `accepting` (accepting_by_property) never
+    # recovers once a safety property is violated once -- it's correct
+    # (matches num_violated_instances: an irrevocable, whole-episode fact,
+    # confirmed on rc_grasp_remains_synced_until_dropped: once desynced, it
+    # stays non-accepting for the rest of the episode even though the
+    # desync itself resolved almost immediately) but paints every frame
+    # after the first failure red, which is not very actionable to look at.
+    # RepeatedViolationMonitor.in_violation is the purpose-built flag for
+    # exactly "is there currently an active, unresolved violation episode" --
+    # True from the moment its own (separate) main DFA copy first rejects,
+    # back to False the instant its recovery DFA accepts (see the class's
+    # own step()/reset() -- this is a deliberate, explicit reset, not a
+    # property of the DFA itself; the primary monitor's own DFA has no such
+    # mechanism and never resets). (main_state in main_dfa.F would coincide
+    # with `not in_violation` in every case observed so far, since main_state
+    # is left frozen at whatever rejecting value it had for the whole
+    # duration in_violation stays True -- but in_violation is the direct,
+    # purpose-built signal, not a coincidental proxy, so use it directly.)
+    # Already computed per-frame in repeated_violation_results[name]["trace"],
+    # just never persisted before now. Only covers the same subset of
+    # properties repeated_monitors covers (not every rc_* property has one --
+    # see build_repeated_*_monitor definitions); accepting_by_property
+    # remains the universal fallback for the rest.
+    #
+    # Deliberately unconditional -- exposes exactly what
+    # RepeatedViolationMonitor.in_violation says for every property it
+    # covers, with no filtering by whether a given property's recovery_ltl
+    # "seems trustworthy" (2026-09-08, reverting an earlier attempt at
+    # exactly that filtering, per explicit user direction: the viewer must
+    # reflect whatever the real monitor pipeline computes, not a second,
+    # independent judgment call about which parts of it to believe).
+    recovery_accepting_by_property = {}
+    for property_name, repeated_result in repeated_violation_results.items():
+        trace = [None] * len(dynamic_frames)
+        for entry in repeated_result.get("trace") or []:
+            idx = entry["frame_index"]
+            if 0 <= idx < len(trace):
+                trace[idx] = not bool(entry["in_violation"])
+        recovery_accepting_by_property[property_name] = trace
+
     return {
         "input_path": path,
+        "repaired_traces": repaired_traces,
+        "accepting_by_property": accepting_by_property,
+        "recovery_accepting_by_property": recovery_accepting_by_property,
         "task_name": replay_summary.get("task_name") or ((static_info.get("task") or {}).get("env_name")),
         "task_description": replay_summary.get("task_description") or ((static_info.get("task") or {}).get("language")),
         "num_frames": len(dynamic_frames),

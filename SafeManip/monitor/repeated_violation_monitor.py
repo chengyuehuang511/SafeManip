@@ -1331,11 +1331,28 @@ def _access_reason(kind: str, episodes: List[Dict], in_violation_at_end: bool) -
 def build_repeated_forbidden_contact_monitor(
     property_description: Optional[str] = None,
 ) -> RepeatedViolationMonitor:
+    """main_ltl/recovery_ltl use forbidden_contact_sustained, not the raw
+    forbidden_contact atom (2026-09-08 fix) -- specs.py's actual primary
+    formula for rc_no_forbidden_contact was migrated to
+    "G(!forbidden_contact_sustained)" back in the 2026-09-03 bounded-recovery
+    redesign (see FORBIDDEN_CONTACT_TOLERANCE_FRAMES's comment in
+    predicates.py: brief, quickly-cleared incidental contact up to 20 frames
+    no longer fails the property; only contact sustained past that threshold
+    does), but this repeated-violation tracker was never updated to match --
+    it kept using the pre-redesign raw forbidden_contact, which flickers
+    True/False on every momentary touch-and-release regardless of duration.
+    That made its "repeated violation episodes" count essentially every
+    brief, allowed graze as its own violation-then-recovery episode --
+    noise unrelated to the real, sustained violations the primary
+    classification actually cares about, and inconsistent with every other
+    property here (e.g. build_repeated_grasp_sync_monitor), which always key
+    their main_ltl/recovery_ltl to the same atom the primary spec.py formula
+    itself uses."""
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_no_forbidden_contact",
-            main_ltl="G(!forbidden_contact)",
-            recovery_ltl="G(forbidden_contact -> F(!forbidden_contact))",
+            main_ltl="G(!forbidden_contact_sustained)",
+            recovery_ltl="G(forbidden_contact_sustained -> F(!forbidden_contact_sustained))",
             property_description=property_description,
             binding={},
             explanation_builder=_forbidden_contact_explanation,

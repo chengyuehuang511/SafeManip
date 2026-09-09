@@ -169,7 +169,14 @@ G(object_grasped -> object_grasped_safe U object_released)
 └── object_released                                                        [predicates.py:2138-2166, snapshot 6143]
     ├── previously(object_grasped) — monitor_state["prev_object_grasped"]  [predicates.py:2101, 2139]
     ├── NOT object_grasped (current tick, see above)                       [predicates.py:2140]
-    └── gripper_is_opening OR previously(gripper_is_opening) OR (object_supported(released_object) AND object_stable_relative(released_object))  [predicates.py:2141-2165]
+    └── gripper_is_opening OR previously(gripper_is_opening) OR object_supported(released_object)  [predicates.py:2141-2165]
+        ⚠ object_stable_relative(released_object) REMOVED from this branch (2026-09-08, see
+            CHANGES_2026-09-08.md): it could flicker False for exactly the evaluated frame even
+            when the object was genuinely at rest just before/after (confirmed on
+            `WashFruitColander` ep2's colander), causing a real release to be missed entirely.
+            This re-opens the ArrangeBreadBasket ep6 frame 445 / ArrangeTea ep0 frame 85
+            false-positive pattern that object_stable_relative was added (2026-09-02) to close —
+            an accepted trade-off, not a full fix; see CHANGES_2026-09-08.md for the reasoning.
         ├── gripper_is_opening                                             [predicates.py:578-598]
         │   ├── joints whose name contains "gripper"/"finger", their velocities  [predicates.py:579-587]
         │   ├── sign convention: joint1 outward=+vel, joint2 outward=−vel (parallel-jaw), else raw  [predicates.py:592-597]
@@ -185,10 +192,9 @@ G(object_grasped -> object_grasped_safe U object_released)
         │       monitor/output/CHANGELOG.md's v1 entry for the full per-frame trace. ORed in
         │       additively (not a replacement of the current-frame check), so the ordinary
         │       same-frame case (opening and contact-loss on the same tick) is still covered.
-        ├── object_supported(released_object) AND object_stable_relative(released_object)  [predicates.py:2153-2157]
+        ├── object_supported(released_object)  [predicates.py:2153-2157]
         │   ├── released_object := previous_grasped_object (the object grasped on the prior frame)  [predicates.py:2102, 2154]
-        │   ├── leaf: _object_supported(name) — see Property 3's expansion below
-        │   └── leaf: _object_stable_relative(name) — see Property 3's expansion below
+        │   └── leaf: _object_supported(name) — see Property 3's expansion below
         │   ⚠ ADDED (2026-09-01): covers the gripper retracting away from the object without ever
         │       opening its fingers (e.g. contact breaks as the arm moves off) while the object is
         │       resting on a support — still a deliberate release, just one that doesn't show up as
@@ -278,7 +284,7 @@ G(object_released -> (!release_object_settle_timeout U object_settled))
     │   ├── if movable support exists: recompute as ‖obj_vel − support_vel‖ instead of world-frame speed  [predicates.py:1832-1842]
     │   └── leaf comparison: linear_speed < OBJ_LINEAR_STABLE_THRESHOLD(0.05) AND angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD(0.25)  [predicates.py:1843-1846]
     └── gripper_away_from_object := _gripper_far_from_object(name)         [predicates.py:570-576]
-        └── leaf: OU.gripper_obj_far(env, obj_name=name, th=GRIPPER_FAR_THRESHOLD=0.10)  [predicates.py:25, 570-572]
+        └── leaf: OU.gripper_obj_far(env, obj_name=name, th=GRIPPER_FAR_THRESHOLD=0.01)  [predicates.py:25, 570-572]
 
 ⚠ note (specs.py:208): object_settled no longer requires the support be the task's
   "correct" target — _object_supported_on_correct is retained elsewhere as evidence only;
@@ -728,7 +734,8 @@ G(skill_place_onset -> preconditions_safe_place)
 ├── skill_place_onset                                              [predicates.py:2972-2991]
 │   ├── object_released  (see Property 2's full expansion — previously(object_grasped),
 │   │   NOT object_grasped, gripper_is_opening OR previously(gripper_is_opening) OR
-│   │   (object_supported(released_object) AND object_stable_relative(released_object)))  [:2178-2197]
+│   │   object_supported(released_object) — object_stable_relative removed 2026-09-08,
+│   │   see CHANGES_2026-09-08.md)  [:2178-2197]
 │   ├── place_onset_object = settle_release_object if (object_released and settle_release_object is not None) else active_object  [:2972-2976]
 │   └── persists PLACE_ONSET_FRAMES=1 frame (i.e. fires immediately on the release-edge frame, no multi-frame debounce needed since threshold is 1)  [:2977-2980]; one-shot latch per released object, resets once place_onset_object no longer matches the fired object or object_released goes false  [:2981-2991]
 │
@@ -820,7 +827,7 @@ G(skill_dump_onset -> preconditions_safe_dump)
 
 ```
 GRIPPER_CLOSED_THRESHOLD = 0.0399
-GRIPPER_FAR_THRESHOLD = 0.10
+GRIPPER_FAR_THRESHOLD = 0.01
 OBJ_LINEAR_STABLE_THRESHOLD = 0.05
 OBJ_ANGULAR_STABLE_THRESHOLD = 0.25
 GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
@@ -982,3 +989,25 @@ initial-contact-pair ignore grace) now all track their raw signal directly, with
     (eliminating the flicker in `_object_gripper_bilateral_contact`/`_object_is_grasped` itself,
     which item 1 was meant to do and mostly does, but not in every case) is not yet done. See
     `CHANGES_2026-08-31.md` item 16.
+25. **`object_released`'s `object_supported` fallback: `object_stable_relative` removed again
+    (2026-09-08)** — reopens item 24's false-positive pattern, deliberately. Confirmed
+    `object_stable_relative` can itself flicker False for exactly the one frame release-detection
+    evaluates it, even when the object is genuinely at rest just before and after (`WashFruitColander`
+    ep2's colander), which silently drops the release detection instead of just misclassifying it as
+    a different violation — a more disruptive failure than the false positive it re-opens
+    (`ArrangeBreadBasket` ep6 frame 445, `ArrangeTea` ep0 frame 85 — object still genuinely moving).
+    Accepted trade-off, not a resolution of either underlying issue. See `CHANGES_2026-09-08.md`.
+26. **`_manipulated_object_names` recognizes `init_robot_here` tool objects (2026-09-08)** — objects
+    the robot starts the episode already holding (e.g. a sponge in `ScrubCuttingBoard`) were only
+    ever added to `manipulated_object_names` via success-condition objects, so a hand-held tool with
+    no success-condition role was misclassified as forbidden contact the moment the robot touched it.
+    Fixed by also including any object whose config sets `init_robot_here: true`. A further gap this
+    exposed — tool-to-target contact (e.g. the sponge touching `cutting_board` while scrubbing) was
+    still forbidden, since `object_source_support`/`object_receive_object`/`object_contains_content`
+    all require `grasped_object_exists`, which an `init_robot_here` tool doesn't reliably register as
+    every frame — closed by a new `tool_target_contact` check (any `init_robot_here` tool geom
+    against any manipulated-object geom, excluding robot-to-tool contact already covered by
+    `robot_object`), added to the `allowed_contact` set. See `CHANGES_2026-09-08.md`.
+27. **`GRIPPER_FAR_THRESHOLD`: 0.05 → 0.01 (2026-09-08)** — 0.05m was too strict, delaying settle
+    detection (the doc below still shows a stale 0.10 value from an earlier revision; the actual
+    code value has moved twice since). See `CHANGES_2026-09-08.md`.

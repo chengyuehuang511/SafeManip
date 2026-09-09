@@ -84,6 +84,19 @@ TRAINING_PRIVILEGED_DIR_SAMPLED = Path(__file__).parent.parent / "SafeManip" / "
 
 _VERSION_DIR_RE = re.compile(r"^v(\d+)_")
 
+# Which vN_.../ version directories are shown as selectable methods in the
+# viewer (2026-09-08, per user request: with ~18 version dirs accumulated
+# under monitor/output/, the viewer felt slow -- _version_dir_is_finished
+# globs every episode file under a version dir, uncached, on *every* request
+# that touches _training_monitor_state (see its own docstring), so this was
+# real, repeated, avoidable I/O across every old version on every page load.
+# Display-only: nothing on disk is touched, older versions stay fully intact
+# and browsable again the moment their number is added back here -- this
+# purely narrows what _discover_training_monitor_methods considers, and (via
+# short-circuiting the `and` below, before _version_dir_is_finished ever
+# runs) skips the expensive glob entirely for every excluded version.
+VISIBLE_VERSION_NUMBERS = {19, 20}
+
 
 def _version_dir_is_finished(version_dir):
     """A vN_.../ dir is only "finished" -- and therefore only shown as a
@@ -124,10 +137,13 @@ def _discover_training_monitor_methods():
     # the key itself if it's ever needed, not worth showing inline.
     methods = {}
     if TRAINING_PRIVILEGED_DIR.is_dir():
-        version_dirs = [
-            p for p in TRAINING_PRIVILEGED_DIR.iterdir()
-            if p.is_dir() and _VERSION_DIR_RE.match(p.name) and _version_dir_is_finished(p)
-        ]
+        version_dirs = []
+        for p in TRAINING_PRIVILEGED_DIR.iterdir():
+            m = _VERSION_DIR_RE.match(p.name) if p.is_dir() else None
+            if not m or int(m.group(1)) not in VISIBLE_VERSION_NUMBERS:
+                continue
+            if _version_dir_is_finished(p):
+                version_dirs.append(p)
         version_dirs.sort(key=lambda p: int(_VERSION_DIR_RE.match(p.name).group(1)))
         for version_dir in version_dirs:
             n = _VERSION_DIR_RE.match(version_dir.name).group(1)
@@ -778,6 +794,14 @@ def list_training_episodes(task, property_filter=None):
             if method_key == _default_method:
                 entry["success"] = m_success
                 entry["num_violations"] = m_num_violations
+        # Whether this episode has a saved annotation, per method (same
+        # per-method scoping as annotations themselves -- see
+        # api_training_monitor's annotation_task_key,
+        # f"training__{task}__{method}") -- 2026-09-08, for the sidebar's
+        # per-episode indicator.
+        entry["annotated"] = {}
+        for method_key in _methods:
+            entry["annotated"][method_key] = has_human_annotation(f"training__{task}__{method_key}", ep)
         episodes.append(entry)
     episodes.sort(key=lambda e: e["episode"])
     return episodes
@@ -793,7 +817,12 @@ def training_violation_counts(method):
     just tallying how many episodes each (task, property) pair shows up
     violated in, for that one method. Scoped to a single method because
     different methods (different predicate-code versions) can disagree on
-    the same episode -- see monitor/output/CHANGELOG.md."""
+    the same episode -- see monitor/output/CHANGELOG.md.
+
+    by_property[prop]["annotated"] / by_property[prop]["by_task"][task]
+    ["annotated"] (2026-09-08): how many of those violations already have a
+    real human annotation (see human_annotation_for_index) -- only for
+    violations, per explicit request, not satisfied instances."""
     by_task = {}
     by_property = {}
     methods, _default_method = _training_monitor_state()
@@ -821,15 +850,42 @@ def training_violation_counts(method):
                 mon = json.loads(monitor_path.read_text())
             except Exception:
                 continue
-            for v in mon.get("violations") or []:
+            for idx, v in enumerate(mon.get("violations") or []):
                 prop = v.get("property_name")
                 if not prop:
                     continue
                 task_by_property[prop] = task_by_property.get(prop, 0) + 1
                 task_total += 1
-                prop_entry = by_property.setdefault(prop, {"total": 0, "by_task": {}})
+                prop_entry = by_property.setdefault(
+                    prop, {"total": 0, "annotated": 0, "by_task": {}}
+                )
                 prop_entry["total"] += 1
-                prop_entry["by_task"][task] = prop_entry["by_task"].get(task, 0) + 1
+                # Human-annotation status of this specific violation
+                # (2026-09-08) -- checked by list index within *this*
+                # episode's violations, not "is the episode annotated at
+                # all" (an episode can have several violated properties,
+                # each independently annotated or not). "just for the
+                # violation" per explicit request -- satisfied instances
+                # aren't counted here.
+                annotated = human_annotation_for_index(
+                    f"training__{task}__{method}", ep, "violations", idx
+                )
+                if annotated:
+                    prop_entry["annotated"] += 1
+                # first violating episode found for this (property, task) --
+                # lets the viewer link straight to one instead of the user
+                # clicking through every task/episode by hand looking for a
+                # violation (2026-09-08). Just the first one, not every one:
+                # this is a "jump to an example" convenience, not a full
+                # index -- if a specific different episode is wanted, the
+                # per-task episode list (with its own per-property badges)
+                # is still there to browse.
+                task_entry_for_prop = prop_entry["by_task"].setdefault(
+                    task, {"count": 0, "annotated": 0, "example_episode": ep}
+                )
+                task_entry_for_prop["count"] += 1
+                if annotated:
+                    task_entry_for_prop["annotated"] += 1
         by_task[task] = {"total": task_total, "by_property": task_by_property}
     return {"by_task": by_task, "by_property": by_property}
 
@@ -1156,43 +1212,92 @@ def compute_occurrences(meta, traces, active_object_by_frame, episode_last_frame
             esc_res_dict = dict(esc_res) if esc_res is not None else {}
             esc_bad_value = escape_meta["obligation_kind"] != "hold_true"
 
-        def _branch_outcome(o_dict, r_dict, bad_val, start, end):
-            """First-event-wins per-frame race for a single `obligation U
-            resolve` branch: resolve becoming true this frame closes the
-            branch successfully *here*, regardless of the obligation's own
-            value this same frame (real Until semantics: Y holding at t
-            satisfies X U Y at t outright). But if the obligation goes bad
-            on an *earlier* frame, before resolve ever fired, the branch has
-            already permanently failed there -- a resolve on some *later*
-            frame cannot retroactively repair it (an interrupted Until does
-            not restart). Returns (resolved_frame, failed_frame) with the
-            other always None; both None means neither happened by `end`
-            (still open/undetermined within this window)."""
+        def _branch_resolved_frame(r_dict, start, end):
+            """First frame in [start, end] where this branch's `resolve`
+            atom is true, or None if it never fires in this window --
+            unaffected by the 2026-09-08 fix below (existence of a
+            resolving frame is a simple fact, not something that depends on
+            whether the obligation held on the way there)."""
             for f in range(start, end + 1):
                 if r_dict.get(f) is True:
-                    return (f, None)
-                if o_dict.get(f) is bad_val:
-                    return (None, f)
-            return (None, None)
+                    return f
+            return None
+
+        def _branch_frame_ok(o_dict, r_dict, bad_val, start, end):
+            """Per-frame satisfaction of `obligation U resolve`, evaluated
+            FRESH at every single frame in [start, end] via the standard
+            backward Until recurrence: ok(t) = resolve(t) or (obligation(t)
+            holds and ok(t+1)).
+
+            Fixes a real bug (2026-09-08, confirmed on `PreSoakPan`
+            ep5/rc_grasp_remains_synced_until_dropped): the previous
+            implementation was a single forward scan that returned the
+            *first* bad frame and then treated the whole rest of the window
+            as permanently violated, on the theory that "an interrupted
+            Until does not restart." That's true for the Until *starting at
+            the original trigger frame* (`start`) -- but G(trigger ->
+            (obligation U resolve)) requires the implication to hold at
+            *every* frame independently, each with its own fresh
+            forward-looking evaluation. A frame where the obligation has
+            already recovered and resolve is still ahead, with the
+            obligation held continuously in between, genuinely satisfies
+            the Until *starting from that later frame* -- confirmed: sync
+            recovered at 171, held through 203, and the drop fired cleanly
+            at 204, so frames 171-203 should read satisfied even though
+            169-170 (the actual desync) correctly read violated. The
+            episode-level satisfied/violated verdict is unaffected either
+            way (that's a real, separate, whole-trace fact already decided
+            correctly by the primary DFA) -- only this per-frame
+            visualization was wrong.
+
+            Special-cased tail: if resolve never fires anywhere in
+            [start, end] *and* the obligation never goes bad either (fully
+            open the entire window, no conclusive answer), returns all-True
+            except a single trailing "still open" frame at `end` --
+            preserves the pre-fix convention for the weak-until "obligation
+            holds forever, never fully resolves" case (the `| G(obligation)`
+            escape some properties have, e.g.
+            rc_grasp_remains_synced_until_dropped's real formula is
+            `(object_sync U object_dropped) | G(object_sync)`, not parsed as
+            a separate branch here -- see spec_derive.py's _WEAK_UNTIL_RE)
+            rather than marking that entire span violated outright, which
+            strict-Until semantics alone would otherwise do. Returns
+            {frame: bool} for every frame in [start, end]."""
+            ever_failed = any(o_dict.get(f) is bad_val for f in range(start, end + 1))
+            ever_resolved = any(r_dict.get(f) is True for f in range(start, end + 1))
+            if not ever_failed and not ever_resolved:
+                ok = {f: True for f in range(start, end)}
+                ok[end] = False
+                return ok
+            ok = {}
+            still_ok_after = False
+            for f in range(end, start - 1, -1):
+                frame_ok = (r_dict.get(f) is True) or (
+                    o_dict.get(f) is not bad_val and still_ok_after
+                )
+                ok[f] = frame_ok
+                still_ok_after = frame_ok
+            return ok
 
         occurrences = []
         for i, start in enumerate(starts):
             next_start = starts[i + 1] if i + 1 < len(starts) else None
             search_end = (next_start - 1) if next_start is not None else episode_last_frame
 
-            primary_resolved, primary_failed = _branch_outcome(
-                obl_dict, res_dict, bad_value, start, search_end
+            primary_resolved = _branch_resolved_frame(res_dict, start, search_end)
+            esc_resolved = (
+                _branch_resolved_frame(esc_res_dict, start, search_end) if escape_meta else None
             )
-            if escape_meta:
-                esc_resolved, esc_failed = _branch_outcome(
-                    esc_obl_dict, esc_res_dict, esc_bad_value, start, search_end
-                )
-            else:
-                esc_resolved, esc_failed = (None, None)
 
-            # Resolved (the OR is satisfied) the instant *either* branch
-            # resolves, whichever comes first -- a branch that's already
-            # failed doesn't block the other one from still succeeding.
+            # Resolved (the OR is satisfied) the instant *either* branch's
+            # resolve atom itself fires, whichever comes first -- a branch
+            # that's already failed doesn't block the other one from still
+            # succeeding. Once *any* branch resolves, this occurrence is
+            # done -- frames after that point belong to a different
+            # question entirely (typically the trigger atom itself has
+            # already gone false by then, e.g. object_grasped after a drop)
+            # and must not be scanned for violations here, same clipping
+            # the pre-fix code did via violated_range_end.
             resolved_candidates = [f for f in (primary_resolved, esc_resolved) if f is not None]
             end_frame = min(resolved_candidates) if resolved_candidates else None
             if end_frame is not None:
@@ -1203,63 +1308,31 @@ def compute_occurrences(meta, traces, active_object_by_frame, episode_last_frame
             else:
                 end_reason = None
 
-            # Genuinely violated (the OR is refuted) only once *both*
-            # branches (or the lone primary branch, if there's no escape)
-            # have conclusively failed -- as long as one branch is still
-            # open, the formula hasn't been refuted yet, matching the real
-            # DFA only confirming a trap once every escape is exhausted.
-            if end_frame is None:
-                if escape_meta is None:
-                    fail_frame = primary_failed
-                elif primary_failed is not None and esc_failed is not None:
-                    fail_frame = max(primary_failed, esc_failed)
-                else:
-                    fail_frame = None  # at least one branch still open
-                # Neither branch may ever conclusively resolve *or* fail
-                # within this window if the episode itself just ends first
-                # (e.g. a *_settle_timeout flag that would eventually fire,
-                # but the trace runs out before it does) -- under finite-
-                # trace semantics an Until that's still open when the trace
-                # ends is deemed unresolved (a real violation), matching
-                # what the primary DFA itself reports for exactly this
-                # case. Only applies to the occurrence actually reaching
-                # true episode end, not one truncated early by the next
-                # trigger.
-                if (
-                    fail_frame is None
-                    and next_start is None
-                    and search_end == episode_last_frame
-                ):
-                    fail_frame = search_end
-            else:
-                fail_frame = None
-
             violated_range_end = end_frame if end_frame is not None else search_end + 1
-            if fail_frame is not None:
-                # Both branches have already permanently failed as of
-                # fail_frame -- the compound OR stays refuted for the rest
-                # of the window regardless of either obligation atom's own
-                # momentary value afterward (a branch that's already dead
-                # doesn't come back), so every frame from fail_frame onward
-                # counts, unconditionally.
-                violated = [
-                    {"frame": f, "reasons": false_children(reason_atom, f)}
-                    for f in range(fail_frame, violated_range_end)
-                ]
-            else:
-                # No branch has conclusively failed yet (still resolved, or
-                # still open with no escape defined) -- fall back to the
-                # original per-frame proxy, only frames where the tracked
-                # obligation(s) are simultaneously bad.
-                violated = [
-                    {"frame": f, "reasons": false_children(reason_atom, f)}
-                    for f in range(start, violated_range_end)
-                    if obl_dict.get(f) is bad_value
-                    and (
-                        escape_meta is None
-                        or esc_obl_dict.get(f) is esc_bad_value
-                    )
-                ]
+            # The DP itself must see end_frame (where resolve actually
+            # fires) to correctly propagate "satisfied" backward from
+            # there -- only the *output* iteration below stops just before
+            # it (end_frame is definitionally satisfied, no violated entry
+            # needed for it). Excluding it from the DP's own window would
+            # make the backward recurrence's base case default to "nothing
+            # confirmed good after this window," wrongly propagating
+            # False all the way back to `start`.
+            dp_end = end_frame if end_frame is not None else search_end
+            primary_ok = _branch_frame_ok(obl_dict, res_dict, bad_value, start, dp_end)
+            esc_ok = (
+                _branch_frame_ok(esc_obl_dict, esc_res_dict, esc_bad_value, start, dp_end)
+                if escape_meta else {}
+            )
+
+            # Violated at frame f iff *neither* branch is satisfied there
+            # (or just the primary branch, if there's no escape) -- each
+            # frame's own fresh Until evaluation, not a single forward scan
+            # that freezes at the first failure (see _branch_frame_ok).
+            violated = [
+                {"frame": f, "reasons": false_children(reason_atom, f)}
+                for f in range(start, violated_range_end)
+                if not (primary_ok.get(f, False) or (escape_meta and esc_ok.get(f, False)))
+            ]
             occurrences.append({
                 "object": obj_at(start),
                 "activation": {"frame": start, "reason": f"{meta['trigger']} became true"},
@@ -1464,6 +1537,57 @@ def _occurrence_marks(occurrences):
     return marks
 
 
+def _real_trace_violated_marks(real_trace, episode_last, to_video_time, occ_object_by_frame=None):
+    """"violated"-kind marks derived directly from a real per-frame
+    accepting/in_violation trace (accepting_by_property/
+    recovery_accepting_by_property), not from compute_occurrences'
+    independent re-derivation (2026-09-08). Necessary because the two can
+    genuinely disagree on exactly which frame a violation starts at --
+    compute_occurrences' own "violated_frames" is a separate, approximate
+    reconstruction from raw predicate traces, and the *bar itself* is now
+    colored straight from real_trace (see build_predicate_breakdown's
+    ltl_trace) -- so a mark built from the other source can point at a
+    different frame than where the bar actually turns red (confirmed:
+    PreSoakPan ep2/rc_grasp_remains_synced_until_dropped, the dashed
+    "violated" mark landed before the red segment it was supposed to be
+    marking the start of). Same consecutive-run-collapsing behavior as
+    _occurrence_marks' own violated-marks loop, just fed from the ground
+    truth instead. `occ_object_by_frame` (same per-frame active-object list
+    already built for compute_occurrences) fills in "object" the same way
+    the "start"/"end" marks already do, so hovering a violated mark also
+    says which object it's about."""
+    marks = []
+    run_start = None
+
+    def _object_at(frame):
+        if not occ_object_by_frame or frame >= len(occ_object_by_frame):
+            return None
+        return occ_object_by_frame[frame]
+
+    for f in range(0, episode_last + 1):
+        bad = real_trace[f] if 0 <= f < len(real_trace) else None
+        if bad is False:
+            if run_start is None:
+                run_start = f
+        else:
+            if run_start is not None:
+                run_end = f - 1
+                label = "violated" if run_end == run_start else f"violated (f{run_start}–f{run_end})"
+                marks.append({
+                    "kind": "violated", "frame": run_start, "marker": to_video_time(run_start),
+                    "label": label, "reason": None, "object": _object_at(run_start),
+                })
+                run_start = None
+    if run_start is not None:
+        run_end = episode_last
+        label = "violated" if run_end == run_start else f"violated (f{run_start}–f{run_end})"
+        marks.append({
+            "kind": "violated", "frame": run_start, "marker": to_video_time(run_start),
+            "label": label, "reason": None, "object": _object_at(run_start),
+        })
+    return marks
+
+
 def ffprobe_info(video_path):
     """Return (fps, duration_s) for a video, cached by (path, mtime)."""
     key = (str(video_path), video_path.stat().st_mtime)
@@ -1498,6 +1622,67 @@ def ffprobe_info(video_path):
 def annotation_path(task, episode):
     safe_task = re.sub(r"[^A-Za-z0-9_.-]", "_", task)
     return ANNOTATIONS_DIR / f"{safe_task}__{episode}.json"
+
+
+def _entry_has_human_content(entry):
+    """Whether a single violations/satisfied annotation entry has any real
+    *human*-authored content -- specifically excluding Claude-authored
+    content (ai_draft/ai_draft_verdict, populated by SafeManip/monitor/
+    populate_claude_annotations.py, and the structured entry["claude"]
+    block -- see save_annotations' own comment on the claude/human x
+    gt_annotation/monitor_problem schema). Human-authored fields, all set
+    only via the reviewer's own UI actions (verdictControls/noteBox/
+    entry["human"] in app.js), never auto-filled: "verdict", "note", or a
+    real "human" block (gt_annotation/monitor_problem)."""
+    if not isinstance(entry, dict):
+        return False
+    if entry.get("verdict") or (entry.get("note") or "").strip():
+        return True
+    human_block = entry.get("human")
+    return isinstance(human_block, dict) and bool(
+        human_block.get("gt_annotation") or human_block.get("monitor_problem")
+    )
+
+
+def has_human_annotation(task, episode):
+    """Whether this (task, episode) has any real saved *human* annotation
+    anywhere in it (any violation/satisfied entry, or the episode-level
+    missed_notes/overall_verdict fields) -- see _entry_has_human_content for
+    what counts. Used for the episode-list sidebar's per-episode "human
+    annotated" indicator (2026-09-08), so it doesn't have to be found by
+    opening every episode one at a time."""
+    p = annotation_path(task, episode)
+    if not p.is_file():
+        return False
+    try:
+        data = json.loads(p.read_text())
+    except Exception:
+        return False
+    if (data.get("missed_notes") or "").strip() or data.get("overall_verdict") is not None:
+        return True
+    for group in ("violations", "satisfied"):
+        for entry in (data.get(group) or {}).values():
+            if _entry_has_human_content(entry):
+                return True
+    return False
+
+
+def human_annotation_for_index(task, episode, group, index):
+    """Whether one specific violations/satisfied entry (by its list index,
+    the same index save_annotations/app.js key annotations by) has real
+    human-authored content -- for the LTL-property sidebar tree's per-
+    property/per-task "how many of these violations are annotated" counts
+    (2026-09-08), which need to check one particular violation's own
+    annotation, not just "is this episode annotated at all" (an episode can
+    have several violated properties, each independently annotated or not)."""
+    p = annotation_path(task, episode)
+    if not p.is_file():
+        return False
+    try:
+        data = json.loads(p.read_text())
+    except Exception:
+        return False
+    return _entry_has_human_content((data.get(group) or {}).get(str(index)))
 
 
 def load_annotations(task, episode):
@@ -1611,6 +1796,50 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
         return None
 
     d = json.loads(mp.read_text())
+    # `repaired_traces` (2026-09-08): a handful of derived predicates get
+    # retroactively corrected at monitor-run time -- e.g. forbidden_contact/
+    # forbidden_contact_sustained, repaired by _repair_forbidden_contact_
+    # active_object_pairs + _ensure_forbidden_contact_sustained in
+    # run_monitor_on_privileged.py -- and it's the *repaired* sequence that
+    # actually determines num_violated_instances/num_satisfied_instances,
+    # not the raw one baked into privileged_information_<N>.json at
+    # extraction time. Reading straight from the raw json for these keys (as
+    # boolean_trace/_frame_predicate_value do by default) shows stale,
+    # already-corrected noise that can visually contradict the real verdict
+    # (confirmed: ScrubCuttingBoard ep0 v19 -- forbidden_contact_sustained
+    # reads True for ~330 frames straight from the raw file, but the actual,
+    # repaired monitor result is 0 violated). run_monitor_on_privileged.py
+    # now persists the repaired per-frame sequence for exactly these keys
+    # into _monitor.json so the viewer can show the same signal the verdict
+    # was actually computed from, instead of duplicating the repair logic
+    # here (this file is stdlib-only, no simulation deps, by design -- see
+    # module docstring). Absent for episodes monitored before this existed;
+    # _trace() below falls back to the raw file's own value in that case.
+    repaired_traces = d.get("repaired_traces") or {}
+    # Per-property, per-frame `accepting` trace straight from the real DFA
+    # (see run_monitor_on_privileged.py's own comment on accepting_by_
+    # property, 2026-09-08) -- absent for monitor.json files written before
+    # this existed, in which case the "LTL (overall)" bar below falls back
+    # to the older occurrence-derived approximation.
+    accepting_by_property = d.get("accepting_by_property") or {}
+    # Preferred over accepting_by_property when available (only for the
+    # subset of properties with a RepeatedViolationMonitor -- see
+    # run_monitor_on_privileged.py's own comment on
+    # recovery_accepting_by_property): the primary DFA's accepting trace
+    # never recovers once violated (correct for the strict, whole-episode
+    # verdict, but paints every frame red for the rest of the episode after
+    # a single early failure); this one restarts after each recovered
+    # violation episode, showing "actively broken right now" instead --
+    # confirmed more useful for at-a-glance reading of what's actually still
+    # wrong versus already resolved.
+    recovery_accepting_by_property = d.get("recovery_accepting_by_property") or {}
+
+    def _trace(key, lo, hi):
+        override = repaired_traces.get(key)
+        if override is not None:
+            return [(f, override[f] if 0 <= f < len(override) else None) for f in range(lo, hi + 1)]
+        return boolean_trace(raw_frames, key, lo, hi)
+
     num_frames = d.get("num_frames")
     video_frame_count = round(video_duration * fps) if video_duration else None
     ratio = (video_frame_count / num_frames) if (video_frame_count and num_frames) else 8.0
@@ -1650,6 +1879,36 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
                 add("mentioned in explanation", f)
         return chips
 
+    def _real_trace_for(property_name, is_violation):
+        """Whichever real, monitor-computed per-frame trace correctly
+        reflects this episode's actual verdict for this property.
+
+        Simply prefers recovery_accepting_by_property whenever present,
+        falling back to accepting_by_property (the primary DFA's own,
+        never-recovers-once-violated trace) otherwise. This used to need a
+        heuristic here to decide whether recovery_accepting_by_property was
+        trustworthy for a given property/episode -- tried "last frame
+        matches the verdict" and "any False frame anywhere", both of which
+        worked for some cases and broke others (confirmed on PreSoakPan,
+        DeliverStraw, and SteamInMicrowave: a completed-and-recovered
+        violation, a violation the recovery signal never registers at all,
+        and a violation where the recovery signal registers one spurious
+        recovered frame, are three genuinely different shapes with no
+        reliable rule distinguishing them from the trace alone). The real
+        fix lives upstream now: run_monitor_on_privileged.py only ever
+        populates recovery_accepting_by_property for properties whose
+        RepeatedViolationMonitorConfig.recovery_represents_genuine_
+        resolution is True (see that flag's own comment) -- for the
+        documented tautological-escape properties (rc_dropped_object_was_
+        released, rc_released_object_eventually_settles), it's never
+        populated at all, so this always correctly falls back to
+        accepting_by_property for those, with no guessing needed here.
+        2026-09-08."""
+        recovery_trace = recovery_accepting_by_property.get(property_name)
+        if recovery_trace:
+            return recovery_trace
+        return accepting_by_property.get(property_name)
+
     def build_predicate_breakdown(property_name, ltl, key_frames, is_violation):
         if not raw_frames:
             return None
@@ -1675,7 +1934,7 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
         # window can be widened to guarantee every mark is actually visible.
         occurrences, marks = [], []
         if meta:
-            full_traces_for_meta = {k: boolean_trace(raw_frames, k, 0, episode_last) for k in display_keys}
+            full_traces_for_meta = {k: _trace(k, 0, episode_last) for k in display_keys}
             object_names = load_object_display_names(base_dir, episode)
             if property_name == "rc_released_object_eventually_settles":
                 occ_object_by_frame = _settle_obj_name_by_frame(raw_frames, object_names)
@@ -1693,6 +1952,19 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
                 if occ.get("eventual_separation") and occ["eventual_separation"].get("frame") is not None:
                     occ["eventual_separation"]["marker"] = to_video_time(occ["eventual_separation"]["frame"])
             marks = _occurrence_marks(occurrences)
+            # Replace compute_occurrences' own "violated"-kind marks with
+            # ones derived directly from the real per-frame trace, when
+            # available (2026-09-08) -- see _real_trace_violated_marks'
+            # docstring for why the two can disagree on exactly which frame
+            # a violation starts at. "start"/"end"/"info" marks (trigger
+            # onset, resolve, eventual-separation) are left as-is; those
+            # aren't what the bar's own coloring is based on.
+            real_trace_for_marks = _real_trace_for(property_name, is_violation)
+            if real_trace_for_marks is not None:
+                marks = [m for m in marks if m["kind"] != "violated"] + _real_trace_violated_marks(
+                    real_trace_for_marks, episode_last, to_video_time, occ_object_by_frame
+                )
+                marks.sort(key=lambda m: m["frame"])
 
         if key_frames:
             frames_of_interest = [c["monitor_frame"] for c in key_frames]
@@ -1707,7 +1979,7 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
             # show the whole episode
             start, end = 0, episode_last
 
-        windowed_traces = {k: boolean_trace(raw_frames, k, start, end) for k in display_keys}
+        windowed_traces = {k: _trace(k, start, end) for k in display_keys}
 
         def node_for(key, is_top):
             trace = windowed_traces.get(key)
@@ -1736,12 +2008,34 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
             }
 
         tree = []
-        # the synthetic "whole LTL" bar goes first: green everywhere except
-        # frames inside a violated run of *any* occurrence, so it reads as
-        # one summary strip above its own decomposition underneath.
+        # the synthetic "whole LTL" bar goes first, so it reads as one
+        # summary strip above its own decomposition underneath. Sourced
+        # directly from a real DFA's own per-frame `accepting` trace
+        # (2026-09-08) when the monitor.json has one -- this is an actual
+        # state the monitor computed, not a second, independent
+        # re-derivation from raw predicate traces. Prefers
+        # recovery_accepting_by_property (the RepeatedViolationMonitor's own
+        # `not in_violation` trace, which goes true again after each
+        # recovered episode -- only available for the subset of properties
+        # with one) over
+        # accepting_by_property (the primary DFA's own trace, which never
+        # recovers once violated -- correct for the strict whole-episode
+        # verdict, but paints every frame red for the rest of the episode
+        # after a single early failure, not very actionable to look at).
+        # Falls back to the older occurrence-derived approximation (green
+        # everywhere except frames inside a violated run of *any*
+        # occurrence) only for monitor.json files written before either of
+        # these existed.
         if meta:
-            violated_set = {v["frame"] for occ in occurrences for v in occ["violated_frames"]}
-            ltl_trace = [(f, f not in violated_set) for f in range(start, end + 1)]
+            real_trace = _real_trace_for(property_name, is_violation)
+            if real_trace is not None:
+                ltl_trace = [
+                    (f, real_trace[f] if 0 <= f < len(real_trace) else None)
+                    for f in range(start, end + 1)
+                ]
+            else:
+                violated_set = {v["frame"] for occ in occurrences for v in occ["violated_frames"]}
+                ltl_trace = [(f, f not in violated_set) for f in range(start, end + 1)]
             ltl_runs = compress_runs(ltl_trace)
             for r in ltl_runs:
                 r["start"] = to_video_time(r["start_frame"])
@@ -1799,6 +2093,22 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
             node = node_for(key, False)
             if node:
                 node["subs"] = []
+                # General case, not specific to forbidden_contact: an
+                # extra_top atom "X" whose "_sustained" debounced sibling
+                # "X_sustained" is one of this property's real top_atoms
+                # (i.e. actually drives the LTL(overall)/left-panel verdict)
+                # is raw, undebounced evidence, not the verdict itself --
+                # rendered as its own top-level row identically to the
+                # verdict-driving rows above it, with nothing distinguishing
+                # them, this reads as a second contradicting verdict rather
+                # than supporting evidence (confirmed source of user
+                # confusion on rc_no_forbidden_contact: forbidden_contact
+                # paints red for any brief touch while forbidden_contact_
+                # sustained, and so the actual LTL, correctly never fires --
+                # 2026-09-08). Label it explicitly so it can't be mistaken
+                # for a second verdict.
+                if f"{key}_sustained" in top_atoms:
+                    node["label"] = f"{node['label']} (raw, pre-tolerance — not the violation verdict)"
                 tree.append(node)
         if not tree:
             return None

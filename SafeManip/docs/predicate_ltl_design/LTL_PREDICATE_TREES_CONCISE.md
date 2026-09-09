@@ -91,8 +91,15 @@ forbidden_contact
 │  ├─ robot_correct_fixture_contact
 │  ├─ correct_manipulated_object_correct_fixture_contact   [if grasped_object_exists]
 │  ├─ correct_manipulated_object_correct_receive_object_contact  [if grasped_object_exists]
-│  └─ correct_manipulated_object_original_support_contact  [if grasped_object_exists]
-│     └─ original_supports_by_object
+│  ├─ correct_manipulated_object_original_support_contact  [if grasped_object_exists]
+│  │  └─ original_supports_by_object
+│  └─ tool_target_contact  [added 2026-09-08, see CHANGES_2026-09-08.md: an init_robot_here
+│     tool (e.g. a sponge) contacting any manipulated-object geom, excluding robot-to-tool
+│     contact (already covered by robot_correct_manipulated_object_contact). Not covered by
+│     the three "if grasped_object_exists" categories above, since an init_robot_here tool
+│     doesn't reliably register as the bilaterally-grasped active object every frame --
+│     without this, e.g. ScrubCuttingBoard's sponge touching cutting_board while scrubbing
+│     read as forbidden contact.]
 └─ no debounce (fires the same frame) [CONTACT_PERSISTENCE_FRAMES removed 2026-09-01]
 
 target_fixtures_by_object / receive_objects_by_object
@@ -107,7 +114,7 @@ object_released
 ├─ previously(object_grasped)
 ├─ not object_grasped
 └─ gripper_is_opening OR previously(gripper_is_opening) OR
-   (object_supported(released_object) AND object_stable_relative(released_object))
+   object_supported(released_object)
   [gripper_is_opening: the usual deliberate-release signal.
    previously(gripper_is_opening): added 2026-09-02 -- gripper_is_opening is a
    raw single-frame check with no debounce and can dip false for exactly one
@@ -121,15 +128,20 @@ object_released
    object_stable: a freshly-dropped object is essentially never already
    resting on something at the exact frame contact breaks, so this doesn't
    reopen the accidental-drop case the way a not-moving check could.
-   AND object_stable_relative(released_object): added 2026-09-02 --
-   object_supported alone fires on any support contact, including a
-   one-frame bilateral-contact dropout mid-carry while the object is still
-   clearly moving (confirmed false positive on real data). A genuinely
-   placed-down object should already be at rest relative to its support, so
-   this doesn't narrow the intended case, only excludes the still-moving
-   false positives. Caveat: this closes one false positive (a phantom
-   release that then never settles) but exposes the same underlying
-   one-frame flicker as a different violation instead
+   (previously also required AND object_stable_relative(released_object),
+   added 2026-09-02 to exclude a one-frame bilateral-contact dropout
+   mid-carry while the object is still clearly moving -- confirmed false
+   positive on real data. REMOVED again 2026-09-08: object_stable_relative
+   itself can flicker False for exactly the one frame release-detection
+   evaluates it, even when the object is genuinely at rest just before/after
+   (confirmed: WashFruitColander ep2's colander), silently dropping the
+   release detection entirely -- a more disruptive failure than the false
+   positive it reopens (ArrangeBreadBasket ep6 frame 445, ArrangeTea ep0
+   frame 85 -- object still genuinely moving). Accepted trade-off, not a
+   resolution of either issue; see CHANGES_2026-09-08.md.)
+   Caveat (pre-existing, independent of the above): this closes one false
+   positive (a phantom release that then never settles) but exposes the same
+   underlying one-frame flicker as a different violation instead
    (rc_dropped_object_was_released, renamed 2026-09-02 from
    rc_grasp_remains_safe_until_release -- see CHANGES_2026-09-02.md; this
    file's trees below are not yet re-derived for the 2026-09-02 grasp-LTL

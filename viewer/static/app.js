@@ -195,10 +195,17 @@ async function refreshViolationCounts() {
 
 // Generic expandable tree-list row: `label` is the clickable selector text,
 // `total` the badge count shown next to it, `children` an array of
-// {label, count} shown (read-only) in a collapsible nested list, `isActive`
-// highlights it as the current selection, `onSelect` fires on a label/count
-// click (not on the caret, which only toggles the nested breakdown).
-function buildTreeRow(label, total, isActive, onSelect, children) {
+// {label, count, onSelect} in a collapsible nested list -- clickable
+// (jumps straight to that child's `onSelect`, e.g. a violating episode,
+// 2026-09-08) when a child supplies one, plain read-only text otherwise
+// (unchanged from before), `isActive` highlights the row as the current
+// selection, `onSelect` (the row's own, not a child's) fires on a
+// label/count click (not on the caret, which only toggles the nested
+// breakdown). `annotated` (optional, 2026-09-08): if given, renders as
+// "total (N✎)" alongside the raw count, without affecting the "nonzero"
+// styling check below (which stays keyed off the numeric `total`, not the
+// formatted text) -- a child's own `c.annotated` works the same way.
+function buildTreeRow(label, total, isActive, onSelect, children, annotated) {
   const wrap = document.createElement("div");
   wrap.className = "tree-item";
 
@@ -217,7 +224,7 @@ function buildTreeRow(label, total, isActive, onSelect, children) {
 
   const countSpan = document.createElement("span");
   countSpan.className = "tree-count" + (total ? " nonzero" : "");
-  countSpan.textContent = total == null ? "" : `${total}`;
+  countSpan.textContent = total == null ? "" : (annotated != null ? `${total} (${annotated}✎)` : `${total}`);
 
   row.append(caret, labelSpan, countSpan);
   wrap.appendChild(row);
@@ -227,8 +234,16 @@ function buildTreeRow(label, total, isActive, onSelect, children) {
     childList.className = "tree-children hidden";
     for (const c of children) {
       const cRow = document.createElement("div");
-      cRow.className = "tree-child-row";
-      cRow.innerHTML = `<span>${c.label}</span><span>${c.count}</span>`;
+      cRow.className = "tree-child-row" + (c.onSelect ? " clickable" : "");
+      const cCountText = c.annotated != null ? `${c.count} (${c.annotated}✎)` : `${c.count}`;
+      cRow.innerHTML = `<span>${c.label}</span><span>${cCountText}</span>`;
+      if (c.onSelect) {
+        cRow.title = "jump to an example violating episode";
+        cRow.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          c.onSelect();
+        });
+      }
       childList.appendChild(cRow);
     }
     wrap.appendChild(childList);
@@ -270,22 +285,54 @@ function renderPropertyTree() {
     buildTreeRow("All properties", allTotal, tdState.property == null, () => selectTrainingProperty(null), null)
   );
   for (const prop of tdPropertiesList) {
-    const counts = tdViolationCounts.by_property[prop] || { total: 0, by_task: {} };
+    const counts = tdViolationCounts.by_property[prop] || { total: 0, annotated: 0, by_task: {} };
+    // by_task[task] is {count, annotated, example_episode} (2026-09-08) --
+    // example_episode backs the clickable jump-to-a-violating-episode
+    // shortcut below, so a violation doesn't have to be found by hand, task
+    // by task, episode by episode. "annotated" (also 2026-09-08) is how
+    // many of those violations already have a real human annotation --
+    // shown alongside the raw count, not as a separate row, so the two
+    // numbers read together at a glance ("N violations, M annotated so
+    // far") instead of requiring a second lookup.
     const children = Object.entries(counts.by_task)
-      .sort((a, b) => b[1] - a[1])
-      .map(([task, count]) => ({ label: task, count }));
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([task, info]) => ({
+        label: task,
+        count: info.count,
+        annotated: info.annotated,
+        onSelect: () => jumpToViolatingEpisode(prop, task, info.example_episode),
+      }));
     tdPropertyTree.appendChild(
-      buildTreeRow(prop, counts.total, prop === tdState.property, () => selectTrainingProperty(prop), children)
+      buildTreeRow(
+        prop,
+        counts.total,
+        prop === tdState.property,
+        () => selectTrainingProperty(prop),
+        children,
+        counts.annotated
+      )
     );
   }
 }
 
-async function loadTrainingEpisodes(task) {
+// Jumps straight to one example violating episode for a (property, task)
+// pair, from the property tree's per-task breakdown (2026-09-08) -- selects
+// the property filter too, so the episode view opens already scoped to the
+// property that made this a "violation" in the first place, instead of
+// landing on the unfiltered whole-episode view.
+function jumpToViolatingEpisode(property, task, episode) {
+  tdState.property = property;
+  renderPropertyTree();
+  loadTrainingEpisodes(task, episode);
+}
+
+async function loadTrainingEpisodes(task, targetEpisode) {
   // captured before tdState.task/episode get overwritten below -- used to
   // re-select the same episode after a property-filter change reloads this
-  // same task's list (see the bottom of this function).
+  // same task's list (see the bottom of this function), unless a specific
+  // `targetEpisode` was requested instead (jumpToViolatingEpisode above).
   const previousTask = tdState.task;
-  const previousEpisode = tdState.episode;
+  const previousEpisode = targetEpisode != null ? targetEpisode : tdState.episode;
   tdState.task = task;
   renderTaskTree();  // update active highlighting in the sidebar tree
   tdEpisodeList.innerHTML = "<div class='loading'>loading episodes…</div>";
@@ -335,20 +382,44 @@ async function loadTrainingEpisodes(task) {
             : `<span class="mini-badge ok" title="${key}">${label}: 0 viol</span>`;
         }).join("\n      ")
       : "";
+    // Per-episode "have I (a human) annotated this yet" indicator
+    // (2026-09-08) -- scoped to the currently-selected method, same as
+    // ep.annotated's own per-method shape (server.py's
+    // list_training_episodes/has_human_annotation). Deliberately excludes
+    // Claude-authored content (ai_draft/ai_draft_verdict, the structured
+    // entry["claude"] block) -- only counts verdict/note/entry["human"]/
+    // missed_notes/overall_verdict, all only ever set by the reviewer's own
+    // UI actions. A button, not just a badge, so it can jump straight into
+    // that episode without requiring a second click on the row first.
+    const isAnnotated = !!(ep.annotated || {})[tdState.monitorMethod];
+    const annotatedBtn = document.createElement("button");
+    annotatedBtn.type = "button";
+    annotatedBtn.className = "mini-badge annotate-btn" + (isAnnotated ? " annotated" : "");
+    annotatedBtn.title = isAnnotated ? "human-annotated -- click to open" : "not yet human-annotated -- click to open";
+    annotatedBtn.textContent = isAnnotated ? "✎ annotated" : "✎ annotate";
+    annotatedBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      selectTrainingEpisode(task, ep, row);
+    });
+
     row.innerHTML = `<span class="ep-num">#${ep.episode}</span>
       ${successBadge}
       ${violBadges}
       <span class="mini-badge">${orUnknown(ep.n_frames)} frames</span>`;
+    row.appendChild(annotatedBtn);
     row.addEventListener("click", () => selectTrainingEpisode(task, ep, row));
     tdEpisodeList.appendChild(row);
   }
   // Re-select whichever episode was already open if this reload is for the
   // *same* task (e.g. the property filter just changed) and that episode
   // still exists in the list; otherwise fall back to the first episode
-  // (task actually changed, or first load).
+  // (task actually changed, or first load). An explicit `targetEpisode`
+  // (jumpToViolatingEpisode) always wins, even across a task switch --
+  // unlike the property-filter-change case, that's the whole point of the
+  // jump, not an incidental same-task preservation.
   const rows = tdEpisodeList.querySelectorAll(".ep-row");
   let keepIdx = 0;
-  if (previousTask === task && previousEpisode != null) {
+  if (targetEpisode != null || (previousTask === task && previousEpisode != null)) {
     const idx = data.episodes.findIndex((e) => e.episode === previousEpisode);
     if (idx !== -1) keepIdx = idx;
   }
@@ -678,6 +749,30 @@ async function saveAnnotation(group, index, patch) {
       ...patch,
     }),
   });
+  // Refresh the training-data sidebar's LTL-property/task trees (2026-09-08)
+  // -- their "N annotated" counts otherwise go stale the instant a verdict
+  // is saved, since tdViolationCounts is only ever fetched once (on load /
+  // method change), never re-pulled after an annotation write. Only when
+  // we're actually in the training tab (annotationContext.task is
+  // "training__<task>", see setAnnotationContext's own comment) --
+  // saveAnnotation is shared with the eval tab, which has no such tree.
+  // Cheap: refreshViolationCounts() is one aggregate fetch, not a full
+  // episode-list/detail-panel reload.
+  if (annotationContext.task && annotationContext.task.startsWith("training__")) {
+    await refreshViolationCounts();
+    renderPropertyTree();
+    renderTaskTree();
+    // The currently-open episode's own sidebar "annotate" button, updated
+    // in place (no network round-trip) -- any verdict/note/human-block
+    // patch means this episode now counts as annotated for the current
+    // method.
+    const activeRow = tdEpisodeList.querySelector(".ep-row.active .annotate-btn");
+    if (activeRow) {
+      activeRow.classList.add("annotated");
+      activeRow.title = "human-annotated -- click to open";
+      activeRow.textContent = "✎ annotated";
+    }
+  }
 }
 
 // While true, the mirrored-seek listeners in wireVideoSync() ignore "seeked"
