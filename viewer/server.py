@@ -73,6 +73,26 @@ DEFAULT_TRAINING_CAMERAS = ["robot0_agentview_left", "robot0_agentview_right", "
 # only needs the raw dataset copy, not privileged_information_<N>.json.
 LIBERO_DATASET_ROOT = Path.home() / "flash" / "datasets" / "libero_raw"
 LIBERO_SUITES = ("libero_10", "libero_goal", "libero_object", "libero_spatial")
+# Properties whose trigger mechanism genuinely never fires anywhere in this
+# 40-task LIBERO corpus (not a guess -- confirmed by inspecting the real
+# fixture set {desk_caddy, flat_stove, microwave, white_cabinet, wine_rack,
+# wooden_cabinet}, the real object set, and all 40 language instructions;
+# see monitor/sim/libero/predicates.py's own module docstring, "EMPIRICALLY
+# INACTIVE FOR THIS 40-TASK CORPUS"). Every episode reports these as
+# vacuously satisfied (their trigger predicate is always False), which is
+# indistinguishable from "genuinely exercised and always passed" using just
+# the violated/satisfied counts alone -- surfaced here as a maintained list,
+# not computed live, since telling the two apart for real would need
+# per-frame DFA-state inspection this viewer doesn't otherwise do. Update
+# this list by hand if predicates.py's own docstring list changes (e.g. a
+# future LIBERO task adds a faucet or push-button fixture).
+LIBERO_INACTIVE_PROPERTIES = {
+    "rc_press_preconditions_safe",
+    "rc_turn_preconditions_safe",
+    "rc_raw_robot_contact_blocks_rte_grasp_until_sanitized",
+    "rc_liquid_transfer_eventually_settles",
+    "rc_solid_transfer_eventually_settles",
+}
 LIBERO_ORIGINAL_VIDEO_DIR = Path(__file__).parent.parent / "replay" / "libero_original_video" / "output"
 
 # Training-data "postprocess monitor" panel: privileged_information_<N>.json /
@@ -3061,7 +3081,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(api_training_episodes(task, property_filter=property_filter))
 
         if parsed.path == "/api/training_ltl_properties":
-            return self._send_json({"properties": sorted(PROPERTY_META.keys())})
+            sim = qs.get("sim", ["robocasa"])[0]
+            resp = {"properties": sorted(PROPERTY_META.keys())}
+            if sim == "libero":
+                resp["inactive"] = sorted(LIBERO_INACTIVE_PROPERTIES)
+            return self._send_json(resp)
 
         if parsed.path == "/api/training_violation_counts":
             sim = qs.get("sim", ["robocasa"])[0]

@@ -146,6 +146,12 @@ async function init() {
 // without re-fetching either list.
 let tdTasksList = [];
 let tdPropertiesList = [];
+// Property names whose trigger mechanism never fires anywhere in the
+// current sim's corpus (LIBERO only, e.g. rc_press_preconditions_safe --
+// no push-button fixture in any of the 40 tasks) -- see server.py's
+// LIBERO_INACTIVE_PROPERTIES for why this is a maintained list, not
+// computed live. Empty for RoboCasa.
+let tdInactiveProperties = new Set();
 // { by_task: {task: {total, by_property: {prop: count}}},
 //   by_property: {prop: {total, by_task: {task: count}}} } for whichever
 // method is currently selected -- see server.py's training_violation_counts.
@@ -216,10 +222,12 @@ el("#td-sim-select").addEventListener("change", async (e) => {
 // list_training_episodes' property_filter param / _property_status_for.
 async function initTrainingLtlPropertyList() {
   try {
-    const data = await fetchJSON("/api/training_ltl_properties");
+    const data = await fetchJSON(`/api/training_ltl_properties?sim=${encodeURIComponent(tdSim)}`);
     tdPropertiesList = data.properties;
+    tdInactiveProperties = new Set(data.inactive || []);
   } catch (e) {
     tdPropertiesList = [];  // non-fatal -- "All properties" still works, just no per-property entries
+    tdInactiveProperties = new Set();
   }
 }
 
@@ -260,12 +268,18 @@ async function refreshViolationCounts() {
 // "total (N✎)" alongside the raw count, without affecting the "nonzero"
 // styling check below (which stays keyed off the numeric `total`, not the
 // formatted text) -- a child's own `c.annotated` works the same way.
-function buildTreeRow(label, total, isActive, onSelect, children, annotated) {
+// `inactive` (optional, 2026-09-09): tags a property whose trigger
+// mechanism never fires anywhere in the current sim's corpus (LIBERO only
+// -- see tdInactiveProperties/server.py's LIBERO_INACTIVE_PROPERTIES) --
+// dimmed row + "(N/A for this sim)" suffix, so a 0-violation count doesn't
+// read as "exercised and always passed" when it actually never triggered
+// at all.
+function buildTreeRow(label, total, isActive, onSelect, children, annotated, inactive) {
   const wrap = document.createElement("div");
   wrap.className = "tree-item";
 
   const row = document.createElement("div");
-  row.className = "tree-row" + (isActive ? " active" : "");
+  row.className = "tree-row" + (isActive ? " active" : "") + (inactive ? " tree-row-inactive" : "");
 
   const hasChildren = children && children.length > 0;
   const caret = document.createElement("span");
@@ -274,8 +288,11 @@ function buildTreeRow(label, total, isActive, onSelect, children, annotated) {
 
   const labelSpan = document.createElement("span");
   labelSpan.className = "tree-label";
-  labelSpan.textContent = label;
-  labelSpan.title = label;
+  const displayLabel = inactive ? `${label} (N/A for this sim)` : label;
+  labelSpan.textContent = displayLabel;
+  labelSpan.title = inactive
+    ? `${label} -- never triggers anywhere in this corpus (no matching fixture/object), not "exercised and always passed"`
+    : label;
 
   const countSpan = document.createElement("span");
   countSpan.className = "tree-count" + (total ? " nonzero" : "");
@@ -404,7 +421,8 @@ function renderPropertyTree() {
         prop === tdState.property,
         () => selectTrainingProperty(prop),
         children,
-        counts.annotated
+        counts.annotated,
+        tdInactiveProperties.has(prop)
       )
     );
   }
