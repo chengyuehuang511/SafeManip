@@ -1309,11 +1309,50 @@ def build_predicate_snapshot(
             pass
         return refs
 
+    def _bare_fixture_status_targets() -> set[str]:
+        """Fixtures whose own is_open()/is_closed() status IS the task's
+        entire success condition (e.g. `return self.toaster_oven.is_closed(
+        self)`, CloseToasterOvenDoor), with no associated object argument at
+        all. _success_target_relations' own add_fixture_target requires
+        BOTH an object and a fixture reference (obj_inside_of/
+        check_obj_fixture_contact/check_rack_contact all take an object as
+        one of their arguments) -- a task whose success check is JUST a
+        bare fixture status check registers nothing there, leaving that
+        fixture entirely unrecognized as a legitimate task-relevant target.
+        Confirmed on CloseToasterOvenDoor/CloseBlenderLid/OpenDrawer/
+        ArrangeTea (`self.cab.is_closed(env=self)`): `_check_success` is
+        literally a bare `self.<fixture>.is_closed(...)`/`.is_open(...)`
+        call (or ANDed with other bare fixture checks), so ordinary,
+        required gripper contact with that fixture while opening/closing
+        it read as forbidden_contact for the whole episode (2026-09-09,
+        found while investigating why LIBERO's rc_no_forbidden_contact
+        rate dropped well below RoboCasa's own)."""
+        fixture_names = {str(name) for name in getattr(env, "fixtures", {}).keys()}
+        method = getattr(env.__class__, "_check_success", None)
+        if method is None:
+            return set()
+        try:
+            tree = ast.parse(textwrap.dedent(inspect.getsource(method)))
+        except Exception:
+            return set()
+        found = set()
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("is_open", "is_closed")
+            ):
+                name = _fixture_name_from_ast(node.func.value)
+                if name in fixture_names:
+                    found.add(name)
+        return found
+
     def _target_fixture_names() -> set[str]:
         _, success_fixture_targets = _success_target_relations()
         names = set()
         for targets in success_fixture_targets.values():
             names.update(targets)
+        names.update(_bare_fixture_status_targets())
         return names
 
     def _target_object_names(
