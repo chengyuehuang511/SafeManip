@@ -1109,6 +1109,22 @@ def build_predicate_snapshot(
                 # RecycleBottlesByType's `if self.choice == "alcohol":
                 # glass.append(mystery) else: plastic.append(mystery)`
                 # (2026-09-08).
+                #
+                # The condition itself must also be visited, not just the
+                # branches: a task can put its receptacle/fixture-contact
+                # check directly in the `if` test with the append living in
+                # the body (`if OU.check_obj_in_receptacle(self, veg,
+                # "tupperware0"): veg_in_0.append(veg)`, PackIdenticalLunches
+                # / PortionHotDogs's actual shape) -- skipping node.test
+                # silently drops every target relation whose call lives
+                # there, misclassifying meat0/vegetable0 (or whatever the
+                # loop variable is) as never a manipulated object, so normal
+                # required contact with them reads as forbidden_contact.
+                # Found via v21's regression sweep (2026-09-08): brand-new,
+                # every-episode rc_no_forbidden_contact violations on
+                # PackIdenticalLunches and PortionHotDogs that didn't exist
+                # before this ast.If branch was added.
+                visit(node.test, bindings)
                 visit_body(node.body, bindings)
                 visit_body(node.orelse, bindings)
                 return
