@@ -187,11 +187,23 @@ from .attributes import (
 # v0 threshold constants (all in meters / radians / raw-frame counts; NOT
 # empirically tuned -- see module docstring).
 # ---------------------------------------------------------------------------
-STABLE_LINEAR_DELTA_THRESHOLD = 0.004   # per-raw-frame position delta (m)
-STABLE_ANGULAR_DELTA_THRESHOLD = 0.05   # per-raw-frame orientation delta (rad, small-angle approx)
-SYNC_RELATIVE_DELTA_THRESHOLD = 0.01    # per-raw-frame change in (obj - eef) offset (m)
+# 2026-09-09: aligned with RoboCasa's own tuned values (predicates.py)
+# wherever the two are genuinely comparable -- both simulators default to
+# control_freq=20 (confirmed directly in each engine's own env base class),
+# so frame-count constants carry over 1:1, and RoboCasa's OBJ_LINEAR_
+# STABLE_THRESHOLD/OBJ_ANGULAR_STABLE_THRESHOLD are real MuJoCo body
+# velocities (m/s, rad/s), not per-frame deltas -- converted here via
+# velocity * dt (dt = 1/20 = 0.05s) to get the equivalent per-frame delta
+# LIBERO's own STABLE_*_DELTA_THRESHOLD actually compares against. Left
+# GRIPPER_OPEN_FRACTION_THRESHOLD/GRIPPER_CLOSED_THRESHOLD unaligned
+# (RoboCasa's is a raw joint qpos value specific to its own gripper model,
+# LIBERO's is a normalized 0-1 closed-fraction -- genuinely different
+# quantities, no valid conversion between them).
+STABLE_LINEAR_DELTA_THRESHOLD = 0.0025   # = RoboCasa's OBJ_LINEAR_STABLE_THRESHOLD (0.05 m/s) * dt
+STABLE_ANGULAR_DELTA_THRESHOLD = 0.0125  # = RoboCasa's OBJ_ANGULAR_STABLE_THRESHOLD (0.25 rad/s) * dt
+SYNC_RELATIVE_DELTA_THRESHOLD = 0.03    # = RoboCasa's GRASP_SLIP_LINEAR_THRESHOLD (already a per-frame position delta, same units, no conversion)
 GRIPPER_FAR_THRESHOLD = 0.12            # eef-to-object distance considered "away" (m) -- fallback tier only, see MESH_GRIPPER_FAR_THRESHOLD
-MESH_GRIPPER_FAR_THRESHOLD = 0.02        # real mesh/geom gap (m) considered "away" -- primary tier, see _gripper_far_from_object
+MESH_GRIPPER_FAR_THRESHOLD = 0.01        # = RoboCasa's own GRIPPER_FAR_THRESHOLD (real mesh/geom gap, same units) -- primary tier, see _gripper_far_from_object
 NEAR_OBJECT_THRESHOLD = 0.09            # eef-to-object distance considered "near" for onset (m)
 GRIPPER_OPEN_FRACTION_THRESHOLD = 0.35  # gripper closed-fraction below this counts as "open enough to release"
 REGION_CLEAR_RADIUS = 0.10              # radius (m) used by object/support region-clear checks
@@ -200,11 +212,11 @@ UPRIGHT_COS_THRESHOLD = 0.85            # cos(angle) between object z-axis and w
 FIXTURE_INTERIOR_RADIUS = 0.18          # eef/object-to-fixture-body distance considered "inside" (m)
 FIXTURE_ARTICULATION_DELTA_THRESHOLD = 2e-3  # per-raw-frame open-fraction delta counted as "articulating"
 
-SKILL_ONSET_FRAMES = 5          # consecutive near-object/contact-and-articulating frames before an onset fires
-SETTLE_TIMEOUT_FRAMES = 100     # frames a dropped/released object has to settle before timeout -- matches RoboCasa's own tuned value (predicates.py) exactly, both call this once per raw ~20Hz simulator frame; LIBERO's original 60 was simply an untuned v0 guess, confirmed too short directly: put_the_wine_bottle_on_the_rack ep0 genuinely settles (supported+stable+gripper-away) ~80 frames after release, timing out at 60 with the object already correctly at rest by 100
-FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 10  # frames of arm-contact tolerated before "sustained"
+SKILL_ONSET_FRAMES = 8          # = RoboCasa's own SKILL_ONSET_FRAMES (consecutive near-object/contact-and-articulating frames before an onset fires)
+SETTLE_TIMEOUT_FRAMES = 100     # = RoboCasa's own SETTLE_TIMEOUT_FRAMES (frames a dropped/released object has to settle before timeout) -- LIBERO's original 60 was an untuned v0 guess, confirmed too short directly: put_the_wine_bottle_on_the_rack ep0 genuinely settles (supported+stable+gripper-away) ~80 frames after release, timing out at 60 with the object already correctly at rest by 100
+FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 20  # = RoboCasa's own FORBIDDEN_CONTACT_TOLERANCE_FRAMES (frames of arm-contact tolerated before "sustained")
 CONTACT_PERSISTENCE_FRAMES = 3   # frames an open/close obstacle contact must persist before counting as a "hit"
-FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES = 60  # frames of continuous retracting that counts as resolved even short of the opposite extreme
+FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES = 100  # = RoboCasa's own FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES (frames of continuous retracting that counts as resolved even short of the opposite extreme)
 FIXTURE_NEAR_THRESHOLD = 0.30    # eef-to-fixture-ROOT-BODY distance considered "near" for press/turn/slide/twist/open_close onset
 # (larger than object-proximity thresholds elsewhere in this file: a fixture's root body origin is its
 # structural reference point, e.g. a cabinet carcass's center, not necessarily where the robot actually
