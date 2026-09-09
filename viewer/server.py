@@ -2549,10 +2549,22 @@ def list_libero_training_tasks(base_dir):
     return tasks
 
 
-def list_libero_training_episodes(base_dir, task, property_filter=None):
+def list_libero_training_episodes(base_dir, task, method=None, property_filter=None):
     """Parallel to list_training_episodes, but episodes are discovered from
     privileged_information_<N>.json directly (no reconstructed-video glob to
-    key off -- see this block's module comment)."""
+    key off -- see this block's module comment). `method` (2026-09-09,
+    the resolved method key, e.g. "v22_2026-08-09_libero_baseline" --
+    the caller already knows it, since it's what resolved `base_dir` in the
+    first place): entry["methods"][method]/entry["annotated"][method] are
+    now real dicts keyed by method, matching RoboCasa's list_training_
+    episodes shape exactly (LIBERO currently only ever has one method
+    resolved at a time, so these dicts have exactly one key -- but the
+    frontend's shared loadTrainingEpisodes/taskTreeRow rendering code reads
+    `ep.methods[currentMethod]`/`(ep.annotated || {})[currentMethod]`
+    regardless of sim, so a flat (non-dict) shape here silently produced no
+    violation-count badge and always-"not annotated" for every LIBERO
+    episode row -- found directly from the rendered page (no violation-
+    count badge showing, only the success badge)."""
     out_dir = base_dir / task
     episodes = []
     if not out_dir.is_dir():
@@ -2568,20 +2580,25 @@ def list_libero_training_episodes(base_dir, task, property_filter=None):
         mon_path = out_dir / f"privileged_information_{ep}_monitor.json"
         entry["success"] = None
         entry["num_violations"] = None
+        entry["methods"] = {}
         entry["lang"] = None
         entry["n_frames"] = None
         if mon_path.is_file():
             try:
                 mon = json.loads(mon_path.read_text())
                 rs = mon.get("replay_summary") or {}
-                entry["success"] = rs.get("success")
+                m_success = rs.get("success")
                 entry["lang"] = rs.get("task_description") or mon.get("task_description")
                 entry["n_frames"] = mon.get("num_frames")
                 if property_filter:
                     status = _property_status_for(mon, property_filter)
-                    entry["num_violations"] = 1 if status is True else (0 if status is False else None)
+                    m_num_violations = 1 if status is True else (0 if status is False else None)
                 else:
-                    entry["num_violations"] = mon.get("num_violated_instances")
+                    m_num_violations = mon.get("num_violated_instances")
+                entry["success"] = m_success
+                entry["num_violations"] = m_num_violations
+                if method is not None:
+                    entry["methods"][method] = {"success": m_success, "num_violations": m_num_violations}
             except Exception:
                 pass
         else:
@@ -2595,7 +2612,9 @@ def list_libero_training_episodes(base_dir, task, property_filter=None):
                 entry["n_frames"] = len(raw.get("privileged_dynamic_info") or []) or None
             except Exception:
                 pass
-        entry["annotated"] = has_human_annotation(f"libero_training__{task}", ep)
+        entry["annotated"] = {
+            method: has_human_annotation(f"libero_training__{task}__{method}", ep)
+        } if method is not None else {}
         # Ground-truth demonstration video (not a re-rendered
         # "reconstruction" -- see ensure_libero_original_video's docstring),
         # available whenever the source LIBERO hdf5 for this task is found
@@ -2687,7 +2706,7 @@ def api_libero_training_episodes(task, method=None, property_filter=None):
     if method is None or method not in methods:
         method = default_method
     episodes = (
-        list_libero_training_episodes(methods[method]["dir"], task, property_filter=property_filter)
+        list_libero_training_episodes(methods[method]["dir"], task, method=method, property_filter=property_filter)
         if method is not None else []
     )
     # {"task", "episodes"} shape, matching api_training_episodes -- the

@@ -433,7 +433,16 @@ async function loadTrainingEpisodes(task, targetEpisode) {
   tdEpisodeList.innerHTML = "<div class='loading'>loading episodes…</div>";
   await ensureTrainingMonitorMethods();  // so tdMethodLabel() has short labels ready for the badges below
   const propertyParam = tdState.property ? `&property=${encodeURIComponent(tdState.property)}` : "";
-  const data = await fetchJSON(`/api/td_episodes?task=${encodeURIComponent(task)}${propertyParam}${tdSimQS()}`);
+  // method= (2026-09-09): LIBERO's api_libero_training_episodes reads this
+  // to resolve which method dir to scope entry.methods[...]/entry.
+  // annotated[...] to -- without it, the server silently falls back to
+  // LIBERO's own default method regardless of the dropdown's actual
+  // selection (harmless while only one LIBERO method exists, but wrong in
+  // general). RoboCasa's api_training_episodes has no such param (it
+  // already reports every known method's counts unconditionally), so this
+  // is a no-op query param there.
+  const methodParam = tdState.monitorMethod ? `&method=${encodeURIComponent(tdState.monitorMethod)}` : "";
+  const data = await fetchJSON(`/api/td_episodes?task=${encodeURIComponent(task)}${propertyParam}${methodParam}${tdSimQS()}`);
   tdEpisodeList.innerHTML = "";
   if (!data.episodes.length) {
     tdEpisodeList.innerHTML = "<div class='muted'>no reconstructed episodes yet for this task"
