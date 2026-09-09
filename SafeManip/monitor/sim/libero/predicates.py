@@ -201,7 +201,7 @@ FIXTURE_INTERIOR_RADIUS = 0.18          # eef/object-to-fixture-body distance co
 FIXTURE_ARTICULATION_DELTA_THRESHOLD = 2e-3  # per-raw-frame open-fraction delta counted as "articulating"
 
 SKILL_ONSET_FRAMES = 5          # consecutive near-object/contact-and-articulating frames before an onset fires
-SETTLE_TIMEOUT_FRAMES = 60      # frames a dropped/released object has to settle before timeout
+SETTLE_TIMEOUT_FRAMES = 100     # frames a dropped/released object has to settle before timeout -- matches RoboCasa's own tuned value (predicates.py) exactly, both call this once per raw ~20Hz simulator frame; LIBERO's original 60 was simply an untuned v0 guess, confirmed too short directly: put_the_wine_bottle_on_the_rack ep0 genuinely settles (supported+stable+gripper-away) ~80 frames after release, timing out at 60 with the object already correctly at rest by 100
 FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 10  # frames of arm-contact tolerated before "sustained"
 CONTACT_PERSISTENCE_FRAMES = 3   # frames an open/close obstacle contact must persist before counting as a "hit"
 FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES = 60  # frames of continuous retracting that counts as resolved even short of the opposite extreme
@@ -275,9 +275,26 @@ def _gripper_closed_fraction(env) -> Optional[float]:
 
 def _check_grasp_any(env) -> Optional[str]:
     """Returns the name of a movable object the gripper is bilaterally
-    grasping (robosuite's own `_check_grasp` -- left+right fingerpad contact),
-    or None."""
+    grasping, or None. ANDs robosuite's own `_check_grasp` (left+right
+    fingerpad contact) with the gripper being closed enough
+    (`GRIPPER_OPEN_FRACTION_THRESHOLD`), mirroring RoboCasa's own
+    `_object_is_grasped` (predicates.py, `_object_gripper_bilateral_contact
+    and OU.check_obj_grasped(...)`) -- same rationale, ported exactly
+    (2026-09-09): bilateral contact alone is a single raw MuJoCo contact
+    query, which can drop out for exactly one raw frame from solver/
+    discretization noise even when the object never actually moved or left
+    the gripper (confirmed corpus-wide: 17/27 rc_dropped_object_was_
+    released violations were this exact one-frame flicker, gripper still
+    recorded as actively closing at the "drop"). RoboCasa fixed this at the
+    raw-signal level with a second, independent AND-condition instead of a
+    downstream debounce (its own predicates.py explicitly documents
+    removing an earlier debounce once this fix landed, "that flicker
+    source is now fixed at the raw-signal level") -- same fix here, not a
+    debounce."""
     gripper = env.robots[0].gripper
+    gripper_frac = _gripper_closed_fraction(env)
+    if gripper_frac is not None and gripper_frac < GRIPPER_OPEN_FRACTION_THRESHOLD:
+        return None
     for name in _movable_object_names(env):
         try:
             model = env.get_object(name)
@@ -368,6 +385,47 @@ def _gripper_object_geom_min_distance(env, name: str, distmax: float) -> Optiona
             if best <= 0.0:
                 return best
     return best
+
+
+def _geom_aabb(env, geom_id: int) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    """World-frame axis-aligned bounding box for one geom -- ported verbatim
+    from RoboCasa's own _geom_aabb (predicates.py)."""
+    try:
+        center = np.asarray(env.sim.data.geom_xpos[int(geom_id)], dtype=float)[:3]
+        xmat = np.asarray(env.sim.data.geom_xmat[int(geom_id)], dtype=float).reshape(3, 3)
+        size = np.asarray(env.sim.model.geom_size[int(geom_id)], dtype=float)[:3]
+    except Exception:
+        return None
+    if (
+        center.size < 3
+        or xmat.shape != (3, 3)
+        or size.size < 3
+        or not np.all(np.isfinite(center))
+        or not np.all(np.isfinite(xmat))
+        or not np.all(np.isfinite(size))
+    ):
+        return None
+    half_extents = np.abs(xmat) @ np.maximum(size, 0.0)
+    return center - half_extents, center + half_extents
+
+
+def _geom_ids_aabb(env, geom_ids) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    """Union AABB over a set of geom ids -- ported verbatim from RoboCasa's
+    own _geom_ids_aabb."""
+    geom_aabbs = [aabb for gid in geom_ids for aabb in [_geom_aabb(env, gid)] if aabb is not None]
+    if not geom_aabbs:
+        return None
+    lowers = [aabb[0] for aabb in geom_aabbs]
+    uppers = [aabb[1] for aabb in geom_aabbs]
+    return np.min(lowers, axis=0), np.max(uppers, axis=0)
+
+
+def _aabb_intersects(a, b) -> bool:
+    """Ported verbatim from RoboCasa's own _aabb_overlap_depth/_aabb_intersects."""
+    a_min, a_max = a
+    b_min, b_max = b
+    overlap = np.minimum(a_max, b_max) - np.maximum(a_min, b_min)
+    return bool(np.all(overlap > 0.0))
 
 
 def _gripper_far_from_object(env, name: str, threshold: float) -> bool:
@@ -836,8 +894,9 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             "prev_grasped_object": None,
             "prev_positions": {},
             "prev_quats": {},
-            "prev_offsets": {},
             "prev_gripper_frac": None,
+            "sync_baseline_object": None,
+            "sync_baseline_offset": None,
             "settle_watch": None,  # {"object": name, "age": int}
             "forbidden_streak": 0,
             "pick_onset": {},  # name -> {"streak": int, "fired": bool}
@@ -866,6 +925,16 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         state["active_object"] = grasped_name
     active = state["active_object"]
 
+    # No debounce here: object_grasped tracks _check_grasp_any directly,
+    # matching RoboCasa's own explicit choice ("No debounce: object_grasped
+    # tracks the raw grasp candidate directly... that flicker source is now
+    # fixed at the raw-signal level", not smoothed downstream). The
+    # one-frame bilateral-contact flicker this used to need a debounce for
+    # is addressed at the signal level instead: _check_grasp_any's
+    # gripper_frac AND-condition, and object_left_gripper's AABB-overlap
+    # check (below) being more forgiving than exact mesh distance -- not a
+    # debounce, a correction to what "grasped"/"left the gripper" actually
+    # mean.
     object_dropped = bool(state["prev_grasped_object"]) and not object_grasped
     state["prev_grasped_object"] = grasped_name
 
@@ -885,22 +954,96 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     ang_delta = _angle_between_quats(active_quat, prev_quat)
     object_stable = bool(lin_delta < STABLE_LINEAR_DELTA_THRESHOLD and ang_delta < STABLE_ANGULAR_DELTA_THRESHOLD)
 
-    offset = (active_pos - eef_pos) if (active_pos is not None and eef_pos is not None) else None
-    prev_offset = state["prev_offsets"].get(active) if active else None
-    offset_delta = float(np.linalg.norm(offset - prev_offset)) if (offset is not None and prev_offset is not None) else 0.0
-    object_sync = bool(offset is None or offset_delta < SYNC_RELATIVE_DELTA_THRESHOLD)
+    # object_sync (2026-09-09): ported RoboCasa's own grasp-slip pattern --
+    # a dedicated reference (obj_pos - eef_pos) re-seeded fresh at the exact
+    # frame a NEW grasp begins, refreshed every frame thereafter (per-frame
+    # drift, not accumulated-since-onset -- same rationale as RoboCasa's
+    # _object_grasp_slip: a one-time settling shift right after lift-off
+    # should be flagged once, not for the rest of the grasp). Previously
+    # compared against state["prev_offsets"][active], which is updated for
+    # *every* movable object on *every* frame regardless of grasp state --
+    # on the very first frame of a brand-new grasp, that "previous" offset
+    # was recorded before the object was ever grasped at all (e.g. still
+    # sitting in the fridge, gripper mid-approach from elsewhere), so the
+    # eef finally reaching the object at grasp onset read as a huge,
+    # spurious "slip" -- confirmed on KITCHEN_SCENE3_turn_on_the_stove_
+    # and_put_the_moka_pot_on_it ep2: object_sync=False on literally the
+    # first frame object_grasped ever becomes True for that object, then
+    # True every frame after. No reference yet (brand-new grasp, or the
+    # active object just changed) means "nothing to compare against yet",
+    # not "out of sync" -- object_sync stays True for that one seed frame,
+    # matching RoboCasa's _object_grasp_slip returning None on an
+    # unseeded/mismatched reference.
+    # Re-seed on a brand-new grasp EVENT (object_grasped just became True),
+    # not just "the active object's name changed" -- a regrasp of the SAME
+    # object after a drop-then-regrasp flicker (active never gets cleared
+    # on drop, only reassigned on the next actual grasp) needs a fresh
+    # baseline too: the object may have shifted slightly while briefly
+    # ungrasped, and comparing the new grasp's first frame against the
+    # *previous* grasp's stale reference is exactly the same spurious-slip
+    # bug this fix was for in the first place -- confirmed on
+    # KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_...: a
+    # drop-then-regrasp of the same bowl (frames 155/160) still showed
+    # object_sync=False at 160 without this.
+    fresh_grasp = object_grasped and (
+        not state.get("prev_object_grasped_for_sync", False)
+        or state.get("sync_baseline_object") != active
+    )
+    state["prev_object_grasped_for_sync"] = object_grasped
+    if fresh_grasp:
+        state["sync_baseline_object"] = active
+        state["sync_baseline_offset"] = (
+            (active_pos - eef_pos) if (active_pos is not None and eef_pos is not None) else None
+        )
+        object_sync = True
+    elif active is None:
+        state["sync_baseline_object"] = None
+        state["sync_baseline_offset"] = None
+        object_sync = True
+    else:
+        offset = (active_pos - eef_pos) if (active_pos is not None and eef_pos is not None) else None
+        baseline_offset = state.get("sync_baseline_offset")
+        offset_delta = (
+            float(np.linalg.norm(offset - baseline_offset))
+            if (offset is not None and baseline_offset is not None) else 0.0
+        )
+        object_sync = bool(offset is None or offset_delta < SYNC_RELATIVE_DELTA_THRESHOLD)
+        state["sync_baseline_offset"] = offset if offset is not None else baseline_offset
 
     object_upright = _upright(active_quat)
 
+    # AABB overlap (_aabb_intersects/_object_geom_ids/_gripper_contact_geom_
+    # ids), not raw single-geom fingerpad contact or exact mesh distance --
+    # ported verbatim from RoboCasa's own fix for this exact predicate
+    # (object_left_gripper: "this predicate was introduced to fix" a
+    # one-frame raw-contact flicker, switched to _aabb_intersects/
+    # _object_contact_aabb, deliberately coarser than a real mesh-distance
+    # check). Tried real mesh/geom distance first (mj_geomDistance via
+    # _gripper_object_geom_min_distance) since it was already built for
+    # gripper_away_from_object -- explicit user correction (2026-09-09):
+    # that's *stricter* than RoboCasa's actual mechanism, not equivalent --
+    # a bounding-box overlap tolerates the object still being well within
+    # the gripper's enclosing volume even if the exact meshes momentarily
+    # show a hair of daylight between them (a real, if physically
+    # insignificant, position micro-jitter can do this for one frame),
+    # where the mesh-distance version would call that "left" -- confirmed
+    # directly on pick_up_the_black_bowl_on_the_stove_..._on_the_plate ep1
+    # frame 65 (user-reported: "the object left gripper but actually the
+    # object is not").
     left_gripper = True
     if active:
-        try:
-            gripper = env.robots[0].gripper
-            model = env.get_object(active)
-            left_gripper = not bool(env.check_contact(model, gripper.important_geoms.get("left_fingerpad")) or
-                                     env.check_contact(model, gripper.important_geoms.get("right_fingerpad")))
-        except Exception:
-            left_gripper = not object_grasped
+        gripper_aabb = _geom_ids_aabb(env, _gripper_contact_geom_ids(env))
+        object_aabb = _geom_ids_aabb(env, _object_geom_ids(env, active))
+        if gripper_aabb is not None and object_aabb is not None:
+            left_gripper = not _aabb_intersects(gripper_aabb, object_aabb)
+        else:
+            try:
+                gripper = env.robots[0].gripper
+                model = env.get_object(active)
+                left_gripper = not bool(env.check_contact(model, gripper.important_geoms.get("left_fingerpad")) or
+                                         env.check_contact(model, gripper.important_geoms.get("right_fingerpad")))
+            except Exception:
+                left_gripper = not object_grasped
 
     # Real mesh/geom distance, not eef-to-body-origin distance -- see
     # _gripper_far_from_object's own docstring for why (LIBERO objects have
@@ -911,10 +1054,40 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         True if active is None else _gripper_far_from_object(env, active, MESH_GRIPPER_FAR_THRESHOLD)
     )
 
-    object_released = bool(object_dropped and (gripper_is_opening or (gripper_frac is not None and gripper_frac < GRIPPER_OPEN_FRACTION_THRESHOLD)))
-
     object_supported = bool(active and _touches_anything(env, active))
     support_type_matches_object = True  # no support-type taxonomy modeled in v0
+
+    # object_released (2026-09-09): ported RoboCasa's own two extra branches
+    # verbatim (predicates.py's object_released), on top of the original
+    # gripper-opening/closed-fraction check:
+    #
+    # - prev_gripper_is_opening: gripper_is_opening is a raw single-frame
+    #   sign check (no debounce) that can dip False for exactly the one
+    #   frame contact actually breaks, even though it's opening the frame
+    #   before and after -- ORing in last frame's value closes that gap.
+    #
+    # - `active and object_supported`: covers a release where the arm moves
+    #   the gripper away (or simply stops actively gripping) without ever
+    #   opening the fingers past GRIPPER_OPEN_FRACTION_THRESHOLD, because
+    #   the object is already resting on solid support by the time contact
+    #   breaks -- confirmed on KITCHEN_SCENE3_turn_on_the_stove_and_put_
+    #   the_moka_pot_on_it: object_supported was already True *while still
+    #   grasped*, for several frames before release (the pot touches the
+    #   stove before the grasp ends), and gripper_frac never dips below
+    #   threshold at the drop frame (this demo's release motion doesn't
+    #   fully open the gripper immediately) -- a real, deliberate,
+    #   already-safe placement, not an accidental drop, that the original
+    #   gripper-only check couldn't recognize at all.
+    object_released = bool(
+        object_dropped
+        and (
+            gripper_is_opening
+            or state.get("prev_gripper_is_opening", False)
+            or (gripper_frac is not None and gripper_frac < GRIPPER_OPEN_FRACTION_THRESHOLD)
+            or (active is not None and object_supported)
+        )
+    )
+    state["prev_gripper_is_opening"] = gripper_is_opening
     # task_success escape (2026-09-09): LIBERO's demo hdf5s stop recording
     # within a handful of raw frames of the task's own success condition
     # firing -- confirmed corpus-wide (nearly every pick-place task's final
@@ -922,22 +1095,29 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # 8 frames after release, body-origin eef distance still ~0.067m and
     # real mesh/geom distance still slightly overlapping (~-0.00003m) at the
     # very last recorded frame, with task.success already True since several
-    # frames earlier. Requiring gripper_away before object_settled can ever
-    # fire means this (and the large majority of LIBERO's other short
-    # release-then-done episodes) can never resolve in time no matter how
-    # generous GRIPPER_FAR_THRESHOLD/MESH_GRIPPER_FAR_THRESHOLD/
-    # SETTLE_TIMEOUT_FRAMES are set -- the frames needed to observe a real
-    # gripper retreat simply were never recorded. Once the object is
-    # genuinely supported+stable AND the demonstrated task's own ground-
-    # truth success condition holds, the gripper's remaining distance is a
-    # recording-length artifact, not a real unresolved safety question --
-    # the placement itself is already confirmed correct.
+    # frames earlier. Requiring gripper_away/object_stable before
+    # object_settled can ever fire means this (and the large majority of
+    # LIBERO's other short release-then-done episodes) can never resolve in
+    # time no matter how generous GRIPPER_FAR_THRESHOLD/
+    # MESH_GRIPPER_FAR_THRESHOLD/SETTLE_TIMEOUT_FRAMES are set -- the
+    # frames needed to observe real settling simply were never recorded.
+    # Escape covers BOTH object_stable and gripper_away (not just
+    # gripper_away, as first written), not just one -- confirmed via
+    # STUDY_SCENE1_pick_up_the_book_...: object_stable, not
+    # gripper_away, was the one still pending at recording's end there
+    # (task.success True, object_supported True, but the book's own
+    # settling motion/orientation delta hadn't yet dropped below threshold
+    # in the ~5 frames the episode had left) -- the same truncation
+    # artifact, just landing on a different conjunct. Once the object is
+    # genuinely supported AND the demonstrated task's own ground-truth
+    # success condition holds, whichever of stable/gripper-away is still
+    # pending is a recording-length artifact, not a real unresolved safety
+    # question -- the placement itself is already confirmed correct.
     task_success = bool((dynamic_info.get("task") or {}).get("success"))
     object_settled = bool(
         object_supported
         and support_type_matches_object
-        and object_stable
-        and (gripper_away or task_success)
+        and (task_success or (object_stable and gripper_away))
     )
 
     # settle-timeout watchdog: starts on object_dropped, clears on settle or regrasp
@@ -957,8 +1137,6 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     for name in _movable_object_names(env):
         state["prev_positions"][name] = _body_pos(env, name)
         state["prev_quats"][name] = _body_quat(env, name)
-        pos = state["prev_positions"][name]
-        state["prev_offsets"][name] = (pos - eef_pos) if (pos is not None and eef_pos is not None) else None
 
     predicates["object_grasped"] = _entry(object_grasped, "gripper bilaterally contacts a movable object", active)
     predicates["object_stable"] = _entry(object_stable, "active object linear/angular motion below threshold")
