@@ -190,7 +190,8 @@ from .attributes import (
 STABLE_LINEAR_DELTA_THRESHOLD = 0.004   # per-raw-frame position delta (m)
 STABLE_ANGULAR_DELTA_THRESHOLD = 0.05   # per-raw-frame orientation delta (rad, small-angle approx)
 SYNC_RELATIVE_DELTA_THRESHOLD = 0.01    # per-raw-frame change in (obj - eef) offset (m)
-GRIPPER_FAR_THRESHOLD = 0.12            # eef-to-object distance considered "away" (m)
+GRIPPER_FAR_THRESHOLD = 0.12            # eef-to-object distance considered "away" (m) -- fallback tier only, see MESH_GRIPPER_FAR_THRESHOLD
+MESH_GRIPPER_FAR_THRESHOLD = 0.02        # real mesh/geom gap (m) considered "away" -- primary tier, see _gripper_far_from_object
 NEAR_OBJECT_THRESHOLD = 0.09            # eef-to-object distance considered "near" for onset (m)
 GRIPPER_OPEN_FRACTION_THRESHOLD = 0.35  # gripper closed-fraction below this counts as "open enough to release"
 REGION_CLEAR_RADIUS = 0.10              # radius (m) used by object/support region-clear checks
@@ -295,6 +296,98 @@ def _touches_anything(env, name: str) -> bool:
         return False
 
 
+def _geom_ids_from_names(env, geom_names) -> set:
+    geom_ids = set()
+    if isinstance(geom_names, str):
+        geom_names = [geom_names]
+    for geom_name in geom_names or []:
+        try:
+            geom_ids.add(int(env.sim.model.geom_name2id(str(geom_name))))
+        except Exception:
+            continue
+    return geom_ids
+
+
+def _object_geom_ids(env, name: str) -> set:
+    try:
+        return _geom_ids_from_names(env, env.get_object(name).contact_geoms)
+    except Exception:
+        return set()
+
+
+def _gripper_contact_geom_ids(env) -> set:
+    try:
+        return _geom_ids_from_names(env, env.robots[0].gripper.contact_geoms)
+    except Exception:
+        return set()
+
+
+def _gripper_object_geom_min_distance(env, name: str, distmax: float) -> Optional[float]:
+    """Real minimum signed distance between any gripper collision geom and
+    any of the object's own collision geoms, via MuJoCo's own mj_geomDistance
+    -- the same mesh/shape-aware collision-geometry query the contact solver
+    itself uses, not the raw body-origin-to-body-origin distance _eef_pos()/
+    _body_pos() alone gives. Ported from RoboCasa's own
+    _gripper_object_geom_min_distance (predicates.py, 2026-09-03) after
+    confirming the same root cause here: LIBERO's objects (moka pots, bowls,
+    baskets, ...) have a non-trivial physical extent, so eef-to-body-origin
+    distance never approaches zero even with the gripper's fingers flush
+    against the object's actual surface -- e.g. KITCHEN_SCENE3's moka_pot_1
+    sits ~0.06m from the eef site the entire time it's genuinely grasped,
+    and the recorded demo episode simply ends 6-13 raw frames after release
+    (LIBERO demos stop recording at task-success detection, not some fixed
+    buffer afterward), during which body-origin distance only grows to
+    ~0.067m -- nowhere near a body-origin-calibrated "away" threshold, even
+    though the gripper's fingers are already several cm clear of the pot's
+    actual surface by then. Confirmed via a corpus-wide sweep (2026-09-09):
+    this exact shape (object_supported=True, object_stable=True,
+    gripper_away_from_object=False for the entire remaining trace) is the
+    dominant rc_released_object_eventually_settles failure across nearly
+    every LIBERO pick-place task, not a one-off.
+    Returns None if the real MjModel/MjData aren't reachable or no geom ids
+    are found for either side."""
+    try:
+        m = env.sim.model._model
+        d = env.sim.data._data
+    except Exception:
+        return None
+    gripper_geom_ids = _gripper_contact_geom_ids(env)
+    object_geom_ids = _object_geom_ids(env, name)
+    if not gripper_geom_ids or not object_geom_ids:
+        return None
+    fromto = np.zeros(6)
+    best = None
+    for gid in gripper_geom_ids:
+        for oid in object_geom_ids:
+            try:
+                dist = float(mujoco.mj_geomDistance(m, d, int(gid), int(oid), distmax, fromto))
+            except Exception:
+                continue
+            if best is None or dist < best:
+                best = dist
+            if best <= 0.0:
+                return best
+    return best
+
+
+def _gripper_far_from_object(env, name: str, threshold: float) -> bool:
+    """True once the gripper is at least `threshold` away from the object.
+    Real mesh/geom distance first (_gripper_object_geom_min_distance), the
+    raw eef-to-body-origin distance only as a fallback if geom ids aren't
+    resolvable for some reason (matches RoboCasa's tiered
+    _gripper_far_from_object, minus the AABB middle tier RoboCasa's has --
+    not ported here, since geom-id resolution has been reliable enough in
+    practice for LIBERO's much smaller object roster to not need it)."""
+    mesh_dist = _gripper_object_geom_min_distance(env, name, distmax=threshold * 2.0)
+    if mesh_dist is not None:
+        return bool(mesh_dist > threshold)
+    eef_pos = _eef_pos(env)
+    obj_pos = _body_pos(env, name)
+    if eef_pos is None or obj_pos is None:
+        return True
+    return bool(float(np.linalg.norm(eef_pos - obj_pos)) > threshold)
+
+
 def _arm_contacts_scene(env) -> bool:
     """True if any non-gripper robot arm geom contacts any fixture/object --
     an incidental arm/body collision, the LIBERO analog of RoboCasa's
@@ -320,6 +413,75 @@ def _angle_between_quats(q1: Optional[np.ndarray], q2: Optional[np.ndarray]) -> 
         return 0.0
     dot = float(np.clip(abs(np.dot(q1, q2)), -1.0, 1.0))
     return 2.0 * np.arccos(dot)
+
+
+def _object_stable_by_name(env, state: Dict[str, Any], name: Optional[str]) -> bool:
+    """Per-object linear/angular-delta stability, generalizing the
+    single-`active`-object `object_stable` computed inline in
+    build_predicate_snapshot to any named object -- needed because pick
+    preconditions must judge the object actually being approached
+    (`focus_pick_object`), which is usually not yet grasped (so not
+    `active`) at the moment a pick onset fires. Compares this frame's fresh
+    position/quat (queried directly, same as the inline `active` version)
+    against state["prev_positions"]/state["prev_quats"], already populated
+    for every movable object name at the end of every prior
+    build_predicate_snapshot call."""
+    if name is None:
+        return True
+    pos = _body_pos(env, name)
+    quat = _body_quat(env, name)
+    prev_pos = state.get("prev_positions", {}).get(name)
+    prev_quat = state.get("prev_quats", {}).get(name)
+    lin_delta = float(np.linalg.norm(pos - prev_pos)) if (pos is not None and prev_pos is not None) else 0.0
+    ang_delta = _angle_between_quats(quat, prev_quat)
+    return bool(lin_delta < STABLE_LINEAR_DELTA_THRESHOLD and ang_delta < STABLE_ANGULAR_DELTA_THRESHOLD)
+
+
+def _point_in_any_fixture_region(env, fixture_name: Optional[str], point: Optional[np.ndarray]) -> Optional[bool]:
+    """Real point-in-box test against a fixture's own registered "region"
+    sites (e.g. wooden_cabinet_1_top_region/_middle_region/_bottom_region --
+    per-drawer interior markers, the LIBERO analog of RoboCasa's `_reg_`
+    geom naming convention), in preference to a fixed eef-to-fixture-ROOT-
+    BODY distance radius (FIXTURE_INTERIOR_RADIUS). Found via
+    open_the_middle_drawer_of_the_cabinet (2026-09-09): this task's own
+    demo never reaches inside the drawer at all (there's nothing to place),
+    yet root-body distance still dipped under FIXTURE_INTERIOR_RADIUS the
+    moment the gripper grabbed the handle to pull it open -- a drawer's
+    root body sits close enough to its own front face that "operating the
+    mechanism from outside" and "genuinely inside the cavity" are
+    indistinguishable by root-body distance alone. The registered region
+    sites mark the *actual* interior volumes (same sites RoboCasa-style
+    check_obj_in_receptacle/check_contain machinery would use for real
+    containment), so testing eef membership in any of them is the same
+    kind of test object_in_fixture already trusts for real objects,
+    applied to the gripper's own point position instead. Uses
+    SiteObjectState's own in_box (LIBERO's registered site + orientation),
+    NOT the generic CompositeObject.in_box that most fixture body classes
+    (e.g. WoodenCabinet, a plain MujocoXMLObject) don't even implement --
+    confirmed directly (AttributeError) that the body-level in_box fallback
+    silently never applies to this corpus's cabinet/drawer fixtures at all.
+    Returns None (meaning: caller should fall back to a cruder proxy) if no
+    matching region site is found for this fixture, e.g. a fixture that
+    was never annotated with region sites."""
+    if fixture_name is None or point is None:
+        return None
+    site_names = [
+        name
+        for name in getattr(env, "object_sites_dict", {}).keys()
+        if name.startswith(f"{fixture_name}_") and name.endswith("_region")
+    ]
+    if not site_names:
+        return None
+    for site_name in site_names:
+        try:
+            site_pos = np.asarray(env.sim.data.get_site_xpos(site_name), dtype=float)
+            site_mat = np.asarray(env.sim.data.get_site_xmat(site_name), dtype=float)
+            site_obj = env.object_sites_dict[site_name]
+            if bool(site_obj.in_box(site_pos, site_mat, point)):
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def _upright(quat: Optional[np.ndarray]) -> bool:
@@ -531,15 +693,42 @@ def _robot_contacts_fixture(env, name: Optional[str]) -> bool:
         return False
 
 
-def _fixture_touches_other_movable(env, name: Optional[str]) -> bool:
+def _fixture_touches_other_movable(env, name: Optional[str], exclude=()) -> bool:
     """True if the fixture body contacts some OTHER movable object (not the
-    robot) -- an obstacle in the fixture's articulation path. Cheap: this
-    corpus has at most a handful of movable objects per task."""
+    robot) -- an obstacle in the fixture's articulation path. `exclude`
+    (2026-09-09, a name or collection of names): the task's own manipulated
+    object (e.g. a bowl actively being placed inside a drawer/cabinet)
+    resting against the fixture's interior is the *intended* outcome, not
+    an obstruction -- confirmed on KITCHEN_SCENE4 (put the bowl in the
+    drawer and close it): the bowl contacting the drawer/cabinet body
+    mid-close read as fixture_close_obstacle_hit even though nothing was
+    actually jamming the mechanism, and since the robot goes on to
+    genuinely finish closing (not retract),
+    fixture_close_retract_resolved never fires -- a permanent, spurious
+    rc_fixture_close_obstacle_retract violation for the rest of the
+    episode. Also covers the case where the manipulated object was ALREADY
+    resting in/against the fixture from the very start of the episode
+    (e.g. pick_up_the_black_bowl_in_the_top_drawer_...: the bowl starts
+    inside the drawer being opened, contacting it before it's ever
+    grasped, so the single-`active`-object exclusion above doesn't apply
+    yet) -- callers should also pass any objects captured as touching the
+    fixture at the start of the episode (see
+    state["initial_fixture_contacts"]), the same "ignore what was already
+    there at frame 0" convention RoboCasa's own predicates.py uses for
+    forbidden_contact's ignored_initial_contact_pairs. Already flagged as
+    a known v0 imprecision in this module's own docstring before this fix.
+    Cheap: this corpus has at most a handful of movable objects per task."""
     if not name:
         return False
+    if isinstance(exclude, str):
+        exclude = {exclude}
+    else:
+        exclude = set(exclude or ())
     try:
         model = env.get_object(name)
         for obj_name in _movable_object_names(env):
+            if obj_name in exclude:
+                continue
             if env.check_contact(model, env.get_object(obj_name)):
                 return True
     except Exception:
@@ -595,7 +784,7 @@ def build_predicate_static_spec(env, static_info: Dict[str, Any]) -> Dict[str, A
                 "gripper_is_opening", "gripper_is_closing",
             ],
             "skill_onset": ["skill_pick_onset", "gripper_near_object"],
-            "pick_preconditions": ["object_region_clear", "preconditions_satisfied_pick"],
+            "pick_preconditions": ["object_region_clear", "preconditions_satisfied_pick", "pick_precondition_escape"],
             "place_preconditions": [
                 "skill_place_onset", "support_region_clear", "support_stable",
                 "support_geometry_valid", "preconditions_satisfied_place",
@@ -653,6 +842,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             "forbidden_streak": 0,
             "pick_onset": {},  # name -> {"streak": int, "fired": bool}
             "last_reach_fixture": None,
+            "initial_fixture_contacts": {},  # fixture_name -> set(object names touching it when first observed
         }
     else:
         state["_prev_timestep"] = current_timestep
@@ -712,13 +902,43 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         except Exception:
             left_gripper = not object_grasped
 
-    gripper_away = bool(eef_pos is None or active_pos is None or float(np.linalg.norm(eef_pos - active_pos)) > GRIPPER_FAR_THRESHOLD)
+    # Real mesh/geom distance, not eef-to-body-origin distance -- see
+    # _gripper_far_from_object's own docstring for why (LIBERO objects have
+    # real physical extent, same root cause RoboCasa's predicates.py already
+    # fixed for its own gripper_away_from_object, 2026-09-08). Falls back to
+    # "no active object" (vacuously away) when there's nothing to be near.
+    gripper_away = (
+        True if active is None else _gripper_far_from_object(env, active, MESH_GRIPPER_FAR_THRESHOLD)
+    )
 
     object_released = bool(object_dropped and (gripper_is_opening or (gripper_frac is not None and gripper_frac < GRIPPER_OPEN_FRACTION_THRESHOLD)))
 
     object_supported = bool(active and _touches_anything(env, active))
     support_type_matches_object = True  # no support-type taxonomy modeled in v0
-    object_settled = bool(object_supported and support_type_matches_object and object_stable and gripper_away)
+    # task_success escape (2026-09-09): LIBERO's demo hdf5s stop recording
+    # within a handful of raw frames of the task's own success condition
+    # firing -- confirmed corpus-wide (nearly every pick-place task's final
+    # release), not a one-off: KITCHEN_SCENE3's moka_pot_1 episode ends only
+    # 8 frames after release, body-origin eef distance still ~0.067m and
+    # real mesh/geom distance still slightly overlapping (~-0.00003m) at the
+    # very last recorded frame, with task.success already True since several
+    # frames earlier. Requiring gripper_away before object_settled can ever
+    # fire means this (and the large majority of LIBERO's other short
+    # release-then-done episodes) can never resolve in time no matter how
+    # generous GRIPPER_FAR_THRESHOLD/MESH_GRIPPER_FAR_THRESHOLD/
+    # SETTLE_TIMEOUT_FRAMES are set -- the frames needed to observe a real
+    # gripper retreat simply were never recorded. Once the object is
+    # genuinely supported+stable AND the demonstrated task's own ground-
+    # truth success condition holds, the gripper's remaining distance is a
+    # recording-length artifact, not a real unresolved safety question --
+    # the placement itself is already confirmed correct.
+    task_success = bool((dynamic_info.get("task") or {}).get("success"))
+    object_settled = bool(
+        object_supported
+        and support_type_matches_object
+        and object_stable
+        and (gripper_away or task_success)
+    )
 
     # settle-timeout watchdog: starts on object_dropped, clears on settle or regrasp
     if object_dropped:
@@ -798,11 +1018,54 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         category = object_category_from_instance_name(focus_pick_object)
         if object_is_receptacle_category(category):
             object_upright_if_receptacle_default = _upright(_body_quat(env, focus_pick_object))
-    preconditions_satisfied_pick = bool(object_region_clear and object_stable and object_upright_if_receptacle_default)
+    # focus_pick_object's OWN stability, not the currently-`active` (grasped)
+    # object's -- at onset time the two are almost always different (the
+    # object being approached generally isn't grasped yet, so `active`/
+    # `object_stable` above reflect the *previous* grasp cycle's object, or
+    # nothing at all). Found via `put_the_bowl_on_the_plate` (2026-09-09):
+    # `object_stable` was checking the wrong object entirely at every real
+    # pick onset in this corpus.
+    focus_pick_stable = _object_stable_by_name(env, state, focus_pick_object) if focus_pick_object else object_stable
+    preconditions_satisfied_pick = bool(object_region_clear and focus_pick_stable and object_upright_if_receptacle_default)
+    # pick_precondition_escape (2026-09-09, ported from RoboCasa's own
+    # predicates.py, same root cause): skill_pick_onset fires the instant
+    # the gripper has been near/approaching for SKILL_ONSET_FRAMES, but a
+    # corpus-wide sweep showed the dominant rc_pick_preconditions_safe
+    # failure across LIBERO's bowl/plate tasks is "object not yet stable"
+    # at that exact instant (freshly-placed scene objects still settling,
+    # or nudged by the approach itself) -- consistent with a real object
+    # that goes on to become perfectly graspable a few frames later, not a
+    # genuinely unsafe pick. Without this escape (simply never implemented
+    # in the initial v0 port -- `pick_precondition_escape` defaults to
+    # False when a property never emits it at all, per monitor/
+    # predicates.py's _predicate_value), G(skill_pick_onset ->
+    # (preconditions_satisfied_pick | F(pick_precondition_escape))) can
+    # never recover from a single transient-instability onset for the rest
+    # of the episode -- confirmed as the dominant failure signature for
+    # nearly every put_the_black_bowl.../place_it_on_the_plate task in this
+    # corpus. Same "latch on first failure, only-if-not-already-pending,
+    # clear once resolved" shape as RoboCasa's.
+    if (
+        any_pick_onset
+        and not preconditions_satisfied_pick
+        and state.get("pick_onset_pending_object") is None
+    ):
+        state["pick_onset_pending_object"] = focus_pick_object
+    pick_onset_pending_object = state.get("pick_onset_pending_object")
+    pick_precondition_escape = False
+    if pick_onset_pending_object is not None:
+        pending_stable = _object_stable_by_name(env, state, pick_onset_pending_object)
+        pending_region_clear = _region_clear(
+            env, _body_pos(env, pick_onset_pending_object), exclude=[pick_onset_pending_object]
+        )
+        pick_precondition_escape = bool(pending_stable and pending_region_clear)
+        if pick_precondition_escape:
+            state["pick_onset_pending_object"] = None
 
     predicates["skill_pick_onset"] = _entry(any_pick_onset, "gripper approached an ungrasped object for the onset window")
     predicates["object_region_clear"] = _entry(object_region_clear, "few foreign objects near the pick/focus object")
     predicates["preconditions_satisfied_pick"] = _entry(preconditions_satisfied_pick, "pick preconditions AND-composition")
+    predicates["pick_precondition_escape"] = _entry(pick_precondition_escape, "pending pick object later became stable and region-clear")
 
     # --- place preconditions --------------------------------------------
     skill_place_onset = object_released
@@ -982,7 +1245,28 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     state["mech_prev_fraction"] = mech_fraction
 
     robot_fixture_contact = _robot_contacts_fixture(env, mech_fixture_name)
-    fixture_obstacle_contact = _fixture_touches_other_movable(env, mech_fixture_name)
+    # Capture, once per fixture, which movable objects were already
+    # touching it the first time it's observed as the mechanism-safety
+    # focus (e.g. a bowl that starts the episode already resting inside
+    # the drawer being opened) -- these were never "introduced" as an
+    # obstacle by anything the robot did, so they're excluded from
+    # fixture_obstacle_contact for the rest of the episode, same rationale
+    # as `active`'s exclusion just below (see _fixture_touches_other_
+    # movable's own docstring).
+    initial_contacts_by_fixture = state.setdefault("initial_fixture_contacts", {})
+    if mech_fixture_name is not None and mech_fixture_name not in initial_contacts_by_fixture:
+        touching = set()
+        try:
+            fixture_model = env.get_object(mech_fixture_name)
+            for obj_name in _movable_object_names(env):
+                if env.check_contact(fixture_model, env.get_object(obj_name)):
+                    touching.add(obj_name)
+        except Exception:
+            pass
+        initial_contacts_by_fixture[mech_fixture_name] = touching
+    initial_contacts = initial_contacts_by_fixture.get(mech_fixture_name, set())
+    exclude_from_obstacle = initial_contacts | ({active} if active else set())
+    fixture_obstacle_contact = _fixture_touches_other_movable(env, mech_fixture_name, exclude=exclude_from_obstacle)
     continue_fixture_open = bool(robot_fixture_contact and fixture_is_opening)
     continue_fixture_close = bool(robot_fixture_contact and fixture_is_closing)
 
@@ -1057,7 +1341,35 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             pass
 
     fixture_pos = _body_pos(env, fixture_name) if fixture_name else None
-    gripper_in_fixture = bool(fixture_pos is not None and eef_pos is not None and float(np.linalg.norm(eef_pos - fixture_pos)) < FIXTURE_INTERIOR_RADIUS)
+    # Real point-in-box containment (the fixture model's own `in_box`, the
+    # exact same geometric test object_in_fixture below already trusts for
+    # real objects via ObjectState.check_contain) in preference to a crude
+    # eef-to-fixture-ROOT-BODY distance radius. Found via KITCHEN_SCENE4
+    # (2026-09-09): FIXTURE_INTERIOR_RADIUS=0.18m root-body-distance fires
+    # reach_in_fixture at the moment the gripper is merely pushing the
+    # drawer's front panel shut from *outside* (empty gripper, no object
+    # held, no detected robot_fixture_contact even), well after the
+    # legitimate open/place/close sequence already completed correctly --
+    # a drawer's root body sits close enough to its own front face that
+    # "operating the mechanism from outside" and "reaching into the
+    # cavity" are geometrically indistinguishable by root-body distance
+    # alone, but not by a real box-containment test (in_box uses the
+    # fixture's own registered half-extents, `total_size`, not a fixed
+    # radius guess). Falls back to the old radius check only if `in_box`
+    # isn't available on this fixture's model (e.g. an unusual fixture
+    # class).
+    gripper_in_fixture = _point_in_any_fixture_region(env, fixture_name, eef_pos)
+    if gripper_in_fixture is None:
+        try:
+            fixture_model = env.get_object(fixture_name)
+            gripper_in_fixture = bool(fixture_model.in_box(fixture_pos, eef_pos))
+        except Exception:
+            gripper_in_fixture = bool(
+                fixture_name is not None
+                and eef_pos is not None
+                and fixture_pos is not None
+                and float(np.linalg.norm(eef_pos - fixture_pos)) < FIXTURE_INTERIOR_RADIUS
+            )
     prev_gripper_in_fixture = state.get("prev_gripper_in_fixture", False)
     reach_in_fixture = bool(gripper_in_fixture and not prev_gripper_in_fixture)
     state["prev_gripper_in_fixture"] = gripper_in_fixture
