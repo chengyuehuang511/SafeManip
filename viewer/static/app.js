@@ -84,27 +84,99 @@ function initTheme() {
   });
 }
 
-function initTabs() {
-  const tabEval = el("#tab-eval");
-  const tabTraining = el("#tab-training");
-  const screenEval = el("#screen-eval");
-  const screenTraining = el("#screen-training");
+// URL sync (2026-09-10): reflects which top-level tab (eval/training) and,
+// for the training tab, which sim (robocasa/libero) is active in
+// `?tab=&sim=` query params -- via history.pushState/popstate, not a real
+// server-side route (single-page app stays as one page/one app.js; see the
+// explicit scope decision this was built to). Fixes a real, reported
+// pain point: with everything living in one URL and only in-memory JS
+// state, two people (or two tabs) sharing the same link always land on
+// the same default view, and there was no way to bookmark/share "the
+// LIBERO training tab" specifically -- easy for different sims'/tabs'
+// state to visually "overwrite" each other with no address-bar cue which
+// one you're looking at. Deliberately scoped to tab+sim only (not task/
+// episode/property/method) -- the existing ?task=&episode= deep link for
+// the eval tab is untouched/orthogonal.
+function currentTabSimParams() {
+  const params = new URLSearchParams(location.search);
+  params.set("tab", el("#tab-training").classList.contains("active") ? "training" : "eval");
+  if (el("#tab-training").classList.contains("active")) {
+    params.set("sim", tdSim);
+  } else {
+    params.delete("sim");
+  }
+  return params;
+}
 
-  tabEval.addEventListener("click", () => {
-    tabEval.classList.add("active");
-    tabTraining.classList.remove("active");
-    screenEval.classList.remove("hidden");
-    screenTraining.classList.add("hidden");
-    el("#root-path").textContent = roots.eval || "";
+function syncUrl() {
+  const params = currentTabSimParams();
+  const next = `${location.pathname}?${params.toString()}`;
+  if (next !== `${location.pathname}${location.search}`) {
+    history.pushState(null, "", next);
+  }
+}
+
+function activateEvalTab() {
+  el("#tab-eval").classList.add("active");
+  el("#tab-training").classList.remove("active");
+  el("#screen-eval").classList.remove("hidden");
+  el("#screen-training").classList.add("hidden");
+  el("#root-path").textContent = roots.eval || "";
+}
+
+function activateTrainingTab() {
+  el("#tab-training").classList.add("active");
+  el("#tab-eval").classList.remove("active");
+  el("#screen-training").classList.remove("hidden");
+  el("#screen-eval").classList.add("hidden");
+  el("#root-path").textContent = roots.training || "loading…";
+  if (!tdState.loaded) {
+    tdState.loaded = true;
+    initTrainingData();
+  }
+}
+
+function initTabs() {
+  el("#tab-eval").addEventListener("click", () => {
+    activateEvalTab();
+    syncUrl();
   });
-  tabTraining.addEventListener("click", () => {
-    tabTraining.classList.add("active");
-    tabEval.classList.remove("active");
-    screenTraining.classList.remove("hidden");
-    screenEval.classList.add("hidden");
+  el("#tab-training").addEventListener("click", () => {
+    activateTrainingTab();
+    syncUrl();
+  });
+  // Browser back/forward: re-derive tab+sim from the URL we just
+  // navigated to and apply it, instead of leaving the page showing
+  // whatever it happened to already be showing (pushState alone doesn't
+  // do this -- only a real navigation event, which popstate is). Toggles
+  // the tab DOM directly (not via activateTrainingTab, whose own
+  // "!tdState.loaded" check means something narrower here -- "has *any*
+  // sim's training data ever been loaded", not "does the *current* sim
+  // need loading", which is what a sim change via back/forward needs).
+  window.addEventListener("popstate", () => {
+    const params = new URLSearchParams(location.search);
+    const wantTab = params.get("tab") || "eval";
+    const wantSim = params.get("sim") || "robocasa";
+    if (wantTab !== "training") {
+      activateEvalTab();
+      return;
+    }
+    const needsLoad = !tdState.loaded || wantSim !== tdSim;
+    if (wantSim !== tdSim) {
+      tdSim = wantSim;
+      el("#td-sim-select").value = wantSim;
+      tdState.task = null;
+      tdState.episode = null;
+      tdState.monitorMethod = null;
+      tdMethodsLoaded = false;
+    }
+    tdState.loaded = true;
+    el("#tab-training").classList.add("active");
+    el("#tab-eval").classList.remove("active");
+    el("#screen-training").classList.remove("hidden");
+    el("#screen-eval").classList.add("hidden");
     el("#root-path").textContent = roots.training || "loading…";
-    if (!tdState.loaded) {
-      tdState.loaded = true;
+    if (needsLoad) {
       initTrainingData();
     }
   });
@@ -133,6 +205,21 @@ async function init() {
     const task = wantTask && data.tasks.includes(wantTask) ? wantTask : data.tasks[0];
     taskSelect.value = task;
     loadEpisodes(task, params.get("episode"));
+  }
+
+  // ?tab=training&sim=libero deep-links straight into the Training Data
+  // tab, already scoped to the requested sim -- same bookmark/share intent
+  // as ?task=&episode= above, just for the other tab. Applied last (after
+  // the eval tab's own always-loaded default state above), and via
+  // history.replaceState (not pushState -- this is establishing the
+  // *initial* URL/state pairing, not a new navigation entry a "back"
+  // button should ever land on).
+  const initialParams = new URLSearchParams(location.search);
+  if ((initialParams.get("tab") || "eval") === "training") {
+    const wantSim = initialParams.get("sim") || "robocasa";
+    tdSim = wantSim;
+    el("#td-sim-select").value = wantSim;
+    activateTrainingTab();
   }
 }
 
@@ -210,6 +297,7 @@ el("#td-sim-select").addEventListener("change", async (e) => {
   tdState.episode = null;
   tdState.monitorMethod = null;
   tdMethodsLoaded = false;
+  syncUrl();
   await initTrainingData();
 });
 
