@@ -3161,6 +3161,22 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/annotators":
             return self._send_json({"annotators": list_annotators(), "default": DEFAULT_ANNOTATOR})
 
+        if parsed.path == "/annotator_guide":
+            guide_path = ANNOTATIONS_DIR / "ANNOTATOR_GUIDE.md"
+            if not guide_path.is_file():
+                return self.send_error(404)
+            data = guide_path.read_bytes()
+            self.send_response(200)
+            # text/plain (not text/markdown) deliberately -- renders as
+            # readable plain text in every browser with zero extra
+            # dependencies (no markdown-to-HTML renderer in this project),
+            # rather than a raw-source download prompt.
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
         if parsed.path == "/api/td_episodes":
             sim = qs.get("sim", ["robocasa"])[0]
             task = qs.get("task", [None])[0]
