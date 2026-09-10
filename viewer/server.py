@@ -874,12 +874,21 @@ def list_training_episodes(task, property_filter=None, annotator=None):
         # per-method scoping as annotations themselves -- see
         # api_training_monitor's annotation_task_key,
         # f"training__{task}__{method}") -- 2026-09-08, for the sidebar's
-        # per-episode indicator.
+        # per-episode indicator. `annotated` stays scoped to the requesting
+        # `annotator` param (None/"__all__" = "has anyone at all", a specific
+        # name = "has that one person"), unchanged from before. `annotated_by`
+        # (2026-09-10) is new: the full list of *every* registered annotator's
+        # name who has real content here, regardless of the `annotator` param
+        # -- lets the sidebar show "you've done this" *and* "so-and-so already
+        # did this too" side by side, instead of only ever one or the other.
         entry["annotated"] = {}
+        entry["annotated_by"] = {}
         for method_key in _methods:
-            entry["annotated"][method_key] = has_human_annotation(
-                f"training__{task}__{method_key}", ep, annotator=annotator
-            )
+            key = f"training__{task}__{method_key}"
+            entry["annotated"][method_key] = has_human_annotation(key, ep, annotator=annotator)
+            entry["annotated_by"][method_key] = [
+                a for a in list_annotators() if _has_human_annotation_one(a, key, ep)
+            ]
         episodes.append(entry)
     episodes.sort(key=lambda e: e["episode"])
     return episodes
@@ -1850,6 +1859,32 @@ def load_annotations(annotator, task, episode):
         return {"violations": {}, "satisfied": {}, "missed_notes": "", "overall_verdict": None}
 
 
+def other_annotations(task, episode, exclude_annotator):
+    """{annotator_name: full annotation dict} for every *other* registered
+    annotator who has real human content (see _entry_has_human_content) for
+    this (task, episode) -- 2026-09-10, so the currently-selected annotator
+    can see everyone else's take on the same episode as a reference,
+    without it being confused for their own editable copy. Skips
+    `exclude_annotator` (whoever's currently "logged in" -- their own
+    annotation is already shown, editable, elsewhere) and any annotator with
+    no real content here at all (an empty/never-annotated file isn't useful
+    reference material, just noise)."""
+    out = {}
+    for name in list_annotators():
+        if name == exclude_annotator:
+            continue
+        data = load_annotations(name, task, episode)
+        has_content = (
+            (data.get("missed_notes") or "").strip()
+            or data.get("overall_verdict") is not None
+            or any(_entry_has_human_content(e) for e in (data.get("violations") or {}).values())
+            or any(_entry_has_human_content(e) for e in (data.get("satisfied") or {}).values())
+        )
+        if has_content:
+            out[name] = data
+    return out
+
+
 def save_annotations(annotator, task, episode, patch):
     annotation_path(annotator, task, episode).parent.mkdir(parents=True, exist_ok=True)
     with _annotation_lock:
@@ -2374,6 +2409,7 @@ def api_episode(task, episode, annotator=None):
         }
 
     ann = load_annotations(annotator, task, episode)
+    other_ann = other_annotations(task, episode, _safe_annotator(annotator))
 
     recon_paths = reconstruction_paths(task, episode)
     reconstruction = None
@@ -2409,6 +2445,7 @@ def api_episode(task, episode, annotator=None):
         "video_url": f"/video?task={task}&episode={episode}",
         **mv,
         "annotations": ann,
+        "other_annotations": other_ann,
         "reconstruction": reconstruction,
         "annotation_task_key": task,
         "annotator": _safe_annotator(annotator),
@@ -2469,6 +2506,7 @@ def api_training_monitor(task, episode, method=None, annotator=None):
     # apply to the "sampled" one for the same episode, since they can
     # legitimately disagree (that's the whole point of comparing them).
     ann = load_annotations(annotator, f"training__{task}__{method}", episode)
+    other_ann = other_annotations(f"training__{task}__{method}", episode, _safe_annotator(annotator))
 
     return {
         "task": task,
@@ -2477,6 +2515,7 @@ def api_training_monitor(task, episode, method=None, annotator=None):
         "video_url": f"/td_video?task={quote(task)}&episode={episode}",
         **mv,
         "annotations": ann,
+        "other_annotations": other_ann,
         "reconstruction": None,
         "annotation_task_key": f"training__{task}__{method}",
         "annotator": _safe_annotator(annotator),
@@ -2717,9 +2756,15 @@ def list_libero_training_episodes(base_dir, task, method=None, property_filter=N
                 entry["n_frames"] = len(raw.get("privileged_dynamic_info") or []) or None
             except Exception:
                 pass
-        entry["annotated"] = {
-            method: has_human_annotation(f"libero_training__{task}__{method}", ep, annotator=annotator)
-        } if method is not None else {}
+        if method is not None:
+            key = f"libero_training__{task}__{method}"
+            entry["annotated"] = {method: has_human_annotation(key, ep, annotator=annotator)}
+            entry["annotated_by"] = {
+                method: [a for a in list_annotators() if _has_human_annotation_one(a, key, ep)]
+            }
+        else:
+            entry["annotated"] = {}
+            entry["annotated_by"] = {}
         # Ground-truth demonstration video (not a re-rendered
         # "reconstruction" -- see ensure_libero_original_video's docstring),
         # available whenever the source LIBERO hdf5 for this task is found
@@ -2891,6 +2936,7 @@ def api_libero_training_monitor(task, episode, method=None, annotator=None):
         }
 
     ann = load_annotations(annotator, f"libero_training__{task}__{method}", episode)
+    other_ann = other_annotations(f"libero_training__{task}__{method}", episode, _safe_annotator(annotator))
     return {
         "task": task,
         "episode": episode,
@@ -2898,6 +2944,7 @@ def api_libero_training_monitor(task, episode, method=None, annotator=None):
         "video_url": video_url,
         **mv,
         "annotations": ann,
+        "other_annotations": other_ann,
         "reconstruction": None,
         "annotation_task_key": f"libero_training__{task}__{method}",
         "annotator": _safe_annotator(annotator),

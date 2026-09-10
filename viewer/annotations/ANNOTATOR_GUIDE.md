@@ -31,6 +31,17 @@ tab.
    the monitor found for that episode, each with a jump-to-frame link so you don't
    have to scrub manually.
 
+## 2b. Sidebar badges: who's already looked at this episode
+
+In the Training Data episode list on the left, each row has an **✎ annotate** /
+**✎ annotated** button -- that one is scoped to *you* (whichever name is picked
+in the Annotator dropdown), so it flips to "annotated" once you've saved
+something for that episode. If someone else has also saved something there, a
+separate **"by: \<names\>"** badge shows up on the same row listing them -- so
+you can tell at a glance whether an episode's already been covered by another
+reviewer before deciding whether to spend time on it yourself (still worth a
+look if you want a second opinion, just not a blind spot either way).
+
 ## 3. The verdict buttons
 
 For **each individual violation/satisfied entry** the monitor lists (not just the

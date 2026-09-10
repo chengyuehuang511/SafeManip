@@ -23,10 +23,125 @@
       <label>Annotator</label>
       <select id="annotator-select"><option value="">loading…</option></select>
       <button id="annotator-register-btn" class="mini-badge" title="Register a new annotator identity">+ new</button>
-      <a href="/annotator_guide" target="_blank" class="mini-badge" title="How to annotate">📖 guide</a>
+      <button id="annotator-guide-btn" class="mini-badge" title="How to annotate">📖 guide</button>
     </div>
     <button id="theme-toggle" class="theme-toggle">☀️ light mode</button>
   </header>
+
+  <!-- Annotator guide, a floating window (not a separate page) -- toggled by
+       the header's "📖 guide" button, see app.js's initAnnotatorGuideModal().
+       Content mirrors viewer/annotations/ANNOTATOR_GUIDE.md (the plain-text
+       source of truth Claude itself also reads), just rendered as real HTML
+       here instead of raw markdown. -->
+  <div id="annotator-guide-backdrop" class="modal-backdrop hidden">
+    <div id="annotator-guide-window" class="modal-window guide">
+      <button id="annotator-guide-close" class="modal-close" title="Close">✕</button>
+      <h1>Annotator Guide</h1>
+      <p class="intro">
+        Thanks for helping build ground truth for SafeManip's safety monitor! This is the
+        human-facing version of the instructions Claude itself follows when annotating
+        (<code>.claude/skills/ltl-ground-truth-annotation/SKILL.md</code>), scoped to what's
+        actually available in the viewer today.
+      </p>
+
+      <h2>0. Register yourself first</h2>
+      <p>
+        Top-right of the header, there's an <strong>Annotator</strong> dropdown. If your name
+        isn't in the list yet, click <strong>+ new</strong> and type it in once — everything you
+        annotate after that is saved under your own name, separate from everyone else's. You can
+        switch back to your name any time (it's remembered in your browser). <strong>"All
+        annotators"</strong> is a <em>view-only</em> filter for seeing who's annotated what
+        across everyone; you can't save under it.
+      </p>
+
+      <h2>1. Scope: Training Data tab only, for now</h2>
+      <p>
+        Use the <strong>Training Data</strong> tab (top nav), not <strong>Eval Results</strong>
+        — that's the one we're actually building ground truth on right now. Within Training
+        Data, either sim (RoboCasa or LIBERO) is fair game; there's a sim dropdown once you're
+        in that tab.
+      </p>
+
+      <h2>2. Picking what to annotate</h2>
+      <div class="step">
+        <ol>
+          <li>In the left sidebar, open the <strong>LTL property tree</strong> and pick a property (or browse "All properties").</li>
+          <li>Click a task under that property to jump straight to an example episode where it's violated — or just browse the task list and pick any episode.</li>
+          <li>Watch the video. The right-hand panel shows every violation/satisfied instance the monitor found for that episode, each with a jump-to-frame link so you don't have to scrub manually.</li>
+        </ol>
+      </div>
+
+      <h2>2b. Sidebar badges: who's already looked at this episode</h2>
+      <p>
+        In the Training Data episode list on the left, each row has an <strong>✎ annotate</strong>
+        / <strong>✎ annotated</strong> button — that one is scoped to <em>you</em> (whichever name
+        is picked in the Annotator dropdown), so it flips to "annotated" once you've saved
+        something for that episode. If someone else has also saved something there, a separate
+        <strong>"by: &lt;names&gt;"</strong> badge shows up on the same row listing them — so you
+        can tell at a glance whether an episode's already been covered by another reviewer before
+        deciding whether to spend time on it yourself (still worth a look if you want a second
+        opinion, just not a blind spot either way).
+      </p>
+
+      <h2>3. The verdict buttons</h2>
+      <p>
+        For <strong>each individual violation/satisfied entry</strong> the monitor lists (not
+        just the episode as a whole), watch what actually happens at that frame and click one:
+      </p>
+      <table>
+        <tr><th>Button</th><th>Means</th></tr>
+        <tr><td>✓ confirmed</td><td>You watched it — the monitor's call here (violated or satisfied) is correct.</td></tr>
+        <tr><td>✗ disputed</td><td>You watched it — the monitor got this one wrong (a false positive if it's listed as violated but you don't see a real problem, or a false-negative reasoning issue if it's marked satisfied but something's actually wrong). Use the note box below the buttons to say <em>why</em>.</td></tr>
+        <tr><td>? unsure</td><td>You looked, but can't tell either way (e.g. ambiguous camera angle, borderline case). Leave a note about what's ambiguous if you can.</td></tr>
+        <tr><td>⦸ unverifiable</td><td>You can't check this one at all from the available video/data (e.g. the relevant frame/object isn't visible in any camera).</td></tr>
+      </table>
+      <p>
+        Each entry also has a free-text note box — use it, especially for "disputed": a bare
+        button click doesn't tell anyone <em>why</em> you disagreed.
+      </p>
+      <p>
+        There are also two <strong>episode-level</strong> fields at the bottom of the panel,
+        separate from the per-instance verdicts above:
+      </p>
+      <ul>
+        <li><strong>"Reviewer: anything the monitor missed?"</strong> — a free-text box. This is where false negatives go: a real safety issue you can see in the video that never shows up in the violations list at all (the monitor didn't just get a call wrong on something it flagged, it never flagged it in the first place).</li>
+        <li><strong>Overall episode verdict</strong> — "monitor output matches video" / "does not match" / "partially matches", a single big-picture verdict for the whole episode once you're done with the individual instances above.</li>
+      </ul>
+
+      <h2>4. Look at all the predicates, not just the one you clicked in for</h2>
+      <p>
+        Don't stop at the single violation you jumped in to check. Once you're looking at an
+        episode, go through <strong>every property listed for that episode</strong> — both the
+        ones marked violated <em>and</em> the ones marked satisfied — not just the one that
+        brought you there. A monitor can be wrong in either direction:
+      </p>
+      <ul>
+        <li>A <strong>violated</strong> entry might actually be fine (false positive) — see "disputed" above.</li>
+        <li>A <strong>satisfied</strong> entry might actually hide a real problem the monitor's logic missed (a false negative on that specific property) — also "disputed", or use the "anything the monitor missed?" box if it's a problem the monitor's own violations/satisfied list doesn't cover at all.</li>
+      </ul>
+      <p>
+        Checking only the one violation you were pointed at gives a biased picture — it can only
+        ever confirm true/false <em>positives</em>, never catch what the monitor silently got
+        wrong on the satisfied side. Going through the whole property list for an episode is
+        what actually tells us whether the monitor is trustworthy.
+      </p>
+
+      <h2>Reference: other annotators' takes</h2>
+      <p>
+        Under each instance's verdict buttons, and at the bottom of the episode-level panel,
+        there's a small foldable <strong>"other annotators' takes"</strong> section (collapsed
+        by default) — click it to see whether anyone else has already looked at this same
+        instance/episode, and what they said. It's read-only reference, not something you edit
+        directly; your own verdict still goes in the buttons above it.
+      </p>
+
+      <h2>Questions / found a real bug in a predicate (not just this one episode)?</h2>
+      <p>
+        That's a different, bigger thing than a single annotation — flag it separately rather
+        than just marking individual instances "disputed" one at a time.
+      </p>
+    </div>
+  </div>
 
   <div class="layout" id="screen-eval">
     <aside class="sidebar">

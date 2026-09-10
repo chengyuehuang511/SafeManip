@@ -357,6 +357,25 @@ video {
 }
 .raw-explanation summary:hover { color: var(--text-dim); }
 
+.other-annotators { margin: 6px 0; }
+.other-annotators summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  user-select: none;
+}
+.other-annotators summary:hover { color: var(--text-dim); }
+.other-annotator-row {
+  font-size: 12px;
+  padding: 4px 6px;
+  margin-top: 4px;
+  border-left: 2px solid var(--border-alt);
+  background: var(--bg-alt2);
+  border-radius: 3px;
+}
+.other-annotator-verdict { color: var(--text-muted); }
+.other-annotator-note { color: var(--text-dim); font-size: 11.5px; margin-top: 2px; white-space: pre-wrap; }
+
 .repeated-violations { margin: 8px 0; }
 .repeated-violations summary {
   cursor: pointer;
@@ -700,3 +719,65 @@ video {
 
 .muted { color: var(--text-muted); font-size: 12px; }
 .loading { color: var(--text-muted); font-size: 12px; padding: 8px; }
+
+/* Episode-list "someone else already annotated this" badge (2026-09-10) --
+   see app.js's loadTrainingEpisodes/othersBadge, server.py's
+   list_training_episodes'/list_libero_training_episodes' entry.annotated_by.
+   Deliberately its own color (not reusing .ok/.viol) -- this isn't a
+   pass/fail signal, just a "heads up, look at annotator-select notes" one. */
+.mini-badge.others-annotated { background: var(--accent-bg); color: var(--accent-text); }
+
+/* Annotator guide modal (2026-09-10) -- toggled by the header's "📖 guide"
+   button, see app.js's initAnnotatorGuideModal(). A floating window instead
+   of a separate page/tab (per explicit feedback that a bare markdown file
+   served as text/plain was unreadable) -- content mirrors
+   viewer/annotations/ANNOTATOR_GUIDE.md, kept in sync by hand since the
+   modal needs real HTML (tables, styled steps) rather than raw markdown. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  z-index: 1000;
+  overflow-y: auto;
+}
+.modal-backdrop.hidden { display: none; }
+.modal-window {
+  position: relative;
+  background: var(--bg-alt);
+  border: 1px solid var(--border-alt);
+  border-radius: 10px;
+  padding: 28px 32px;
+  max-width: 720px;
+  width: 100%;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  border: 1px solid var(--border-alt);
+  background: var(--bg-alt2);
+  color: var(--text-dim);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.modal-close:hover { background: var(--bg-input); color: var(--text); }
+.modal-window.guide h1 { margin-top: 0; font-size: 20px; }
+.modal-window.guide .intro { color: var(--text-dim); font-size: 13px; }
+.modal-window.guide h2 { font-size: 15px; margin: 22px 0 8px; border-top: 1px solid var(--border); padding-top: 16px; }
+.modal-window.guide h2:first-of-type { border-top: none; padding-top: 0; }
+.modal-window.guide p, .modal-window.guide li { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+.modal-window.guide ol, .modal-window.guide ul { padding-left: 20px; margin: 6px 0; }
+.modal-window.guide .step { background: var(--bg-alt2); border-radius: 6px; padding: 8px 14px; margin: 8px 0; }
+.modal-window.guide table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 12.5px; }
+.modal-window.guide th, .modal-window.guide td { text-align: left; padding: 6px 8px; border: 1px solid var(--border); vertical-align: top; }
+.modal-window.guide th { background: var(--bg-alt2); color: var(--text-dim); }
+.modal-window.guide code { background: var(--bg-alt2); padding: 1px 4px; border-radius: 3px; font-size: 12px; }

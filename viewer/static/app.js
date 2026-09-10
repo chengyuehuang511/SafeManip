@@ -233,6 +233,27 @@ function activateTrainingTab() {
   }
 }
 
+// Wires the header's "📖 guide" button to the in-page annotator guide modal
+// (2026-09-10) -- see index.html's #annotator-guide-backdrop and style.css's
+// .modal-backdrop/.modal-window.guide rules. Closes on the ✕ button, on a
+// click outside the window (backdrop itself), or on Escape while open.
+function initAnnotatorGuideModal() {
+  const backdrop = el("#annotator-guide-backdrop");
+  const openBtn = el("#annotator-guide-btn");
+  const closeBtn = el("#annotator-guide-close");
+  if (!backdrop || !openBtn || !closeBtn) return;
+  const open = () => backdrop.classList.remove("hidden");
+  const close = () => backdrop.classList.add("hidden");
+  openBtn.addEventListener("click", open);
+  closeBtn.addEventListener("click", close);
+  backdrop.addEventListener("click", (ev) => {
+    if (ev.target === backdrop) close();
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && !backdrop.classList.contains("hidden")) close();
+  });
+}
+
 function initTabs() {
   el("#tab-eval").addEventListener("click", () => {
     activateEvalTab();
@@ -282,6 +303,7 @@ function initTabs() {
 async function init() {
   initTheme();
   await initAnnotatorPicker();
+  initAnnotatorGuideModal();
   initTabs();
   const data = await fetchJSON("/api/tasks");
   roots.eval = data.root;
@@ -710,10 +732,24 @@ async function loadTrainingEpisodes(task, targetEpisode) {
       selectTrainingEpisode(task, ep, row);
     });
 
+    // "Who's already annotated this episode" (2026-09-10) -- server.py's
+    // ep.annotated_by[method] is the full list of registered annotator
+    // names with real content here, regardless of the currently-selected
+    // annotator filter. Split into "you" (folded into the annotate button's
+    // own state above) vs. everyone else, so a reviewer can tell at a
+    // glance whether someone already covered this episode before deciding
+    // whether it's worth their own time too.
+    const annotatedByAll = (ep.annotated_by || {})[tdState.monitorMethod] || [];
+    const others = annotatedByAll.filter((a) => a !== currentAnnotator);
+    const othersBadge = others.length
+      ? `<span class="mini-badge others-annotated" title="${others.join(", ")} also annotated this episode">by: ${others.join(", ")}</span>`
+      : "";
+
     row.innerHTML = `<span class="ep-num">#${ep.episode}</span>
       ${successBadge}
       ${violBadges}
-      <span class="mini-badge">${orUnknown(ep.n_frames)} frames</span>`;
+      <span class="mini-badge">${orUnknown(ep.n_frames)} frames</span>
+      ${othersBadge}`;
     row.appendChild(annotatedBtn);
     row.addEventListener("click", () => selectTrainingEpisode(task, ep, row));
     tdEpisodeList.appendChild(row);
@@ -957,11 +993,11 @@ function renderTrainingMonitor(detail) {
   if (!detail.violations.length) {
     vlist.innerHTML = "<div class='muted'>No violations flagged by the monitor.</div>";
   }
-  for (const v of detail.violations) vlist.appendChild(renderViolation(v, detail.annotations));
+  for (const v of detail.violations) vlist.appendChild(renderViolation(v, detail.annotations, detail.other_annotations));
 
   const slist = el("#td-satisfied-list");
   slist.innerHTML = "";
-  for (const s of detail.satisfied) slist.appendChild(renderSatisfied(s, detail.annotations));
+  for (const s of detail.satisfied) slist.appendChild(renderSatisfied(s, detail.annotations, detail.other_annotations));
 
   resolveMarkCollisions(el("#td-monitor-body"));
   renderMissedPanel(detail, el("#td-monitor-body"), "td-missed-panel");
@@ -1068,6 +1104,79 @@ function aiDraftBlock(current) {
   body.textContent = current.ai_draft;
   wrap.appendChild(body);
   return wrap;
+}
+
+// Foldable "other annotators' takes" reference (2026-09-10) -- other
+// registered annotators' verdict/note on this SAME (group, index) instance,
+// read-only (you can only ever edit your own selected identity's
+// annotation, never someone else's -- see currentAnnotator/saveAnnotation).
+// `otherAnn` is detail.other_annotations: {annotatorName: full annotation
+// dict}, already pre-filtered server-side to annotators with *some* real
+// content for this episode -- but that doesn't mean they annotated *this
+// specific* instance, so still checked per-entry here. Collapsed by
+// default (a <details> element, not always-visible) so it's available as
+// a reference without cluttering the common case (no one else has looked
+// at this episode yet).
+function otherAnnotatorsBlock(group, index, otherAnn) {
+  if (!otherAnn) return null;
+  const rows = [];
+  for (const [name, data] of Object.entries(otherAnn)) {
+    const entry = (data[group] || {})[String(index)];
+    if (!entry || (!entry.verdict && !(entry.note || "").trim())) continue;
+    rows.push({ name, entry });
+  }
+  if (!rows.length) return null;
+  const details = document.createElement("details");
+  details.className = "other-annotators";
+  const summary = document.createElement("summary");
+  summary.textContent = `other annotators' takes (${rows.length})`;
+  details.appendChild(summary);
+  for (const { name, entry } of rows) {
+    const row = document.createElement("div");
+    row.className = "other-annotator-row";
+    const label = entry.verdict ? (DRAFT_VERDICT_LABEL[entry.verdict] || entry.verdict) : "(no verdict)";
+    row.innerHTML = `<strong>${name}</strong>: <span class="other-annotator-verdict">${label}</span>`;
+    if ((entry.note || "").trim()) {
+      const note = document.createElement("div");
+      note.className = "other-annotator-note";
+      note.textContent = entry.note;
+      row.appendChild(note);
+    }
+    details.appendChild(row);
+  }
+  return details;
+}
+
+// Same idea as otherAnnotatorsBlock, but for the episode-level missed_notes/
+// overall_verdict fields instead of a single violation/satisfied instance.
+function otherAnnotatorsEpisodeBlock(otherAnn) {
+  if (!otherAnn) return null;
+  const rows = [];
+  for (const [name, data] of Object.entries(otherAnn)) {
+    const missed = (data.missed_notes || "").trim();
+    const overall = data.overall_verdict;
+    if (!missed && !overall) continue;
+    rows.push({ name, missed, overall });
+  }
+  if (!rows.length) return null;
+  const details = document.createElement("details");
+  details.className = "other-annotators";
+  const summary = document.createElement("summary");
+  summary.textContent = `other annotators' episode-level notes (${rows.length})`;
+  details.appendChild(summary);
+  for (const { name, missed, overall } of rows) {
+    const row = document.createElement("div");
+    row.className = "other-annotator-row";
+    row.innerHTML = `<strong>${name}</strong>${overall ? `: <span class="other-annotator-verdict">${overall}</span>` : ""}`;
+    if (missed) {
+      const note = document.createElement("div");
+      note.className = "other-annotator-note";
+      note.textContent = missed;
+      row.appendChild(note);
+    }
+    details.appendChild(row);
+  }
+  return details;
 }
 
 function noteBox(group, index, current) {
@@ -1745,7 +1854,7 @@ function ltlLine(ltl) {
   return line;
 }
 
-function renderViolation(v, ann) {
+function renderViolation(v, ann, otherAnn) {
   const current = ann.violations[String(v.index)];
   const card = document.createElement("div");
   card.className = "card violation-card";
@@ -1795,10 +1904,12 @@ function renderViolation(v, ann) {
 
   card.appendChild(verdictControls("violations", v.index, current));
   card.appendChild(noteBox("violations", v.index, current));
+  const others = otherAnnotatorsBlock("violations", v.index, otherAnn);
+  if (others) card.appendChild(others);
   return card;
 }
 
-function renderSatisfied(s, ann) {
+function renderSatisfied(s, ann, otherAnn) {
   const card = document.createElement("div");
   card.className = "card satisfied-card";
   const current = ann.satisfied[String(s.index)];
@@ -1837,6 +1948,8 @@ function renderSatisfied(s, ann) {
 
   card.appendChild(verdictControls("satisfied", s.index, current));
   card.appendChild(noteBox("satisfied", s.index, current));
+  const others = otherAnnotatorsBlock("satisfied", s.index, otherAnn);
+  if (others) card.appendChild(others);
   return card;
 }
 
@@ -1952,11 +2065,11 @@ function render(detail) {
   if (!detail.violations.length) {
     vlist.innerHTML = "<div class='muted'>No violations flagged by the monitor.</div>";
   }
-  for (const v of detail.violations) vlist.appendChild(renderViolation(v, detail.annotations));
+  for (const v of detail.violations) vlist.appendChild(renderViolation(v, detail.annotations, detail.other_annotations));
 
   const slist = el("#satisfied-list");
   slist.innerHTML = "";
-  for (const s of detail.satisfied) slist.appendChild(renderSatisfied(s, detail.annotations));
+  for (const s of detail.satisfied) slist.appendChild(renderSatisfied(s, detail.annotations, detail.other_annotations));
 
   resolveMarkCollisions(episodeView);
   renderMissedPanel(detail, episodeView, "missed-panel");
@@ -2018,6 +2131,9 @@ function renderMissedPanel(detail, containerEl, panelId) {
     overallWrap.appendChild(b);
   }
   panel.appendChild(overallWrap);
+
+  const others = otherAnnotatorsEpisodeBlock(detail.other_annotations);
+  if (others) panel.appendChild(others);
 }
 
 init();
