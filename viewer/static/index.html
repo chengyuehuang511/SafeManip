@@ -13,6 +13,17 @@
       <button id="tab-eval" class="tab-btn active">Eval Results</button>
       <button id="tab-training" class="tab-btn">Training Data</button>
     </nav>
+    <!-- Multi-annotator picker/filter (2026-09-10): who annotation reads/
+         writes are scoped to (persisted in localStorage, see app.js's
+         currentAnnotator) -- "All annotators" aggregates across everyone
+         registered for viewing/filtering (e.g. the sidebar's "annotated"
+         counts), but editing a verdict/note always writes to your own
+         selected identity, never "All". -->
+    <div class="annotator-picker">
+      <label>Annotator</label>
+      <select id="annotator-select"><option value="">loading…</option></select>
+      <button id="annotator-register-btn" class="mini-badge" title="Register a new annotator identity">+ new</button>
+    </div>
     <button id="theme-toggle" class="theme-toggle">☀️ light mode</button>
   </header>
 

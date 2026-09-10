@@ -36,6 +36,23 @@ let tdSim = "robocasa";
 function tdSimQS() {
   return `&sim=${encodeURIComponent(tdSim)}`;
 }
+
+// Multi-annotator support (2026-09-10): who's currently "logged in" as far
+// as annotation reads/writes go -- persisted in localStorage so it survives
+// reloads/new tabs on the same browser, but is otherwise just a plain-text
+// identity (no real auth; this is an internal review tool). Threaded into
+// every annotation-touching fetch as &annotator=<name> (GET) or
+// {annotator: <name>} (POST /api/annotate) -- see server.py's
+// register_annotator/annotation_path, which give each annotator their own
+// subdirectory under viewer/annotations/, so two people's verdicts on the
+// same episode never overwrite each other. null until loadAnnotators()
+// resolves on page load (falls back to the server's DEFAULT_ANNOTATOR,
+// "chengyue", the pre-existing owner of all annotations made before this
+// feature existed).
+let currentAnnotator = localStorage.getItem("safemanip-annotator") || null;
+function annotatorQS() {
+  return currentAnnotator ? `&annotator=${encodeURIComponent(currentAnnotator)}` : "";
+}
 const tdTaskTree = el("#td-task-tree");
 const tdPropertyTree = el("#td-property-tree");
 const tdEpisodeList = el("#td-episode-list");
@@ -81,6 +98,86 @@ function initTheme() {
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("safemanip-theme", next);
     setLabel();
+  });
+}
+
+const ALL_ANNOTATORS_VALUE = "__all__";
+
+// Populates the header's Annotator select from /api/annotators, wires the
+// "register new" flow, and reacts to a change by re-fetching whatever's
+// currently on screen under the newly-selected identity/filter. Called
+// once on page load; the select itself persists across tab/sim switches
+// (it's outside both #screen-eval/#screen-training).
+async function initAnnotatorPicker() {
+  const select = el("#annotator-select");
+  const registerBtn = el("#annotator-register-btn");
+
+  async function refreshOptions(selectValue) {
+    let data;
+    try {
+      data = await fetchJSON("/api/annotators");
+    } catch (e) {
+      data = { annotators: [], default: "chengyue" };
+    }
+    if (!currentAnnotator) {
+      currentAnnotator = data.default;
+      localStorage.setItem("safemanip-annotator", currentAnnotator);
+    }
+    const names = data.annotators.length ? data.annotators : [data.default];
+    select.innerHTML = "";
+    const allOpt = document.createElement("option");
+    allOpt.value = ALL_ANNOTATORS_VALUE;
+    allOpt.textContent = "All annotators (view only)";
+    select.appendChild(allOpt);
+    for (const name of names) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      select.appendChild(opt);
+    }
+    select.value = selectValue || currentAnnotator;
+    if (select.value !== (selectValue || currentAnnotator)) {
+      // requested value isn't a real <option> (e.g. a stale localStorage
+      // name from before a corpus reset) -- fall back rather than silently
+      // showing the browser's own "nothing selected" default.
+      select.value = currentAnnotator;
+    }
+  }
+
+  await refreshOptions(currentAnnotator);
+
+  select.addEventListener("change", async () => {
+    currentAnnotator = select.value;
+    // "All annotators" is a view-only filter, never a save identity -- but
+    // there's nothing to *save* here, just re-render the current screen
+    // scoped to the new selection, same as switching to a real name.
+    if (currentAnnotator !== ALL_ANNOTATORS_VALUE) {
+      localStorage.setItem("safemanip-annotator", currentAnnotator);
+    }
+    if (el("#tab-training").classList.contains("active")) {
+      await refreshViolationCounts();
+      renderTaskTree();
+      renderPropertyTree();
+      if (tdState.task && tdState.episode != null) {
+        await loadTrainingMonitor(tdState.task, tdState.episode, tdState.monitorMethod);
+      }
+    } else if (state.task && state.episode != null) {
+      await selectEpisode(state.task, state.episode);
+    }
+  });
+
+  registerBtn.addEventListener("click", async () => {
+    const name = (prompt("New annotator name:") || "").trim();
+    if (!name) return;
+    const data = await fetchJSON("/api/register_annotator", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    currentAnnotator = data.annotator;
+    localStorage.setItem("safemanip-annotator", currentAnnotator);
+    await refreshOptions(currentAnnotator);
+    select.dispatchEvent(new Event("change"));
   });
 }
 
@@ -184,6 +281,7 @@ function initTabs() {
 
 async function init() {
   initTheme();
+  await initAnnotatorPicker();
   initTabs();
   const data = await fetchJSON("/api/tasks");
   roots.eval = data.root;
@@ -337,7 +435,7 @@ async function refreshViolationCounts() {
   }
   try {
     tdViolationCounts = await fetchJSON(
-      `/api/training_violation_counts?sim=${encodeURIComponent(tdSim)}&method=${encodeURIComponent(tdState.monitorMethod)}`
+      `/api/training_violation_counts?sim=${encodeURIComponent(tdSim)}&method=${encodeURIComponent(tdState.monitorMethod)}${annotatorQS()}`
     );
   } catch (e) {
     tdViolationCounts = { by_task: {}, by_property: {} };
@@ -548,7 +646,7 @@ async function loadTrainingEpisodes(task, targetEpisode) {
   // already reports every known method's counts unconditionally), so this
   // is a no-op query param there.
   const methodParam = tdState.monitorMethod ? `&method=${encodeURIComponent(tdState.monitorMethod)}` : "";
-  const data = await fetchJSON(`/api/td_episodes?task=${encodeURIComponent(task)}${propertyParam}${methodParam}${tdSimQS()}`);
+  const data = await fetchJSON(`/api/td_episodes?task=${encodeURIComponent(task)}${propertyParam}${methodParam}${tdSimQS()}${annotatorQS()}`);
   tdEpisodeList.innerHTML = "";
   if (!data.episodes.length) {
     tdEpisodeList.innerHTML = "<div class='muted'>no reconstructed episodes yet for this task"
@@ -801,7 +899,7 @@ async function loadTrainingMonitor(task, episode, method) {
   let detail;
   try {
     detail = await fetchJSON(
-      `/api/training_monitor?task=${encodeURIComponent(task)}&episode=${episode}&method=${encodeURIComponent(method)}${tdSimQS()}`
+      `/api/training_monitor?task=${encodeURIComponent(task)}&episode=${episode}&method=${encodeURIComponent(method)}${tdSimQS()}${annotatorQS()}`
     );
   } catch (e) {
     missing.textContent = `failed to load monitor results: ${e}`;
@@ -920,7 +1018,7 @@ async function selectEpisode(task, episode, rowEl) {
   episodeView.classList.remove("hidden");
 
   const detail = await fetchJSON(
-    `/api/episode?task=${encodeURIComponent(task)}&episode=${episode}`
+    `/api/episode?task=${encodeURIComponent(task)}&episode=${episode}${annotatorQS()}`
   );
   state.detail = detail;
   render(detail);
@@ -1007,6 +1105,7 @@ async function saveAnnotation(group, index, patch) {
     body: JSON.stringify({
       task: annotationContext.task,
       episode: annotationContext.episode,
+      annotator: currentAnnotator,
       ...(group ? { group, index } : {}),
       ...patch,
     }),

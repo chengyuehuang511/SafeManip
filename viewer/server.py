@@ -800,12 +800,15 @@ def _property_status_for(mon, property_name):
     return None
 
 
-def list_training_episodes(task, property_filter=None):
+def list_training_episodes(task, property_filter=None, annotator=None):
     """`property_filter`: if given, every returned num_violations/success
     pair is scoped to that single named LTL property instead of the
     all-properties aggregate -- lets the viewer show "does episode N violate
     *this* property" per the property tab selector, rather than always the
-    whole-episode violated-instance count."""
+    whole-episode violated-instance count. `annotator`: None/"__all__" means
+    the per-episode "annotated" indicator reflects *any* registered
+    annotator; a specific name scopes it to just that one (see
+    has_human_annotation)."""
     out_dir = TRAINING_OUTPUT_DIR / task
     episodes = []
     if not out_dir.is_dir():
@@ -874,13 +877,15 @@ def list_training_episodes(task, property_filter=None):
         # per-episode indicator.
         entry["annotated"] = {}
         for method_key in _methods:
-            entry["annotated"][method_key] = has_human_annotation(f"training__{task}__{method_key}", ep)
+            entry["annotated"][method_key] = has_human_annotation(
+                f"training__{task}__{method_key}", ep, annotator=annotator
+            )
         episodes.append(entry)
     episodes.sort(key=lambda e: e["episode"])
     return episodes
 
 
-def training_violation_counts(method):
+def training_violation_counts(method, annotator=None):
     """Aggregate, for one postprocess method, how many episodes violated each
     LTL property -- broken down both by task (with a per-property breakdown
     nested inside) and by property (with a per-task breakdown nested inside),
@@ -941,7 +946,7 @@ def training_violation_counts(method):
                 # violation" per explicit request -- satisfied instances
                 # aren't counted here.
                 annotated = human_annotation_for_index(
-                    f"training__{task}__{method}", ep, "violations", idx
+                    f"training__{task}__{method}", ep, "violations", idx, annotator=annotator
                 )
                 if annotated:
                     prop_entry["annotated"] += 1
@@ -967,8 +972,8 @@ def api_training_tasks():
     return {"dataset_root": str(TRAINING_DATASET_ROOT), "tasks": list_training_tasks()}
 
 
-def api_training_episodes(task, property_filter=None):
-    episodes = list_training_episodes(task, property_filter=property_filter)
+def api_training_episodes(task, property_filter=None, annotator=None):
+    episodes = list_training_episodes(task, property_filter=property_filter, annotator=annotator)
     for ep in episodes:
         cams = ep.get("camera_names") or []
         cam_paths = [training_original_video_path(task, ep["episode"], cam) for cam in cams]
@@ -1692,9 +1697,66 @@ def ffprobe_info(video_path):
     return result
 
 
-def annotation_path(task, episode):
+# Multi-annotator support (2026-09-10): previously every annotation file
+# lived directly under ANNOTATIONS_DIR, with no notion of *who* saved it --
+# in practice, always the one person who happened to be using this viewer.
+# Explicit user request: let multiple people register as their own
+# annotator identity, each with their own separate saved files (so two
+# people's verdicts on the same episode don't overwrite each other), plus
+# a filter to view/aggregate by annotator. Each registered annotator gets
+# their own subdirectory (ANNOTATIONS_DIR/<annotator>/...), with the exact
+# same per-(task, episode) filename scheme underneath as before --
+# annotation_path/load_annotations/save_annotations/has_human_annotation/
+# human_annotation_for_index all take a new required `annotator` arg. The
+# pre-existing flat files (all Chengyue's work) were migrated into
+# ANNOTATIONS_DIR/chengyue/ as part of this change, preserving git history
+# via `git mv`.
+DEFAULT_ANNOTATOR = "chengyue"
+_ALL_ANNOTATORS_SENTINEL = "__all__"
+
+
+def _safe_annotator(annotator):
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", str(annotator or DEFAULT_ANNOTATOR))
+
+
+# Not an annotator -- a pre-existing reference-docs subdirectory under
+# ANNOTATIONS_DIR (per-property LTL debugging writeups, referenced by path
+# from several docs/comments elsewhere; left in place rather than moved,
+# to avoid updating every one of those references). Excluded from
+# list_annotators() so it never shows up as a fake registered annotator.
+_RESERVED_ANNOTATIONS_SUBDIRS = {"ltl_debugging_guides"}
+
+
+def list_annotators():
+    """Every registered annotator (one subdirectory under ANNOTATIONS_DIR
+    each), sorted, DEFAULT_ANNOTATOR first if present. Live/uncached, same
+    pattern as the version-dir discovery elsewhere in this file -- a newly
+    registered annotator (register_annotator, or just their first save)
+    shows up without a viewer restart."""
+    if not ANNOTATIONS_DIR.is_dir():
+        return []
+    names = sorted(
+        p.name for p in ANNOTATIONS_DIR.iterdir()
+        if p.is_dir() and not p.name.startswith(".") and p.name not in _RESERVED_ANNOTATIONS_SUBDIRS
+    )
+    if DEFAULT_ANNOTATOR in names:
+        names.remove(DEFAULT_ANNOTATOR)
+        names.insert(0, DEFAULT_ANNOTATOR)
+    return names
+
+
+def register_annotator(name):
+    """Create (if not already present) the annotator directory for `name`.
+    Idempotent -- calling this for an already-registered annotator is a
+    harmless no-op. Returns the sanitized annotator slug actually used."""
+    slug = _safe_annotator(name)
+    (ANNOTATIONS_DIR / slug).mkdir(parents=True, exist_ok=True)
+    return slug
+
+
+def annotation_path(annotator, task, episode):
     safe_task = re.sub(r"[^A-Za-z0-9_.-]", "_", task)
-    return ANNOTATIONS_DIR / f"{safe_task}__{episode}.json"
+    return ANNOTATIONS_DIR / _safe_annotator(annotator) / f"{safe_task}__{episode}.json"
 
 
 def _entry_has_human_content(entry):
@@ -1717,14 +1779,8 @@ def _entry_has_human_content(entry):
     )
 
 
-def has_human_annotation(task, episode):
-    """Whether this (task, episode) has any real saved *human* annotation
-    anywhere in it (any violation/satisfied entry, or the episode-level
-    missed_notes/overall_verdict fields) -- see _entry_has_human_content for
-    what counts. Used for the episode-list sidebar's per-episode "human
-    annotated" indicator (2026-09-08), so it doesn't have to be found by
-    opening every episode one at a time."""
-    p = annotation_path(task, episode)
+def _has_human_annotation_one(annotator, task, episode):
+    p = annotation_path(annotator, task, episode)
     if not p.is_file():
         return False
     try:
@@ -1740,15 +1796,23 @@ def has_human_annotation(task, episode):
     return False
 
 
-def human_annotation_for_index(task, episode, group, index):
-    """Whether one specific violations/satisfied entry (by its list index,
-    the same index save_annotations/app.js key annotations by) has real
-    human-authored content -- for the LTL-property sidebar tree's per-
-    property/per-task "how many of these violations are annotated" counts
-    (2026-09-08), which need to check one particular violation's own
-    annotation, not just "is this episode annotated at all" (an episode can
-    have several violated properties, each independently annotated or not)."""
-    p = annotation_path(task, episode)
+def has_human_annotation(task, episode, annotator=None):
+    """Whether this (task, episode) has any real saved *human* annotation
+    anywhere in it (any violation/satisfied entry, or the episode-level
+    missed_notes/overall_verdict fields) -- see _entry_has_human_content for
+    what counts. Used for the episode-list sidebar's per-episode "human
+    annotated" indicator (2026-09-08), so it doesn't have to be found by
+    opening every episode one at a time. `annotator` (2026-09-10): None or
+    the "__all__" sentinel checks every *registered* annotator (True if
+    *anyone* has annotated it -- the "All annotators" filter view);
+    otherwise scoped to that one annotator only."""
+    if annotator is None or annotator == _ALL_ANNOTATORS_SENTINEL:
+        return any(_has_human_annotation_one(a, task, episode) for a in list_annotators())
+    return _has_human_annotation_one(annotator, task, episode)
+
+
+def _human_annotation_for_index_one(annotator, task, episode, group, index):
+    p = annotation_path(annotator, task, episode)
     if not p.is_file():
         return False
     try:
@@ -1758,8 +1822,26 @@ def human_annotation_for_index(task, episode, group, index):
     return _entry_has_human_content((data.get(group) or {}).get(str(index)))
 
 
-def load_annotations(task, episode):
-    p = annotation_path(task, episode)
+def human_annotation_for_index(task, episode, group, index, annotator=None):
+    """Whether one specific violations/satisfied entry (by its list index,
+    the same index save_annotations/app.js key annotations by) has real
+    human-authored content -- for the LTL-property sidebar tree's per-
+    property/per-task "how many of these violations are annotated" counts
+    (2026-09-08), which need to check one particular violation's own
+    annotation, not just "is this episode annotated at all" (an episode can
+    have several violated properties, each independently annotated or not).
+    `annotator` (2026-09-10): same None/"__all__"-means-anyone semantics as
+    has_human_annotation."""
+    if annotator is None or annotator == _ALL_ANNOTATORS_SENTINEL:
+        return any(
+            _human_annotation_for_index_one(a, task, episode, group, index)
+            for a in list_annotators()
+        )
+    return _human_annotation_for_index_one(annotator, task, episode, group, index)
+
+
+def load_annotations(annotator, task, episode):
+    p = annotation_path(annotator, task, episode)
     if not p.is_file():
         return {"violations": {}, "satisfied": {}, "missed_notes": "", "overall_verdict": None}
     try:
@@ -1768,10 +1850,10 @@ def load_annotations(task, episode):
         return {"violations": {}, "satisfied": {}, "missed_notes": "", "overall_verdict": None}
 
 
-def save_annotations(task, episode, patch):
-    ANNOTATIONS_DIR.mkdir(parents=True, exist_ok=True)
+def save_annotations(annotator, task, episode, patch):
+    annotation_path(annotator, task, episode).parent.mkdir(parents=True, exist_ok=True)
     with _annotation_lock:
-        data = load_annotations(task, episode)
+        data = load_annotations(annotator, task, episode)
         group = patch.get("group")  # "violations" | "satisfied" | None
         if group in ("violations", "satisfied"):
             idx = str(patch["index"])
@@ -1806,7 +1888,7 @@ def save_annotations(task, episode, patch):
             data["missed_notes"] = patch["missed_notes"]
         if "overall_verdict" in patch:
             data["overall_verdict"] = patch["overall_verdict"]
-        annotation_path(task, episode).write_text(json.dumps(data, indent=2))
+        annotation_path(annotator, task, episode).write_text(json.dumps(data, indent=2))
         return data
 
 
@@ -2269,7 +2351,7 @@ def load_monitor_view(base_dir, episode, fps, video_duration):
     }
 
 
-def api_episode(task, episode):
+def api_episode(task, episode, annotator=None):
     rollout_dir = latest_rollout_dir(task)
     if rollout_dir is None:
         return {"error": f"no rollout_data found for task {task!r}"}, 404
@@ -2291,7 +2373,7 @@ def api_episode(task, episode):
             "error": "monitor json missing for this episode",
         }
 
-    ann = load_annotations(task, episode)
+    ann = load_annotations(annotator, task, episode)
 
     recon_paths = reconstruction_paths(task, episode)
     reconstruction = None
@@ -2328,10 +2410,12 @@ def api_episode(task, episode):
         **mv,
         "annotations": ann,
         "reconstruction": reconstruction,
+        "annotation_task_key": task,
+        "annotator": _safe_annotator(annotator),
     }
 
 
-def api_training_monitor(task, episode, method=None):
+def api_training_monitor(task, episode, method=None, annotator=None):
     """Training-data-tab counterpart to `api_episode`: same violations/
     satisfied/predicate-breakdown shape (built by the same `load_monitor_view`
     helper), sourced from SafeManip/monitor/extract_privileged_from_dataset*.py's
@@ -2384,7 +2468,7 @@ def api_training_monitor(task, episode, method=None):
     # task -- a verdict/note on the "scaled" result shouldn't silently
     # apply to the "sampled" one for the same episode, since they can
     # legitimately disagree (that's the whole point of comparing them).
-    ann = load_annotations(f"training__{task}__{method}", episode)
+    ann = load_annotations(annotator, f"training__{task}__{method}", episode)
 
     return {
         "task": task,
@@ -2395,6 +2479,7 @@ def api_training_monitor(task, episode, method=None):
         "annotations": ann,
         "reconstruction": None,
         "annotation_task_key": f"training__{task}__{method}",
+        "annotator": _safe_annotator(annotator),
     }
 
 
@@ -2569,7 +2654,7 @@ def list_libero_training_tasks(base_dir):
     return tasks
 
 
-def list_libero_training_episodes(base_dir, task, method=None, property_filter=None):
+def list_libero_training_episodes(base_dir, task, method=None, property_filter=None, annotator=None):
     """Parallel to list_training_episodes, but episodes are discovered from
     privileged_information_<N>.json directly (no reconstructed-video glob to
     key off -- see this block's module comment). `method` (2026-09-09,
@@ -2633,7 +2718,7 @@ def list_libero_training_episodes(base_dir, task, method=None, property_filter=N
             except Exception:
                 pass
         entry["annotated"] = {
-            method: has_human_annotation(f"libero_training__{task}__{method}", ep)
+            method: has_human_annotation(f"libero_training__{task}__{method}", ep, annotator=annotator)
         } if method is not None else {}
         # Ground-truth demonstration video (not a re-rendered
         # "reconstruction" -- see ensure_libero_original_video's docstring),
@@ -2649,7 +2734,7 @@ def list_libero_training_episodes(base_dir, task, method=None, property_filter=N
     return episodes
 
 
-def libero_training_violation_counts(base_dir):
+def libero_training_violation_counts(base_dir, annotator=None):
     """LIBERO analog of training_violation_counts -- same {by_task,
     by_property} shape for the sidebar's expandable Task/LTL-property trees,
     but keyed off privileged_information_<N>_monitor.json existence directly
@@ -2693,7 +2778,7 @@ def libero_training_violation_counts(base_dir):
                 prop_entry = by_property.setdefault(prop, {"total": 0, "annotated": 0, "by_task": {}})
                 prop_entry["total"] += 1
                 annotated = human_annotation_for_index(
-                    f"libero_training__{task}__{base_dir.name}", ep, "violations", idx
+                    f"libero_training__{task}__{base_dir.name}", ep, "violations", idx, annotator=annotator
                 )
                 if annotated:
                     prop_entry["annotated"] += 1
@@ -2721,12 +2806,14 @@ def api_libero_training_tasks(method=None):
     }
 
 
-def api_libero_training_episodes(task, method=None, property_filter=None):
+def api_libero_training_episodes(task, method=None, property_filter=None, annotator=None):
     methods, default_method = _libero_training_monitor_state()
     if method is None or method not in methods:
         method = default_method
     episodes = (
-        list_libero_training_episodes(methods[method]["dir"], task, method=method, property_filter=property_filter)
+        list_libero_training_episodes(
+            methods[method]["dir"], task, method=method, property_filter=property_filter, annotator=annotator
+        )
         if method is not None else []
     )
     # {"task", "episodes"} shape, matching api_training_episodes -- the
@@ -2747,7 +2834,7 @@ def api_libero_training_monitor_methods():
     }
 
 
-def api_libero_training_monitor(task, episode, method=None):
+def api_libero_training_monitor(task, episode, method=None, annotator=None):
     """LIBERO analog of api_training_monitor -- same load_monitor_view shape
     (violations/satisfied/predicate-breakdown). Uses the real original
     (ground-truth demonstration) video's own real fps/duration, exactly like
@@ -2803,7 +2890,7 @@ def api_libero_training_monitor(task, episode, method=None):
                      f"({methods[method]['label']}) yet -- extraction ran but monitoring hasn't (yet)",
         }
 
-    ann = load_annotations(f"libero_training__{task}__{method}", episode)
+    ann = load_annotations(annotator, f"libero_training__{task}__{method}", episode)
     return {
         "task": task,
         "episode": episode,
@@ -2813,6 +2900,7 @@ def api_libero_training_monitor(task, episode, method=None):
         "annotations": ann,
         "reconstruction": None,
         "annotation_task_key": f"libero_training__{task}__{method}",
+        "annotator": _safe_annotator(annotator),
     }
 
 
@@ -3043,7 +3131,8 @@ class Handler(BaseHTTPRequestHandler):
             episode = qs.get("episode", [None])[0]
             if not task or episode is None:
                 return self._send_json({"error": "missing task/episode"}, 400)
-            result = api_episode(task, int(episode))
+            annotator = qs.get("annotator", [None])[0]
+            result = api_episode(task, int(episode), annotator=annotator)
             status = result[1] if isinstance(result, tuple) else 200
             body = result[0] if isinstance(result, tuple) else result
             return self._send_json(body, status)
@@ -3069,16 +3158,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json(api_libero_training_tasks(method=method))
             return self._send_json(api_training_tasks())
 
+        if parsed.path == "/api/annotators":
+            return self._send_json({"annotators": list_annotators(), "default": DEFAULT_ANNOTATOR})
+
         if parsed.path == "/api/td_episodes":
             sim = qs.get("sim", ["robocasa"])[0]
             task = qs.get("task", [None])[0]
             if not task:
                 return self._send_json({"error": "missing task"}, 400)
             property_filter = qs.get("property", [None])[0] or None
+            annotator = qs.get("annotator", [None])[0]
             if sim == "libero":
                 method = qs.get("method", [None])[0]
-                return self._send_json(api_libero_training_episodes(task, method=method, property_filter=property_filter))
-            return self._send_json(api_training_episodes(task, property_filter=property_filter))
+                return self._send_json(api_libero_training_episodes(task, method=method, property_filter=property_filter, annotator=annotator))
+            return self._send_json(api_training_episodes(task, property_filter=property_filter, annotator=annotator))
 
         if parsed.path == "/api/training_ltl_properties":
             sim = qs.get("sim", ["robocasa"])[0]
@@ -3089,15 +3182,16 @@ class Handler(BaseHTTPRequestHandler):
 
         if parsed.path == "/api/training_violation_counts":
             sim = qs.get("sim", ["robocasa"])[0]
+            annotator = qs.get("annotator", [None])[0]
             if sim == "libero":
                 methods, default_method = _libero_training_monitor_state()
                 method = qs.get("method", [default_method])[0]
                 if method is None or method not in methods:
                     return self._send_json({"by_task": {}, "by_property": {}})
-                return self._send_json(libero_training_violation_counts(methods[method]["dir"]))
+                return self._send_json(libero_training_violation_counts(methods[method]["dir"], annotator=annotator))
             _methods, _default_method = _training_monitor_state()
             method = qs.get("method", [_default_method])[0]
-            return self._send_json(training_violation_counts(method))
+            return self._send_json(training_violation_counts(method, annotator=annotator))
 
         if parsed.path == "/api/training_monitor":
             sim = qs.get("sim", ["robocasa"])[0]
@@ -3105,14 +3199,15 @@ class Handler(BaseHTTPRequestHandler):
             episode = qs.get("episode", [None])[0]
             if not task or episode is None:
                 return self._send_json({"error": "missing task/episode"}, 400)
+            annotator = qs.get("annotator", [None])[0]
             if sim == "libero":
                 _methods, _default_method = _libero_training_monitor_state()
                 method = qs.get("method", [_default_method])[0]
-                result = api_libero_training_monitor(task, int(episode), method=method)
+                result = api_libero_training_monitor(task, int(episode), method=method, annotator=annotator)
             else:
                 _methods, _default_method = _training_monitor_state()
                 method = qs.get("method", [_default_method])[0]
-                result = api_training_monitor(task, int(episode), method=method)
+                result = api_training_monitor(task, int(episode), method=method, annotator=annotator)
             status = result[1] if isinstance(result, tuple) else 200
             body = result[0] if isinstance(result, tuple) else result
             return self._send_json(body, status)
@@ -3164,20 +3259,29 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        if parsed.path != "/api/annotate":
-            return self.send_error(404)
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length) if length else b"{}"
         try:
             body = json.loads(raw.decode("utf-8"))
         except Exception:
             return self._send_json({"error": "bad json body"}, 400)
+
+        if parsed.path == "/api/register_annotator":
+            name = (body.get("name") or "").strip()
+            if not name:
+                return self._send_json({"error": "missing name"}, 400)
+            slug = register_annotator(name)
+            return self._send_json({"ok": True, "annotator": slug, "annotators": list_annotators()})
+
+        if parsed.path != "/api/annotate":
+            return self.send_error(404)
         task = body.get("task")
         episode = body.get("episode")
         if not task or episode is None:
             return self._send_json({"error": "missing task/episode"}, 400)
-        data = save_annotations(task, int(episode), body)
-        return self._send_json({"ok": True, "annotations": data})
+        annotator = register_annotator(body.get("annotator"))
+        data = save_annotations(annotator, task, int(episode), body)
+        return self._send_json({"ok": True, "annotations": data, "annotator": annotator})
 
 
 def main():
