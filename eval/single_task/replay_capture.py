@@ -145,62 +145,112 @@ class ReplayCapture:
         extras/dataset_meta.json. Returns the lerobot-style dataset root
         directory (pass this as the eval-side --dataset_dir), or None if no
         episodes were recorded."""
-        from robocasa.scripts.collect_demos import gather_demonstrations_as_hdf5
+        return finalize_replay_dir(self.raw_dir, self.output_dir, self.env_kwargs)
 
-        env_info = json.dumps(self.env_kwargs, default=str)
-        hdf5_dir = self.output_dir / "hdf5"
-        hdf5_dir.mkdir(parents=True, exist_ok=True)
-        hdf5_path = gather_demonstrations_as_hdf5(
-            str(self.raw_dir), str(hdf5_dir), env_info, verbose=True
-        )
-        if not hdf5_path:
-            print("ReplayCapture: no episodes recorded, nothing to finalize.")
-            return None
 
-        import h5py
+def _stub_pynput_for_headless_import():
+    """robocasa.scripts.collect_demos (the only place
+    gather_demonstrations_as_hdf5 lives) is a human-teleop CLI script --
+    importing it as a module (just to reach that one function) transitively
+    imports `robocasa.wrappers.enclosing_wall_render_wrapper`, which does
+    `from pynput.keyboard import Key, Listener` at module level. pynput's
+    keyboard backend probes for a real X/Wayland display *at import time*
+    and raises ImportError if none is found -- which is always true on a
+    headless SLURM compute node (confirmed by a real eval run's traceback:
+    `ImportError: this platform is not supported: ('failed to acquire X
+    connection: Bad display name \"\"', ...)`). We never call anything from
+    pynput (only `gather_demonstrations_as_hdf5`, a pure hdf5-writing
+    function with no UI/input dependency of its own), so pre-populating
+    sys.modules with lightweight stand-ins for the two names actually
+    imported (`Key`, `Listener`) lets the import succeed without needing a
+    real display, without editing collect_demos.py or
+    enclosing_wall_render_wrapper.py."""
+    import sys
+    import types
 
-        lerobot_dir = self.output_dir / "lerobot"
-        extras_dir = lerobot_dir / "extras"
-        extras_dir.mkdir(parents=True, exist_ok=True)
+    if "pynput" in sys.modules and "pynput.keyboard" in sys.modules:
+        return
+    pynput_mod = types.ModuleType("pynput")
+    keyboard_mod = types.ModuleType("pynput.keyboard")
+    keyboard_mod.Key = type("Key", (), {})
+    keyboard_mod.Listener = type("Listener", (), {})
+    pynput_mod.keyboard = keyboard_mod
+    sys.modules.setdefault("pynput", pynput_mod)
+    sys.modules.setdefault("pynput.keyboard", keyboard_mod)
 
-        with h5py.File(hdf5_path, "r") as f:
-            data_grp = f["data"]
-            demo_keys = sorted(data_grp.keys(), key=lambda k: int(k.split("_")[-1]))
-            for idx, demo_key in enumerate(demo_keys):
-                self._write_episode_extras(extras_dir, data_grp[demo_key], idx)
-            env_name = str(data_grp.attrs.get("env", ""))
 
-        dataset_meta = {
-            "total": len(demo_keys),
-            "env_args": {"env_name": env_name, "env_kwargs": self.env_kwargs},
-        }
-        with open(extras_dir / "dataset_meta.json", "w") as f:
-            json.dump(dataset_meta, f, indent=4, default=str)
+def finalize_replay_dir(
+    raw_dir: Path, output_dir: Path, env_kwargs: Dict[str, Any]
+) -> Optional[Path]:
+    """Consolidates a DataCollectionWrapper output directory (`raw_dir`,
+    containing one `ep_*/state_*.npz` + `model.xml` subfolder per episode --
+    see ReplayCapture.__init__) into `output_dir/lerobot/extras/<episode>/
+    {...}` + `extras/dataset_meta.json`, the layout
+    extract_privileged_from_dataset.py already reads for training data.
 
-        return lerobot_dir
+    Standalone (not a ReplayCapture method) so it can also be used to
+    finalize a run whose live rollout already completed and wrote raw
+    states to disk, but whose in-process finalize() call failed for an
+    unrelated reason (e.g. the pynput import bug this function works around)
+    -- no need to redo the actual (expensive) policy rollout to recover.
+    """
+    _stub_pynput_for_headless_import()
+    from robocasa.scripts.collect_demos import gather_demonstrations_as_hdf5
 
-    @staticmethod
-    def _write_episode_extras(extras_dir: Path, demo_group, demo_index: int) -> None:
-        """Mirrors robocasa.utils.lerobot_utils.save_extra_demo_info's file
-        layout (states.npz / ep_meta.json / model.xml.gz), built directly
-        from gather_demonstrations_as_hdf5's raw output -- see module
-        docstring for why the heavier save_extra_demo_info/
-        dataset_states_to_obs.py path isn't used here."""
-        states = demo_group["states"][:]
-        ep_meta_raw = demo_group.attrs.get("ep_meta")
-        ep_meta = json.loads(ep_meta_raw) if ep_meta_raw else {}
-        model_xml = demo_group.attrs["model_file"]
+    raw_dir = Path(raw_dir)
+    output_dir = Path(output_dir)
+    env_info = json.dumps(env_kwargs, default=str)
+    hdf5_dir = output_dir / "hdf5"
+    hdf5_dir.mkdir(parents=True, exist_ok=True)
+    hdf5_path = gather_demonstrations_as_hdf5(str(raw_dir), str(hdf5_dir), env_info, verbose=True)
+    if not hdf5_path:
+        print("ReplayCapture: no episodes recorded, nothing to finalize.")
+        return None
 
-        ep_dir = extras_dir / f"episode_{demo_index:06d}"
-        ep_dir.mkdir(parents=True, exist_ok=True)
+    import h5py
 
-        np.savez_compressed(ep_dir / "states.npz", states=states)
-        with open(ep_dir / "ep_meta.json", "w") as f:
-            json.dump(ep_meta, f, indent=4)
+    lerobot_dir = output_dir / "lerobot"
+    extras_dir = lerobot_dir / "extras"
+    extras_dir.mkdir(parents=True, exist_ok=True)
 
-        root = ET.fromstring(model_xml)
-        tree = ET.ElementTree(root)
-        ET.indent(tree, space="  ")
-        xml_bytes = ET.tostring(root, encoding="utf-8", xml_declaration=True)
-        with gzip.open(ep_dir / "model.xml.gz", "wb") as f:
-            f.write(xml_bytes)
+    with h5py.File(hdf5_path, "r") as f:
+        data_grp = f["data"]
+        demo_keys = sorted(data_grp.keys(), key=lambda k: int(k.split("_")[-1]))
+        for idx, demo_key in enumerate(demo_keys):
+            _write_episode_extras(extras_dir, data_grp[demo_key], idx)
+        env_name = str(data_grp.attrs.get("env", ""))
+
+    dataset_meta = {
+        "total": len(demo_keys),
+        "env_args": {"env_name": env_name, "env_kwargs": env_kwargs},
+    }
+    with open(extras_dir / "dataset_meta.json", "w") as f:
+        json.dump(dataset_meta, f, indent=4, default=str)
+
+    return lerobot_dir
+
+
+def _write_episode_extras(extras_dir: Path, demo_group, demo_index: int) -> None:
+    """Mirrors robocasa.utils.lerobot_utils.save_extra_demo_info's file
+    layout (states.npz / ep_meta.json / model.xml.gz), built directly
+    from gather_demonstrations_as_hdf5's raw output -- see module
+    docstring for why the heavier save_extra_demo_info/
+    dataset_states_to_obs.py path isn't used here."""
+    states = demo_group["states"][:]
+    ep_meta_raw = demo_group.attrs.get("ep_meta")
+    ep_meta = json.loads(ep_meta_raw) if ep_meta_raw else {}
+    model_xml = demo_group.attrs["model_file"]
+
+    ep_dir = extras_dir / f"episode_{demo_index:06d}"
+    ep_dir.mkdir(parents=True, exist_ok=True)
+
+    np.savez_compressed(ep_dir / "states.npz", states=states)
+    with open(ep_dir / "ep_meta.json", "w") as f:
+        json.dump(ep_meta, f, indent=4)
+
+    root = ET.fromstring(model_xml)
+    tree = ET.ElementTree(root)
+    ET.indent(tree, space="  ")
+    xml_bytes = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    with gzip.open(ep_dir / "model.xml.gz", "wb") as f:
+        f.write(xml_bytes)
