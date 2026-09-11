@@ -60,12 +60,20 @@ class MultiCameraVideoCapture:
             self._current_frames[cam].append(np.asarray(frame, dtype=np.uint8))
 
     def reset(self, *args, **kwargs):
+        # Deliberately does NOT capture a frame here. GR00T's own
+        # run_simulation() (gr00t/eval/simulation.py) calls one extra
+        # `self.env.reset()` for cleanup after the episode loop ends, right
+        # before `close()`, with no step() following it -- if reset()
+        # captured a frame, that spurious call would show up as an empty
+        # extra "episode" (confirmed by a real run: "recorded 4 episodes
+        # but expected 3" for a 3-episode rollout). Capturing only on
+        # step() means that trailing cleanup reset produces zero frames and
+        # is correctly skipped below, at the cost of not capturing the very
+        # first (pre-action) frame of each real episode.
         if any(len(v) > 0 for v in self._current_frames.values()):
             self._episode_frames.append(self._current_frames)
         self._current_frames = {cam: [] for cam in self.camera_names}
-        result = self.env.reset(*args, **kwargs)
-        self._capture_frame()
-        return result
+        return self.env.reset(*args, **kwargs)
 
     def step(self, *args, **kwargs):
         result = self.env.step(*args, **kwargs)
