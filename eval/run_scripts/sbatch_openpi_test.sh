@@ -70,10 +70,7 @@ model_variant="${OPENPI_MODEL_VARIANT:-pi0}"
 model_family="${OPENPI_MODEL_FAMILY:-pretraining}"
 video_dir="${VIDEO_OUTPUT_DIR:-${base_video_dir}/${model_variant}/${model_family}}"
 log_dir="${LOG_DIR:-${video_dir}}"
-save_privileged_info="${SAVE_PRIVILEGED_INFO:-1}"
-run_monitor="${RUN_MONITOR:-1}"
-privileged_trajectory_horizon="${PRIVILEGED_TRAJECTORY_HORIZON:-128}"
-sceneflow_root="${SCENEFLOW_ROOT:-${PROJECT_ROOT}}"
+save_replay="${SAVE_REPLAY:-1}"
 replan_steps="${REPLAN_STEPS:-5}"
 
 model_env="OPENPI_MODEL_VARIANT=${model_variant},OPENPI_MODEL_FAMILY=${model_family},OPENPI_HF_SNAPSHOT=${OPENPI_HF_SNAPSHOT},LOG_DIR=${log_dir},VIDEO_DIR=${video_dir}"
@@ -102,7 +99,7 @@ array_end=$(( ${#task_names[@]} - 1 ))
 
 sbatch_args=(
   --array="0-${array_end}" \
-  --export="ALL,TASK_LIST=${task_list},SPLIT=target,SEED=${seed},N_EPISODES=${N_EPISODES:-50},SAVE_PRIVILEGED_INFO=${save_privileged_info},RUN_MONITOR=${run_monitor},PRIVILEGED_TRAJECTORY_HORIZON=${privileged_trajectory_horizon},SCENEFLOW_ROOT=${sceneflow_root},REPLAN_STEPS=${replan_steps},${model_env}" \
+  --export="ALL,TASK_LIST=${task_list},SPLIT=target,SEED=${seed},N_EPISODES=${N_EPISODES:-50},SAVE_REPLAY=${save_replay},REPLAN_STEPS=${replan_steps},${model_env}" \
   --job-name="${job_name}" \
   --output="${output_dir}/${job_name}-slurm-%A_%a.out" \
   --error="${output_dir}/${job_name}-slurm-%A_%a.err"

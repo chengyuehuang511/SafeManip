@@ -28,7 +28,6 @@ OPENPI_ROOT="${PROJECT_ROOT}/eval/models/openpi"
 cd "${OPENPI_ROOT}"
 
 OPENPI_CONDA_ENV_NAME="${OPENPI_CONDA_ENV_NAME:-${CONDA_ENV_NAME:-openpi-robocasa}}"
-ROBOCASA_CONDA_ENV_NAME="${ROBOCASA_CONDA_ENV_NAME:-robocasa}"
 
 if [[ -f "${CONDA_SH}" ]]; then
   # shellcheck disable=SC1090
@@ -42,7 +41,7 @@ conda activate "${OPENPI_CONDA_ENV_NAME}"
 
 ROBOCASA_ROOT="${ROBOCASA_ROOT:-${PROJECT_ROOT}/eval/simulators/robocasa}"
 ROBOSUITE_ROOT="${ROBOSUITE_ROOT:-${PROJECT_ROOT}/robosuite}"
-export PYTHONPATH="${OPENPI_ROOT}:${OPENPI_ROOT}/src:${OPENPI_ROOT}/packages/openpi-client/src:${ROBOCASA_ROOT}:${ROBOSUITE_ROOT}:${PYTHONPATH:-}"
+export PYTHONPATH="${OPENPI_ROOT}:${OPENPI_ROOT}/src:${OPENPI_ROOT}/packages/openpi-client/src:${ROBOCASA_ROOT}:${ROBOSUITE_ROOT}:${PROJECT_ROOT}/eval/single_task:${PYTHONPATH:-}"
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
 if [[ -z "${MUJOCO_EGL_DEVICE_ID:-}" ]]; then
   export MUJOCO_EGL_DEVICE_ID="${CUDA_VISIBLE_DEVICES%%,*}"
@@ -74,18 +73,8 @@ SEED="${SEED:-42}"
 N_EPISODES="${N_EPISODES:-10}"
 RESIZE_SIZE="${RESIZE_SIZE:-224}"
 REPLAN_STEPS="${REPLAN_STEPS:-5}"
-SAVE_PRIVILEGED_INFO="${SAVE_PRIVILEGED_INFO:-1}"
-RUN_MONITOR="${RUN_MONITOR:-1}"
-PRIVILEGED_TRAJECTORY_HORIZON="${PRIVILEGED_TRAJECTORY_HORIZON:-128}"
-SCENEFLOW_ROOT="${SCENEFLOW_ROOT:-${PROJECT_ROOT}}"
-MONITOR_ROOT="${MONITOR_ROOT:-${SCENEFLOW_ROOT}/SafeManip/monitor}"
-if [[ ! -f "${MONITOR_ROOT}/run_monitor_on_privileged.py" ]]; then
-  if [[ -f "${SCENEFLOW_ROOT}/run_monitor_on_privileged.py" ]]; then
-    MONITOR_ROOT="${SCENEFLOW_ROOT}"
-  elif [[ -f "${SCENEFLOW_ROOT}/monitor/run_monitor_on_privileged.py" ]]; then
-    MONITOR_ROOT="${SCENEFLOW_ROOT}/monitor"
-  fi
-fi
+SAVE_REPLAY="${SAVE_REPLAY:-1}"
+SINGLE_TASK_DIR="${PROJECT_ROOT}/eval/single_task"
 OPENPI_MODEL_VARIANT="${OPENPI_MODEL_VARIANT:-pi0}"
 OPENPI_MODEL_FAMILY="${OPENPI_MODEL_FAMILY:-pretraining}"
 OPENPI_CHECKPOINT_ROOT="${OPENPI_CHECKPOINT_ROOT:-${OPENPI_ROOT}/checkpoints}"
@@ -201,7 +190,6 @@ mkdir -p "${LOG_DIR}"
 echo "Hostname: $(hostname)"
 echo "Working directory: ${OPENPI_ROOT}"
 echo "OPENPI_CONDA_ENV_NAME=${OPENPI_CONDA_ENV_NAME}"
-echo "ROBOCASA_CONDA_ENV_NAME=${ROBOCASA_CONDA_ENV_NAME}"
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-}"
 echo "MUJOCO_GL=${MUJOCO_GL}"
 echo "MUJOCO_EGL_DEVICE_ID=${MUJOCO_EGL_DEVICE_ID}"
@@ -219,10 +207,7 @@ echo "SEED=${SEED}"
 echo "N_EPISODES=${N_EPISODES}"
 echo "RESIZE_SIZE=${RESIZE_SIZE}"
 echo "REPLAN_STEPS=${REPLAN_STEPS}"
-echo "SAVE_PRIVILEGED_INFO=${SAVE_PRIVILEGED_INFO}"
-echo "RUN_MONITOR=${RUN_MONITOR}"
-echo "PRIVILEGED_TRAJECTORY_HORIZON=${PRIVILEGED_TRAJECTORY_HORIZON}"
-echo "SCENEFLOW_ROOT=${SCENEFLOW_ROOT}"
+echo "SAVE_REPLAY=${SAVE_REPLAY}"
 echo "NUMBA_DISABLE_JIT=${NUMBA_DISABLE_JIT}"
 if command -v nvidia-smi >/dev/null 2>&1; then
   nvidia-smi -L || true
@@ -285,25 +270,31 @@ if ! kill -0 "${server_pid}" 2>/dev/null; then
   exit 1
 fi
 
+# Runs eval/single_task/run_single_task_openpi.py against the PRISTINE
+# eval/models/openpi submodule (examples/robocasa/main.py's eval_env(),
+# called directly rather than via its own broken --task_soup CLI entry
+# point -- see run_single_task_openpi.py's docstring) and eval/simulators/
+# robocasa (pristine robocasa/robocasa). No monitor/privileged-info wiring
+# here (that was a *_safemanip-only addition); replayable rollout saving
+# goes through eval/single_task/replay_capture.py
+# (robosuite.wrappers.DataCollectionWrapper composed from the outside).
+# Runs in the already-activated ${OPENPI_CONDA_ENV_NAME} env directly (no
+# conda-env switch, unlike the old *_safemanip flow -- that switch existed
+# only because the monitor pipeline needed robocasa's own env).
 CLIENT_ARGS=(
-  python examples/robocasa/eval_single_task.py
-  --task "${TASK}" \
-  --split "${SPLIT}" \
-  --log-dir "${LOG_DIR}" \
-  --num-trials "${N_EPISODES}" \
-  --resize-size "${RESIZE_SIZE}" \
-  --replan-steps "${REPLAN_STEPS}" \
-  --host "127.0.0.1" \
-  --port "${PORT}" \
-  --seed "${SEED}" \
-  --privileged-trajectory-horizon "${PRIVILEGED_TRAJECTORY_HORIZON}" \
-  --sceneflow-root "${SCENEFLOW_ROOT}"
+  python "${SINGLE_TASK_DIR}/run_single_task_openpi.py"
+  --task "${TASK}"
+  --split "${SPLIT}"
+  --log_dir "${LOG_DIR}"
+  --num_trials "${N_EPISODES}"
+  --resize_size "${RESIZE_SIZE}"
+  --replan_steps "${REPLAN_STEPS}"
+  --host "127.0.0.1"
+  --port "${PORT}"
+  --seed "${SEED}"
 )
-if [[ "${SAVE_PRIVILEGED_INFO}" == "0" ]]; then
-  CLIENT_ARGS+=(--no-save-privileged-info)
-fi
-if [[ "${RUN_MONITOR}" == "0" ]]; then
-  CLIENT_ARGS+=(--no-run-monitor)
+if [[ "${SAVE_REPLAY}" == "1" ]]; then
+  CLIENT_ARGS+=(--save_replay)
 fi
 
-conda run -n "${ROBOCASA_CONDA_ENV_NAME}" "${CLIENT_ARGS[@]}"
+"${CLIENT_ARGS[@]}"

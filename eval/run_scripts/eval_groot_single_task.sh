@@ -10,6 +10,19 @@
 
 set -euo pipefail
 
+# Runs eval/single_task/run_single_task_groot.py against the PRISTINE
+# eval/models/Isaac-GR00T submodule (robocasa-benchmark/Isaac-GR00T, no
+# SafeManip additions) and eval/simulators/robocasa (pristine
+# robocasa/robocasa). This intentionally does NOT reproduce the determinism
+# env-var plumbing (GR00T_TORCH_DETERMINISTIC, GR00T_POLICY_COMPUTE_DTYPE,
+# ...) or the privileged-info/monitor wiring this script used to have --
+# none of that exists in the pristine gr00t.model.policy/gr00t.eval.simulation,
+# since it was a *_safemanip-only addition (see git history for the previous
+# version of this file if you need that feature set again). Replayable
+# rollout saving here goes through eval/single_task/replay_capture.py
+# (robosuite.wrappers.DataCollectionWrapper composed from the outside), not
+# the old privileged-info JSON path.
+
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   if [[ "$(basename "${SLURM_SUBMIT_DIR}")" == "run_scripts" ]]; then
     PROJECT_ROOT=$(cd "${SLURM_SUBMIT_DIR}/../.." && pwd)
@@ -25,6 +38,8 @@ if [[ -f "${RUN_SCRIPTS_DIR}/.local_paths.sh" ]]; then
   source "${RUN_SCRIPTS_DIR}/.local_paths.sh"
 fi
 GROOT_ROOT="${PROJECT_ROOT}/eval/models/Isaac-GR00T"
+ROBOCASA_ROOT="${ROBOCASA_ROOT:-${PROJECT_ROOT}/eval/simulators/robocasa}"
+SINGLE_TASK_DIR="${PROJECT_ROOT}/eval/single_task"
 cd "${GROOT_ROOT}"
 
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"
@@ -39,7 +54,11 @@ fi
 
 conda activate "${CONDA_ENV_NAME}"
 
-export PYTHONPATH="${GROOT_ROOT}:${PYTHONPATH:-}"
+# GROOT_ROOT first (so `import gr00t` resolves to the pristine submodule,
+# not any editable-installed fork elsewhere on this env's site-packages),
+# then ROBOCASA_ROOT (pristine robocasa), then SINGLE_TASK_DIR (so
+# run_single_task_groot.py can `import replay_capture`).
+export PYTHONPATH="${GROOT_ROOT}:${ROBOCASA_ROOT}:${SINGLE_TASK_DIR}:${PYTHONPATH:-}"
 export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-/tmp/${USER}/triton-${SLURM_JOB_ID:-local}}"
 mkdir -p "${TRITON_CACHE_DIR}"
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
@@ -72,43 +91,9 @@ if [[ -z "${PORT:-}" ]]; then
 fi
 SEED="${SEED:-42}"
 export PYTHONHASHSEED="${PYTHONHASHSEED:-${SEED}}"
-export CUBLAS_WORKSPACE_CONFIG="${CUBLAS_WORKSPACE_CONFIG-:4096:8}"
-export NVIDIA_TF32_OVERRIDE="${NVIDIA_TF32_OVERRIDE-0}"
-export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM-false}"
-export GR00T_POLICY_COMPUTE_DTYPE="${GR00T_POLICY_COMPUTE_DTYPE-float32}"
-export GR00T_POLICY_DISABLE_AUTOCAST="${GR00T_POLICY_DISABLE_AUTOCAST-1}"
-export GR00T_DISABLE_FLASH_ATTN="${GR00T_DISABLE_FLASH_ATTN-1}"
-export GR00T_SEED_PYTHON_RANDOM="${GR00T_SEED_PYTHON_RANDOM-1}"
-export GR00T_SEED_NUMPY="${GR00T_SEED_NUMPY-1}"
-export GR00T_SEED_TORCH="${GR00T_SEED_TORCH-1}"
-export GR00T_SEED_CUDA="${GR00T_SEED_CUDA-1}"
-export GR00T_CUDNN_BENCHMARK="${GR00T_CUDNN_BENCHMARK-0}"
-export GR00T_CUDNN_DETERMINISTIC="${GR00T_CUDNN_DETERMINISTIC-1}"
-export GR00T_MATMUL_ALLOW_TF32="${GR00T_MATMUL_ALLOW_TF32-0}"
-export GR00T_CUDNN_ALLOW_TF32="${GR00T_CUDNN_ALLOW_TF32-0}"
-export GR00T_TORCH_DETERMINISTIC="${GR00T_TORCH_DETERMINISTIC-1}"
-export GR00T_TORCH_DETERMINISTIC_WARN_ONLY="${GR00T_TORCH_DETERMINISTIC_WARN_ONLY-1}"
-export GR00T_PER_ACTION_SEED="${GR00T_PER_ACTION_SEED-1}"
 N_EPISODES="${N_EPISODES:-10}"
-N_ENVS="${N_ENVS:-1}"
 N_ACTION_STEPS="${N_ACTION_STEPS:-16}"
-SAVE_REPLAY_PACKAGE="${SAVE_REPLAY_PACKAGE:-1}"
-SAVE_PRIVILEGED_INFO="${SAVE_PRIVILEGED_INFO:-1}"
-RENDER_PRIVILEGED_VIDEO="${RENDER_PRIVILEGED_VIDEO:-0}"
-ISOLATE_PRIVILEGED_INFO="${ISOLATE_PRIVILEGED_INFO:-0}"
-ROLLOUT_VIDEO_SOURCE="${ROLLOUT_VIDEO_SOURCE:-obs}"
-ROLLOUT_SIM_RENDER_WARMUP_PASSES="${ROLLOUT_SIM_RENDER_WARMUP_PASSES:-0}"
-STABILIZE_ROLLOUT_VIDEO="${STABILIZE_ROLLOUT_VIDEO:-1}"
-PRIVILEGED_TRAJECTORY_HORIZON="${PRIVILEGED_TRAJECTORY_HORIZON:-128}"
-SCENEFLOW_ROOT="${SCENEFLOW_ROOT:-${PROJECT_ROOT}}"
-MONITOR_ROOT="${MONITOR_ROOT:-${SCENEFLOW_ROOT}/SafeManip/monitor}"
-if [[ ! -f "${MONITOR_ROOT}/run_monitor_on_privileged.py" ]]; then
-  if [[ -f "${SCENEFLOW_ROOT}/run_monitor_on_privileged.py" ]]; then
-    MONITOR_ROOT="${SCENEFLOW_ROOT}"
-  elif [[ -f "${SCENEFLOW_ROOT}/monitor/run_monitor_on_privileged.py" ]]; then
-    MONITOR_ROOT="${SCENEFLOW_ROOT}/monitor"
-  fi
-fi
+SAVE_REPLAY="${SAVE_REPLAY:-1}"
 
 FOUNDATION_MODEL_ROOT="${FOUNDATION_MODEL_ROOT:-${GROOT_CHECKPOINT_ROOT}/foundation_model_learning}"
 MODEL_FAMILY="${MODEL_FAMILY:-target_posttraining}"
@@ -192,63 +177,27 @@ echo "SPLIT=${SPLIT}"
 echo "VIDEO_DIR=${VIDEO_DIR}"
 echo "PORT=${PORT}"
 echo "SEED=${SEED}"
-echo "PYTHONHASHSEED=${PYTHONHASHSEED}"
-echo "CUBLAS_WORKSPACE_CONFIG=${CUBLAS_WORKSPACE_CONFIG}"
-echo "NVIDIA_TF32_OVERRIDE=${NVIDIA_TF32_OVERRIDE}"
-echo "TOKENIZERS_PARALLELISM=${TOKENIZERS_PARALLELISM}"
-echo "GR00T_POLICY_COMPUTE_DTYPE=${GR00T_POLICY_COMPUTE_DTYPE}"
-echo "GR00T_POLICY_DISABLE_AUTOCAST=${GR00T_POLICY_DISABLE_AUTOCAST}"
-echo "GR00T_DISABLE_FLASH_ATTN=${GR00T_DISABLE_FLASH_ATTN}"
-echo "GR00T_SEED_PYTHON_RANDOM=${GR00T_SEED_PYTHON_RANDOM}"
-echo "GR00T_SEED_NUMPY=${GR00T_SEED_NUMPY}"
-echo "GR00T_SEED_TORCH=${GR00T_SEED_TORCH}"
-echo "GR00T_SEED_CUDA=${GR00T_SEED_CUDA}"
-echo "GR00T_CUDNN_BENCHMARK=${GR00T_CUDNN_BENCHMARK}"
-echo "GR00T_CUDNN_DETERMINISTIC=${GR00T_CUDNN_DETERMINISTIC}"
-echo "GR00T_MATMUL_ALLOW_TF32=${GR00T_MATMUL_ALLOW_TF32}"
-echo "GR00T_CUDNN_ALLOW_TF32=${GR00T_CUDNN_ALLOW_TF32}"
-echo "GR00T_TORCH_DETERMINISTIC=${GR00T_TORCH_DETERMINISTIC}"
-echo "GR00T_TORCH_DETERMINISTIC_WARN_ONLY=${GR00T_TORCH_DETERMINISTIC_WARN_ONLY}"
-echo "GR00T_PER_ACTION_SEED=${GR00T_PER_ACTION_SEED}"
 echo "N_EPISODES=${N_EPISODES}"
-echo "N_ENVS=${N_ENVS}"
 echo "N_ACTION_STEPS=${N_ACTION_STEPS}"
-echo "SAVE_REPLAY_PACKAGE=${SAVE_REPLAY_PACKAGE}"
-echo "SAVE_PRIVILEGED_INFO=${SAVE_PRIVILEGED_INFO}"
-echo "RENDER_PRIVILEGED_VIDEO=${RENDER_PRIVILEGED_VIDEO}"
-echo "ISOLATE_PRIVILEGED_INFO=${ISOLATE_PRIVILEGED_INFO}"
-echo "ROLLOUT_VIDEO_SOURCE=${ROLLOUT_VIDEO_SOURCE}"
-echo "ROLLOUT_SIM_RENDER_WARMUP_PASSES=${ROLLOUT_SIM_RENDER_WARMUP_PASSES}"
-echo "STABILIZE_ROLLOUT_VIDEO=${STABILIZE_ROLLOUT_VIDEO}"
-echo "PRIVILEGED_TRAJECTORY_HORIZON=${PRIVILEGED_TRAJECTORY_HORIZON}"
-echo "SCENEFLOW_ROOT=${SCENEFLOW_ROOT}"
+echo "SAVE_REPLAY=${SAVE_REPLAY}"
 if command -v nvidia-smi >/dev/null 2>&1; then
   nvidia-smi -L || true
 fi
 
 EXTRA_ARGS=()
-if [[ "${SAVE_REPLAY_PACKAGE}" == "1" ]]; then
-  EXTRA_ARGS+=(--save_replay_package)
-fi
-if [[ "${SAVE_PRIVILEGED_INFO}" == "1" ]]; then
-  EXTRA_ARGS+=(--save_privileged_info)
-fi
-if [[ "${RENDER_PRIVILEGED_VIDEO}" == "1" ]]; then
-  EXTRA_ARGS+=(--render_privileged_video)
+if [[ "${SAVE_REPLAY}" == "1" ]]; then
+  EXTRA_ARGS+=(--save_replay)
 fi
 
 srun_status=0
-srun python scripts/run_single_task.py \
+srun python "${SINGLE_TASK_DIR}/run_single_task_groot.py" \
   --model_path "${MODEL_PATH}" \
   --task "${TASK}" \
   --split "${SPLIT}" \
   --video_dir "${VIDEO_DIR}" \
   --port "${PORT}" \
-  --seed "${SEED}" \
   --n_episodes "${N_EPISODES}" \
-  --n_envs "${N_ENVS}" \
   --n_action_steps "${N_ACTION_STEPS}" \
-  --privileged_trajectory_horizon "${PRIVILEGED_TRAJECTORY_HORIZON}" \
   "${EXTRA_ARGS[@]}" || srun_status="$?"
 
 exit "${srun_status}"
