@@ -56,6 +56,8 @@ submodule).
 import contextlib
 import gzip
 import json
+import os
+import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -63,7 +65,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 
 
-def _locate_env_holder(gym_env):
+def locate_env_holder(gym_env):
     """Returns `(holder, raw_env)` where `holder.env` is exactly the raw
     robocasa/robosuite Kitchen env (the object with a genuine `.sim` MuJoCo
     handle).
@@ -134,7 +136,8 @@ class ReplayCapture:
         self.raw_dir.mkdir(parents=True, exist_ok=True)
         self.env_kwargs = dict(env_kwargs)
 
-        holder_obj, raw_env = _locate_env_holder(gym_env)
+        holder_obj, raw_env = locate_env_holder(gym_env)
+        self.holder_obj = holder_obj
         self._wrapped = DataCollectionWrapper(
             raw_env, str(self.raw_dir), use_env_xml_for_reset=True
         )
@@ -180,13 +183,38 @@ def _stub_pynput_for_headless_import():
 
 
 def finalize_replay_dir(
-    raw_dir: Path, output_dir: Path, env_kwargs: Dict[str, Any]
+    raw_dir: Path,
+    output_dir: Path,
+    env_kwargs: Dict[str, Any],
+    video_dir: Optional[Path] = None,
 ) -> Optional[Path]:
     """Consolidates a DataCollectionWrapper output directory (`raw_dir`,
     containing one `ep_*/state_*.npz` + `model.xml` subfolder per episode --
     see ReplayCapture.__init__) into `output_dir/lerobot/extras/<episode>/
     {...}` + `extras/dataset_meta.json`, the layout
     extract_privileged_from_dataset.py already reads for training data.
+
+    Episode numbering: `episode_NNNNNN` is assigned by TRUE CHRONOLOGICAL
+    rollout order -- each raw episode directory is named `ep_<epoch>_<rand>`
+    by DataCollectionWrapper itself (see collect_demos.py's
+    `env.ep_directory`), so sorting those directory names by the embedded
+    epoch timestamp recovers the real order episodes were recorded in.
+    This is deliberately NOT the same as `gather_demonstrations_as_hdf5`'s
+    own internal `demo_N` numbering, which is assigned in whatever order
+    `os.listdir(raw_dir)` happens to return -- confirmed empirically (on a
+    real completed run) to be arbitrary, not chronological. Numbering by
+    true rollout order here means a `video_dir` of one video per episode
+    (also produced strictly in rollout order, one per episode, no
+    concurrency -- see gr00t/eval/simulation.py's VideoRecordingWrapper)
+    can be attached by mtime order directly, correct by construction,
+    rather than needing a separate reverse-lookup pass after the fact.
+
+    If `video_dir` is given, each episode's video (sorted by file
+    modification time, one per episode) is moved into
+    `extras/episode_NNNNNN/rollout.mp4` in the same pass -- skipped (with a
+    warning) if the video count doesn't match the episode count, rather
+    than guessing. Not needed for openpi, whose eval_env already names
+    videos `rollout_<episode_idx>_<success|failure>.mp4`.
 
     Standalone (not a ReplayCapture method) so it can also be used to
     finalize a run whose live rollout already completed and wrote raw
@@ -209,25 +237,85 @@ def finalize_replay_dir(
 
     import h5py
 
+    # Map each demo_N (hdf5 group) back to the raw episode directory it came
+    # from, via the same os.listdir(raw_dir) order gather_demonstrations_as_hdf5
+    # used internally (directory contents are unchanged since that call just
+    # returned, so this is the identical order) -- then assign the FINAL
+    # episode_NNNNNN number by each raw directory's own true creation-time
+    # order (embedded in its `ep_<epoch>_<rand>` name), not by listdir
+    # position. See the docstring above for why this distinction matters.
+    listdir_order = os.listdir(raw_dir)
+    chronological_raw_dirs = sorted(listdir_order, key=lambda name: int(name.split("_")[1]))
+    raw_name_to_final_index = {name: i for i, name in enumerate(chronological_raw_dirs)}
+
     lerobot_dir = output_dir / "lerobot"
     extras_dir = lerobot_dir / "extras"
     extras_dir.mkdir(parents=True, exist_ok=True)
 
     with h5py.File(hdf5_path, "r") as f:
         data_grp = f["data"]
-        demo_keys = sorted(data_grp.keys(), key=lambda k: int(k.split("_")[-1]))
-        for idx, demo_key in enumerate(demo_keys):
-            _write_episode_extras(extras_dir, data_grp[demo_key], idx)
+        # demo_keys, restored to the same order they were assigned in (h5py
+        # doesn't guarantee group-iteration order matches insertion order).
+        demo_keys_by_listdir_pos = sorted(data_grp.keys(), key=lambda k: int(k.split("_")[-1]))
+        if len(demo_keys_by_listdir_pos) != len(listdir_order):
+            raise RuntimeError(
+                f"finalize_replay_dir: {len(demo_keys_by_listdir_pos)} demos in the hdf5 but "
+                f"{len(listdir_order)} raw episode dirs -- gather_demonstrations_as_hdf5 must "
+                "have dropped or merged an episode; refusing to guess a mapping."
+            )
+        for listdir_pos, demo_key in enumerate(demo_keys_by_listdir_pos):
+            raw_name = listdir_order[listdir_pos]
+            final_index = raw_name_to_final_index[raw_name]
+            _write_episode_extras(extras_dir, data_grp[demo_key], final_index)
         env_name = str(data_grp.attrs.get("env", ""))
+        total_episodes = len(demo_keys_by_listdir_pos)
 
     dataset_meta = {
-        "total": len(demo_keys),
+        "total": total_episodes,
         "env_args": {"env_name": env_name, "env_kwargs": env_kwargs},
     }
     with open(extras_dir / "dataset_meta.json", "w") as f:
         json.dump(dataset_meta, f, indent=4, default=str)
 
+    if video_dir is not None:
+        _attach_episode_videos(Path(video_dir), extras_dir, total_episodes)
+
     return lerobot_dir
+
+
+def _attach_episode_videos(video_dir: Path, extras_dir: Path, num_episodes: int) -> int:
+    """Moves each episode's rollout video (recorded separately, one per
+    episode, named by a random uuid with no episode index at all -- see
+    gr00t/eval/simulation.py's VideoRecordingWrapper) into
+    `extras/episode_NNNNNN/rollout.mp4`, next to that episode's states.npz.
+
+    Correct by construction: videos are written strictly one-per-episode in
+    real time (no concurrency in the rollout loop), so sorting by file
+    modification time recovers true rollout order -- which is now exactly
+    how finalize_replay_dir numbers episode_NNNNNN too (see its docstring).
+    So video[i] (by mtime) IS episode_{i:06d}, directly, with no reverse
+    lookup through gather_demonstrations_as_hdf5's own (arbitrary) internal
+    ordering needed.
+
+    Returns the number of videos successfully attached (0 if the video
+    count doesn't match num_episodes -- refuses to guess rather than risk a
+    wrong pairing; leaves videos where they were)."""
+    videos = sorted(video_dir.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
+    if len(videos) != num_episodes:
+        print(
+            f"_attach_episode_videos: video count ({len(videos)}) != episode count "
+            f"({num_episodes}); leaving videos in {video_dir} unattached."
+        )
+        return 0
+
+    attached = 0
+    for idx, video_path in enumerate(videos):
+        dest_dir = extras_dir / f"episode_{idx:06d}"
+        if not dest_dir.is_dir():
+            continue
+        shutil.move(str(video_path), str(dest_dir / "rollout.mp4"))
+        attached += 1
+    return attached
 
 
 def _write_episode_extras(extras_dir: Path, demo_group, demo_index: int) -> None:

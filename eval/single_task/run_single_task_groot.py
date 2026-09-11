@@ -41,6 +41,7 @@ if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
 from replay_capture import ReplayCapture, capture_env_kwargs  # noqa: E402
+from video_capture import MultiCameraVideoCapture  # noqa: E402
 
 from robocasa.utils.dataset_registry_utils import get_task_horizon  # noqa: E402
 
@@ -87,6 +88,7 @@ class ReplaySimulationInferenceClient(SimulationInferenceClient):
         super().__init__(host=host, port=port)
         self.replay_root = Path(replay_root) if replay_root is not None else None
         self.replay_captures: List[ReplayCapture] = []
+        self.video_captures: List[MultiCameraVideoCapture] = []
 
     def setup_environment(self, config: SimulationConfig):
         if self.replay_root is None:
@@ -109,13 +111,16 @@ class ReplaySimulationInferenceClient(SimulationInferenceClient):
             env_kwargs = dict(captured)
 
         for sub_env in vec_env.envs:
-            self.replay_captures.append(
-                ReplayCapture(sub_env, self.replay_root, env_kwargs)
-            )
+            capture = ReplayCapture(sub_env, self.replay_root, env_kwargs)
+            self.replay_captures.append(capture)
+            # Stack the 3-camera video recorder on top of ReplayCapture's own
+            # DataCollectionWrapper (holder_obj.env is currently that
+            # wrapper) so one env.step()/reset() call drives both state and
+            # video recording together -- see video_capture.py's docstring.
+            video_capture = MultiCameraVideoCapture(capture.holder_obj.env)
+            capture.holder_obj.env = video_capture
+            self.video_captures.append(video_capture)
         return vec_env
-
-    def finalize_replays(self) -> List[Path]:
-        return [p for p in (c.finalize() for c in self.replay_captures) if p is not None]
 
 
 def run_single_task(
@@ -149,12 +154,17 @@ def run_single_task(
         simulation_client = SimulationInferenceClient(host=host, port=port)
 
     horizon = get_task_horizon(task)
+    # When save_replay is on, MultiCameraVideoCapture (stacked in
+    # ReplaySimulationInferenceClient.setup_environment) records the 3
+    # separate training-data-style camera views directly from env.sim, so
+    # GR00T's own single-blended-camera VideoRecordingWrapper is skipped
+    # entirely (video_dir=None) rather than writing a redundant extra video.
     config = SimulationConfig(
         env_name=f"robocasa/{task}",
         split=split,
         n_episodes=n_episodes,
         n_envs=1,
-        video=VideoConfig(video_dir=video_dir),
+        video=VideoConfig(video_dir=None if save_replay else video_dir),
         multistep=MultiStepConfig(n_action_steps=n_action_steps, max_episode_steps=horizon),
     )
 
@@ -165,9 +175,18 @@ def run_single_task(
 
     replay_dataset_dirs: List[str] = []
     if isinstance(simulation_client, ReplaySimulationInferenceClient):
-        replay_dataset_dirs = [str(p) for p in simulation_client.finalize_replays()]
-        for p in replay_dataset_dirs:
-            print(f"Replayable dataset written to: {p}")
+        for capture, video_capture in zip(
+            simulation_client.replay_captures, simulation_client.video_captures
+        ):
+            lerobot_dir = capture.finalize()
+            if lerobot_dir is None:
+                continue
+            replay_dataset_dirs.append(str(lerobot_dir))
+            print(f"Replayable dataset written to: {lerobot_dir}")
+            extras_dir = lerobot_dir / "extras"
+            num_episodes = len(list(extras_dir.glob("episode_*")))
+            n_videos = video_capture.finalize(extras_dir, num_episodes)
+            print(f"Wrote 3-camera videos for {n_videos}/{num_episodes} episodes.")
 
     return {
         "task": task,

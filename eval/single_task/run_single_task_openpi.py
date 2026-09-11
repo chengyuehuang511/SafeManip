@@ -51,6 +51,7 @@ if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
 from replay_capture import ReplayCapture, capture_env_kwargs  # noqa: E402
+from video_capture import MultiCameraVideoCapture  # noqa: E402
 
 
 def _load_pristine_main_module():
@@ -96,6 +97,7 @@ def run_single_task(
     main_module = _load_pristine_main_module()
 
     replay_holder: Dict[str, ReplayCapture] = {}
+    video_holder: Dict[str, MultiCameraVideoCapture] = {}
     if save_replay:
         import gymnasium as gym
 
@@ -105,7 +107,16 @@ def run_single_task(
             with capture_env_kwargs() as captured:
                 gym_env = original_make(*args, **kwargs)
                 env_kwargs = dict(captured)
-            replay_holder["capture"] = ReplayCapture(gym_env, Path(replay_dir), env_kwargs)
+            capture = ReplayCapture(gym_env, Path(replay_dir), env_kwargs)
+            replay_holder["capture"] = capture
+            # Stack the 3-camera video recorder on top of ReplayCapture's own
+            # DataCollectionWrapper, same composition as run_single_task_groot.py
+            # -- one env.step()/reset() call drives both state and video
+            # recording together. eval_env's own single-camera preview mp4s
+            # (rollout_<idx>_<success>.mp4) are left alone/untouched.
+            video_capture = MultiCameraVideoCapture(capture.holder_obj.env)
+            capture.holder_obj.env = video_capture
+            video_holder["capture"] = video_capture
             return gym_env
 
         gym.make = _patched_make
@@ -131,6 +142,10 @@ def run_single_task(
         replay_dataset_dir = replay_holder["capture"].finalize()
         if replay_dataset_dir is not None:
             print(f"Replayable dataset written to: {replay_dataset_dir}")
+            extras_dir = replay_dataset_dir / "extras"
+            num_episodes = len(list(extras_dir.glob("episode_*")))
+            n_videos = video_holder["capture"].finalize(extras_dir, num_episodes)
+            print(f"Wrote 3-camera videos for {n_videos}/{num_episodes} episodes.")
 
     # eval_env already wrote its own stats.json under log_dir/evals_1.5/<split>/<task>/<timestamp>/;
     # surface that path so callers don't have to re-derive the timestamp themselves.
