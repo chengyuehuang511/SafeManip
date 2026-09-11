@@ -213,19 +213,39 @@ robocasa's own `.gitignore`, same as any other RoboCasa checkout) -- this is
 expected and matches robocasa's own documented setup, not an accidental
 submodule edit.
 
-**Exception -- `DATASET_BASE_PATH` is set from *outside* the submodule, not
-via `macros_private.py`.** `setup_macros` only creates the private macros
-file with `DATASET_BASE_PATH = None`; robocasa's own convention is to hand-edit
-that file afterward to point at the training dataset root. This repo instead
-leaves `macros_private.py` untouched (`DATASET_BASE_PATH` stays `None`) and
-sets it from the calling process instead, via
-`eval/single_task/serve_policy_wrapper.py` (used in place of openpi's own
-`scripts/serve_policy.py` by `eval_openpi_single_task.sh`) -- it monkeypatches
-`robocasa.macros.DATASET_BASE_PATH` before `openpi.training.config`'s own
-`from robocasa.macros import DATASET_BASE_PATH` resolves it, reading the
-value from the `ROBOCASA_DATASET_BASE_PATH` env var (default
-`~/flash/datasets/robocasa`, this machine's actual RoboCasa v1.0 dataset
-location). This only matters for OpenPI checkpoint loading (it needs
+**Exception -- `DATASET_BASE_PATH` is set via a symlink, not
+`macros_private.py`, and not a Python-level patch either.** `setup_macros`
+only creates the private macros file with `DATASET_BASE_PATH = None`;
+robocasa's own convention is to hand-edit that file afterward to point at
+the training dataset root. This repo instead leaves `macros_private.py`
+untouched (`DATASET_BASE_PATH` stays `None`) and relies on robocasa's own
+documented fallback instead (`robocasa/utils/dataset_registry_utils.py`:
+when `DATASET_BASE_PATH is None`, it uses `<robocasa package
+parent>/datasets`, i.e. `eval/simulators/robocasa/datasets`) -- so
+`eval/simulators/robocasa/datasets` is a **symlink** to
+`~/flash/datasets/robocasa` (this machine's actual RoboCasa v1.0 dataset
+location):
+
+```bash
+ln -s ~/flash/datasets/robocasa eval/simulators/robocasa/datasets
+```
+
+A pure Python-level patch (`eval/single_task/serve_policy_wrapper.py`,
+which monkeypatches `robocasa.macros.DATASET_BASE_PATH` from the
+`ROBOCASA_DATASET_BASE_PATH` env var before running openpi's own
+`scripts/serve_policy.py`) was tried first and does **not** work here:
+merely `import robocasa.macros` already imports the whole `robocasa`
+package, which eagerly imports `robocasa.utils.dataset_registry` and
+computes its entire `DATASET_SOUP_REGISTRY` (baking in whatever
+`DATASET_BASE_PATH` was at that moment) as a side effect -- confirmed
+directly (`'robocasa.utils.dataset_registry' in sys.modules` is `True`
+immediately after `import robocasa.macros`, before any patch code can run).
+By the time the patch executes, the registry's paths are already frozen
+using the stale `None` fallback. `eval_openpi_single_task.sh` still routes
+through `serve_policy_wrapper.py` (harmless, and gives an
+`ROBOCASA_DATASET_BASE_PATH` override knob for whatever *does* read the
+macro dynamically), but the symlink above is what actually fixes dataset
+path resolution. This only matters for OpenPI checkpoint loading (it needs
 `DATASET_BASE_PATH` to find the training dataset's normalization stats) --
 GR00T eval doesn't read this macro at all.
 

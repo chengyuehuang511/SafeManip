@@ -63,46 +63,36 @@ from typing import Any, Dict, Optional
 import numpy as np
 
 
-def _get_raw_robocasa_env(gym_env):
-    """Walk down .unwrapped/.env to the raw robocasa/robosuite env (the
-    object with a `.sim` MuJoCo handle)."""
-    env = gym_env
-    seen = set()
-    while id(env) not in seen:
-        seen.add(id(env))
-        if hasattr(env, "sim"):
-            return env
-        nxt = getattr(env, "unwrapped", None)
-        if nxt is not None and nxt is not env:
-            env = nxt
-            continue
-        nxt = getattr(env, "env", None)
-        if nxt is not None:
-            env = nxt
-            continue
-        break
-    return None
+def _locate_env_holder(gym_env):
+    """Returns `(holder, raw_env)` where `holder.env` is exactly the raw
+    robocasa/robosuite Kitchen env (the object with a genuine `.sim` MuJoCo
+    handle).
 
+    Walks `.unwrapped` to reach the base gym.Env -- `RoboCasaGymEnv`
+    (robocasa/wrappers/gym_wrapper.py) is a plain `gym.Env`, not a
+    `gym.Wrapper`, so `.unwrapped` (which recurses through any number of
+    gym.Wrapper layers, e.g. GR00T's MultiStepWrapper/VideoRecordingWrapper,
+    or gymnasium's own TimeLimit/OrderEnforcing) always terminates there in
+    one call -- then reads its `.env` attribute directly, which
+    RoboCasaGymEnv's own step/reset/close all use unchanged.
 
-def _find_env_attr_holder(gym_env, raw_env):
-    """Find the (object, attr_name) pair whose `.env` attribute holds
-    `raw_env` directly, so ReplayCapture knows what to overwrite to splice
-    DataCollectionWrapper into the call chain."""
-    env = gym_env
-    seen = set()
-    while id(env) not in seen:
-        seen.add(id(env))
-        if getattr(env, "env", None) is raw_env:
-            return env, "env"
-        nxt = getattr(env, "unwrapped", None)
-        if nxt is not None and nxt is not env:
-            env = nxt
-            continue
-        break
-    raise RuntimeError(
-        "ReplayCapture: could not find the attribute holding the raw robocasa env "
-        "(expected some wrapper's `.env` to be it directly)."
-    )
+    Deliberately does NOT use `hasattr(obj, "sim")` as a stopping condition:
+    `RoboCasaGymEnv.__getattr__` (`return getattr(self.env, name)`) proxies
+    ANY missing attribute -- including "sim" -- down to `self.env`, so
+    `hasattr(RoboCasaGymEnv_instance, "sim")` is already True one level too
+    early, even though the real MuJoCo `.sim` handle lives on
+    `RoboCasaGymEnv_instance.env`. An earlier version of this function used
+    that check and silently mistook the wrapper itself for the raw env,
+    causing `ReplayCapture` to look for a holder of the wrapper instead of
+    the wrapper's own `.env` -- confirmed by a real eval run's traceback."""
+    base = getattr(gym_env, "unwrapped", gym_env)
+    raw_env = getattr(base, "env", None)
+    if raw_env is None or not hasattr(raw_env, "sim"):
+        raise RuntimeError(
+            "ReplayCapture: could not find the raw robocasa env -- "
+            f"gym_env.unwrapped={base!r} has no usable `.env` with `.sim`."
+        )
+    return base, raw_env
 
 
 @contextlib.contextmanager
@@ -144,17 +134,11 @@ class ReplayCapture:
         self.raw_dir.mkdir(parents=True, exist_ok=True)
         self.env_kwargs = dict(env_kwargs)
 
-        raw_env = _get_raw_robocasa_env(gym_env)
-        if raw_env is None:
-            raise RuntimeError(
-                "ReplayCapture: could not find a raw robocasa env (with `.sim`) "
-                "underneath the given gym env."
-            )
-        holder_obj, holder_attr = _find_env_attr_holder(gym_env, raw_env)
+        holder_obj, raw_env = _locate_env_holder(gym_env)
         self._wrapped = DataCollectionWrapper(
             raw_env, str(self.raw_dir), use_env_xml_for_reset=True
         )
-        setattr(holder_obj, holder_attr, self._wrapped)
+        holder_obj.env = self._wrapped
 
     def finalize(self) -> Optional[Path]:
         """Consolidate all recorded episodes into extras/<episode>/{...} +
