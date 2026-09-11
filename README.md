@@ -30,8 +30,8 @@ SafeManip/
 |   |-- simulators/
 |   |   |-- robocasa/                   # pristine upstream submodule (robocasa/robocasa)
 |   |   |-- robocasa_safemanip/         # gitignored -- fork with privileged-state export
-|   |   |-- libero/                     # pristine upstream submodule (Lifelong-Robot-Learning/LIBERO)
-|   |   `-- libero_safemanip/           # gitignored -- vendored checkout used by the monitor's LIBERO extraction path
+|   |   `-- libero/                     # pristine upstream submodule (Lifelong-Robot-Learning/LIBERO); used directly
+|   |                                     #   by the monitor's LIBERO extraction path (content-identical to upstream)
 |   |-- run_scripts/                    # Slurm launch and evaluation scripts
 |   |-- launch_groot.sh                 # GR00T evaluation launcher
 |   `-- launch_openpi.sh                # OpenPI evaluation launcher
