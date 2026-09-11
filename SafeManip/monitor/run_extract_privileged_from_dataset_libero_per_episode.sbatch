@@ -48,7 +48,7 @@ CONDA_ENV_NAME="${CONDA_ENV_NAME:-safemanip_libero}"
 source "${CONDA_SH}"
 conda activate "${CONDA_ENV_NAME}"
 
-export LIBERO_CONFIG_PATH="${LIBERO_CONFIG_PATH:-/nethome/chuang475/testnvme/projects/SafeManip/eval/simulators/libero_safemanip/.libero_config}"
+export LIBERO_CONFIG_PATH="${LIBERO_CONFIG_PATH:-/nethome/chuang475/testnvme/projects/SafeManip/eval/simulators/libero/.libero_config}"
 export PYTHONPATH="${SCRIPT_DIR}:$(dirname "${SCRIPT_DIR}")${PYTHONPATH:+:${PYTHONPATH}}"
 
 mkdir -p "${SCRIPT_DIR}/logs"

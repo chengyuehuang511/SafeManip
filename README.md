@@ -54,12 +54,12 @@ SafeManip/
 
 Privileged information export:
 
-- `eval/simulators/robocasa_safemanip/robocasa/environments/kitchen/kitchen.py`
+- `eval/simulators/robocasa/robocasa/environments/kitchen/kitchen.py`
 
 Predicate and attribute computation:
 
-- `eval/simulators/robocasa_safemanip/robocasa/environments/kitchen/attributes.py`
-- `eval/simulators/robocasa_safemanip/robocasa/environments/kitchen/predicates.py`
+- `eval/simulators/robocasa/robocasa/environments/kitchen/attributes.py`
+- `eval/simulators/robocasa/robocasa/environments/kitchen/predicates.py`
 
 Symbolic monitoring:
 
@@ -263,7 +263,7 @@ launcher:
 TASK=PackIdenticalLunches N_EPISODES=50 SEED=42 bash groot-identical.sh
 ```
 
-This calls `eval/models/Isaac-GR00T_safemanip/scripts/run_single_task_identical.py`, which takes the
+This calls `eval/models/Isaac-GR00T/scripts/run_single_task_identical.py`, which takes the
 same arguments as `run_single_task.py` but monkey-patches the environment factory
 so every reset reuses one seed. The scene is fully determined by `SEED`; changing
 `SEED` selects a different (but still single, repeated) scene. Outputs are written

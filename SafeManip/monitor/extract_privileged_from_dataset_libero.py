@@ -74,7 +74,7 @@ import numpy as np  # noqa: E402
 DEFAULT_DATASET_ROOT = "/srv/datasets/libero"
 DEFAULT_SUITES = ("libero_10", "libero_goal", "libero_object", "libero_spatial")
 LIBERO_REPO_ROOT = Path(
-    "/nethome/chuang475/testnvme/projects/SafeManip/eval/simulators/libero_safemanip"
+    "/nethome/chuang475/testnvme/projects/SafeManip/eval/simulators/libero"
 )
 THIS_DIR = Path(__file__).parent
 DEFAULT_OUTPUT_ROOT = THIS_DIR / "output" / "v22_2026-09-08_libero_baseline"

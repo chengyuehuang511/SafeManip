@@ -3,7 +3,7 @@
 `monitor/sim/robocasa/kitchen_ext.py`. Monkeypatched onto LIBERO's common
 problem-env base class (`BDDLBaseDomain`, in
 `libero/libero/envs/bddl_base_domain.py`, imported from the vendored fresh
-checkout at `/nethome/chuang475/testnvme/projects/SafeManip/eval/simulators/libero_safemanip`) so that
+checkout at `/nethome/chuang475/testnvme/projects/SafeManip/eval/simulators/libero`) so that
 `env.get_privileged_information()` works the same way at every call site
 `monitor/sim/robocasa/kitchen_ext.py`'s does for RoboCasa's `Kitchen` class.
 
