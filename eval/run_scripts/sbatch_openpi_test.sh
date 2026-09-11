@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
-PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-RUN_SCRIPTS_DIR="${PROJECT_ROOT}/run_scripts"
+PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+RUN_SCRIPTS_DIR="${PROJECT_ROOT}/eval/run_scripts"
 if [[ -f "${RUN_SCRIPTS_DIR}/.local_paths.sh" ]]; then
   # shellcheck disable=SC1091
   source "${RUN_SCRIPTS_DIR}/.local_paths.sh"
@@ -114,7 +114,7 @@ if [[ -n "${SLURM_EXCLUDE_NODES:-}" ]]; then
   sbatch_args+=(--exclude="${SLURM_EXCLUDE_NODES}")
 fi
 
-sbatch "${sbatch_args[@]}" "run_scripts/eval_openpi_single_task.sh"
+sbatch "${sbatch_args[@]}" "eval/run_scripts/eval_openpi_single_task.sh"
 
 echo "Submitted ${job_name} for ${#task_names[@]} tasks"
 echo "OpenPI selection: ${model_env}"

@@ -19,7 +19,7 @@ set -euo pipefail
 #
 # The scene is fully determined by SEED, so changing SEED selects a different
 # (but still single, repeated) scene. The varied-scene pipeline
-# (run_scripts/sbatch_groot_test.sh) is untouched.
+# (eval/run_scripts/sbatch_groot_test.sh) is untouched.
 #
 # Validate that the produced episodes really share one scene with:
 #   python SafeManip/validate_identical_scene.py \
@@ -32,13 +32,13 @@ if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
 else
   PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 fi
-RUN_SCRIPTS_DIR="${PROJECT_ROOT}/run_scripts"
+RUN_SCRIPTS_DIR="${PROJECT_ROOT}/eval/run_scripts"
 # Machine-specific paths (CONDA_SH, GROOT_CHECKPOINT_ROOT, ...) live here. See README.
 if [[ -f "${RUN_SCRIPTS_DIR}/.local_paths.sh" ]]; then
   # shellcheck disable=SC1091
   source "${RUN_SCRIPTS_DIR}/.local_paths.sh"
 fi
-GROOT_ROOT="${PROJECT_ROOT}/Isaac-GR00T"
+GROOT_ROOT="${PROJECT_ROOT}/eval/models/Isaac-GR00T"
 
 # ── USER CONFIG (override via environment) ──────────────────────────────────
 TASK="${TASK:-PackIdenticalLunches}"
@@ -54,7 +54,7 @@ VIDEO_DIR="${VIDEO_DIR:-${PROJECT_ROOT}/results/groot_identical/${MODEL_FAMILY}}
 
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"
 if [[ -z "${CONDA_SH:-}" || ! -f "${CONDA_SH}" ]]; then
-  echo "CONDA_SH is not set or does not exist. Set it in run_scripts/.local_paths.sh" >&2
+  echo "CONDA_SH is not set or does not exist. Set it in eval/run_scripts/.local_paths.sh" >&2
   exit 1
 fi
 # shellcheck disable=SC1090
@@ -85,7 +85,7 @@ PORT="${PORT:-$((5555 + (${SLURM_JOB_ID:-0} % 20000)))}"
 
 if [[ ! -d "${MODEL_PATH}" ]]; then
   echo "MODEL_PATH does not exist or is not a directory: ${MODEL_PATH}" >&2
-  echo "Set MODEL_PATH directly, or GROOT_CHECKPOINT_ROOT in run_scripts/.local_paths.sh" >&2
+  echo "Set MODEL_PATH directly, or GROOT_CHECKPOINT_ROOT in eval/run_scripts/.local_paths.sh" >&2
   exit 1
 fi
 

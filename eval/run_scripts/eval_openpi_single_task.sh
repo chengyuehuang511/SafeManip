@@ -12,19 +12,19 @@ set -euo pipefail
 
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   if [[ "$(basename "${SLURM_SUBMIT_DIR}")" == "run_scripts" ]]; then
-    PROJECT_ROOT=$(cd "${SLURM_SUBMIT_DIR}/.." && pwd)
+    PROJECT_ROOT=$(cd "${SLURM_SUBMIT_DIR}/../.." && pwd)
   else
     PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
   fi
 else
-  PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+  PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 fi
-RUN_SCRIPTS_DIR="${PROJECT_ROOT}/run_scripts"
+RUN_SCRIPTS_DIR="${PROJECT_ROOT}/eval/run_scripts"
 if [[ -f "${RUN_SCRIPTS_DIR}/.local_paths.sh" ]]; then
   # shellcheck disable=SC1091
   source "${RUN_SCRIPTS_DIR}/.local_paths.sh"
 fi
-OPENPI_ROOT="${PROJECT_ROOT}/openpi"
+OPENPI_ROOT="${PROJECT_ROOT}/eval/models/openpi"
 cd "${OPENPI_ROOT}"
 
 OPENPI_CONDA_ENV_NAME="${OPENPI_CONDA_ENV_NAME:-${CONDA_ENV_NAME:-openpi-robocasa}}"
@@ -40,7 +40,7 @@ fi
 
 conda activate "${OPENPI_CONDA_ENV_NAME}"
 
-ROBOCASA_ROOT="${ROBOCASA_ROOT:-${PROJECT_ROOT}/robocasa}"
+ROBOCASA_ROOT="${ROBOCASA_ROOT:-${PROJECT_ROOT}/eval/simulators/robocasa}"
 ROBOSUITE_ROOT="${ROBOSUITE_ROOT:-${PROJECT_ROOT}/robosuite}"
 export PYTHONPATH="${OPENPI_ROOT}:${OPENPI_ROOT}/src:${OPENPI_ROOT}/packages/openpi-client/src:${ROBOCASA_ROOT}:${ROBOSUITE_ROOT}:${PYTHONPATH:-}"
 export MUJOCO_GL="${MUJOCO_GL:-egl}"

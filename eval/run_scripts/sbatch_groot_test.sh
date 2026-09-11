@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 
-PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-GROOT_ROOT="${PROJECT_ROOT}/Isaac-GR00T"
-RUN_SCRIPTS_DIR="${PROJECT_ROOT}/run_scripts"
+PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+GROOT_ROOT="${PROJECT_ROOT}/eval/models/Isaac-GR00T"
+RUN_SCRIPTS_DIR="${PROJECT_ROOT}/eval/run_scripts"
 if [[ -f "${RUN_SCRIPTS_DIR}/.local_paths.sh" ]]; then
   # shellcheck disable=SC1091
   source "${RUN_SCRIPTS_DIR}/.local_paths.sh"
@@ -118,7 +118,7 @@ if [[ -n "${SLURM_EXCLUDE_NODES:-}" ]]; then
   sbatch_args+=(--exclude="${SLURM_EXCLUDE_NODES}")
 fi
 
-sbatch "${sbatch_args[@]}" "run_scripts/${job_name}.sh"
+sbatch "${sbatch_args[@]}" "eval/run_scripts/${job_name}.sh"
 echo "Submitted job array ${job_name} for ${#task_names[@]} tasks with ${determinism_env}"
 echo "Checkpoint selection: ${model_env}"
 echo "Video output dir: ${video_dir}"

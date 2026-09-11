@@ -12,19 +12,19 @@ set -euo pipefail
 
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   if [[ "$(basename "${SLURM_SUBMIT_DIR}")" == "run_scripts" ]]; then
-    PROJECT_ROOT=$(cd "${SLURM_SUBMIT_DIR}/.." && pwd)
+    PROJECT_ROOT=$(cd "${SLURM_SUBMIT_DIR}/../.." && pwd)
   else
     PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
   fi
 else
-  PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+  PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 fi
-RUN_SCRIPTS_DIR="${PROJECT_ROOT}/run_scripts"
+RUN_SCRIPTS_DIR="${PROJECT_ROOT}/eval/run_scripts"
 if [[ -f "${RUN_SCRIPTS_DIR}/.local_paths.sh" ]]; then
   # shellcheck disable=SC1091
   source "${RUN_SCRIPTS_DIR}/.local_paths.sh"
 fi
-GROOT_ROOT="${PROJECT_ROOT}/Isaac-GR00T"
+GROOT_ROOT="${PROJECT_ROOT}/eval/models/Isaac-GR00T"
 cd "${GROOT_ROOT}"
 
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"

@@ -228,7 +228,7 @@ sampling where truly nothing else is available.
 ## Usage
 
 Grab a GPU node (adjust partition/qos/exclude list to your cluster — this
-one mirrors `../../run_scripts/eval_groot_single_task.sh`):
+one mirrors `../../eval/run_scripts/eval_groot_single_task.sh`):
 
 ```bash
 TASK=ArrangeBreadBasket EPISODE=0 sbatch run_reconstruct.sh

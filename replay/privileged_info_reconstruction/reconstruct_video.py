@@ -28,7 +28,7 @@ IMPORTANT: this must be run inside the `robocasa` conda env, on a machine/
 node with a working GPU (MUJOCO_GL=egl) — env.reset() hangs indefinitely on
 a CPU-only login node, with either egl or osmesa. See run_reconstruct.sh for
 an sbatch wrapper, or grab an interactive GPU node first (e.g. see
-../run_scripts/eval_groot_single_task.sh for the resource shape this repo
+../eval/run_scripts/eval_groot_single_task.sh for the resource shape this repo
 uses, or your own equivalent of `salloc -p ... --qos debug --gpus-per-node=1`).
 
 IMPORTANT: do not run this with your shell's cwd set to the SafeManip repo

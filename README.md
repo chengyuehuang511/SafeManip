@@ -18,12 +18,23 @@ For full details, see the paper: **[SafeManip: A Property-Driven Benchmark for T
 
 ```text
 SafeManip/
-|-- Isaac-GR00T/              # GR00T policy and evaluation integration
-|   `-- scripts/
-|       |-- run_single_task.py           # Single-task GR00T eval entry point
-|       `-- run_single_task_identical.py # Fixed-scene variant (seed-locked reset)
-|-- openpi/                   # OpenPI policy and evaluation integration
-|-- robocasa/                 # RoboCasa fork with privileged-state export
+|-- eval/
+|   |-- models/
+|   |   |-- Isaac-GR00T/                # GR00T policy+eval, pristine upstream submodule (robocasa-benchmark/Isaac-GR00T)
+|   |   |-- Isaac-GR00T_safemanip/      # gitignored -- fork with the working eval-pipeline additions:
+|   |   |   `-- scripts/
+|   |   |       |-- run_single_task.py           # Single-task GR00T eval entry point
+|   |   |       `-- run_single_task_identical.py # Fixed-scene variant (seed-locked reset)
+|   |   |-- openpi/                     # OpenPI policy+eval, pristine upstream submodule (robocasa-benchmark/openpi)
+|   |   `-- openpi_safemanip/           # gitignored -- fork with the working eval-pipeline additions
+|   |-- simulators/
+|   |   |-- robocasa/                   # pristine upstream submodule (robocasa/robocasa)
+|   |   |-- robocasa_safemanip/         # gitignored -- fork with privileged-state export
+|   |   |-- libero/                     # pristine upstream submodule (Lifelong-Robot-Learning/LIBERO)
+|   |   `-- libero_safemanip/           # gitignored -- vendored checkout used by the monitor's LIBERO extraction path
+|   |-- run_scripts/                    # Slurm launch and evaluation scripts
+|   |-- launch_groot.sh                 # GR00T evaluation launcher
+|   `-- launch_openpi.sh                # OpenPI evaluation launcher
 |-- SafeManip/
 |   |-- monitor/              # Symbolic monitor, predicates, LTL/DFA logic
 |   |-- analysis/             # Post-evaluation analysis scripts
@@ -32,10 +43,7 @@ SafeManip/
 |   |   `-- predicate_ltl_design/
 |   |-- validate_identical_scene.py  # Checks fixed-scene rollouts share one scene
 |   `-- install_mona.sh       # MONA installer for DFA construction
-|-- run_scripts/              # Slurm launch and evaluation scripts
 |-- examples/                 # Qualitative safety-category videos and monitor outputs
-|-- launch_groot.sh           # GR00T evaluation launcher
-|-- launch_openpi.sh          # OpenPI evaluation launcher
 |-- groot-identical.sh        # Fixed-scene ("identical episode") GR00T launcher
 |-- requirements.txt          # Pinned dependency snapshot (alternative to install.sh)
 |-- install_flash_attn.sh     # Helper to build/install flash-attn
@@ -46,12 +54,12 @@ SafeManip/
 
 Privileged information export:
 
-- `robocasa/robocasa/environments/kitchen/kitchen.py`
+- `eval/simulators/robocasa_safemanip/robocasa/environments/kitchen/kitchen.py`
 
 Predicate and attribute computation:
 
-- `robocasa/robocasa/environments/kitchen/attributes.py`
-- `robocasa/robocasa/environments/kitchen/predicates.py`
+- `eval/simulators/robocasa_safemanip/robocasa/environments/kitchen/attributes.py`
+- `eval/simulators/robocasa_safemanip/robocasa/environments/kitchen/predicates.py`
 
 Symbolic monitoring:
 
@@ -63,10 +71,10 @@ Symbolic monitoring:
 
 Evaluation entry points:
 
-- `run_scripts/sbatch_groot_test.sh`
-- `run_scripts/eval_groot_single_task.sh`
-- `run_scripts/sbatch_openpi_test.sh`
-- `run_scripts/eval_openpi_single_task.sh`
+- `eval/run_scripts/sbatch_groot_test.sh`
+- `eval/run_scripts/eval_groot_single_task.sh`
+- `eval/run_scripts/sbatch_openpi_test.sh`
+- `eval/run_scripts/eval_openpi_single_task.sh`
 
 Specification and design notes:
 
@@ -74,6 +82,15 @@ Specification and design notes:
 - `SafeManip/docs/predicate_ltl_design/`
 
 ## Installation
+
+> **⚠️ Paths below need re-verification.** `Isaac-GR00T`/`openpi`/`robocasa` at repo root
+> are now pristine upstream git submodules (no eval-pipeline or privileged-state additions);
+> the working fork code has moved to `eval/models/Isaac-GR00T_safemanip`,
+> `eval/models/openpi_safemanip`, and `eval/simulators/robocasa_safemanip` (all gitignored).
+> The editable-install commands below (`pip install -e ./Isaac-GR00T`, `pip install -e
+> robocasa`, `cd Isaac-GR00T && pip install -e .`, etc.) still reference the old bare
+> top-level paths and have not yet been updated to point at the `*_safemanip` copies or the
+> new submodules -- confirm which one you actually want installed before running them.
 
 Use a Python environment compatible with the policy stack being evaluated. The evaluation stack uses local editable installs so that the RoboCasa privileged-state changes and policy integration code are picked up directly from this repository.
 
@@ -182,7 +199,7 @@ bash install.sh --with-openpi
 Machine-specific paths, checkpoint locations, and scheduler settings should be placed in:
 
 ```bash
-run_scripts/.local_paths.sh
+eval/run_scripts/.local_paths.sh
 ```
 
 This file is ignored by git. A minimal template is:
@@ -205,7 +222,7 @@ export SLURM_EXCLUDE_NODES="<node1,node2>"
 GR00T evaluations:
 
 ```bash
-bash launch_groot.sh
+bash eval/launch_groot.sh
 ```
 
 The launcher submits the configured task list for these model families:
@@ -218,22 +235,22 @@ The launcher submits the configured task list for these model families:
 To submit a single GR00T model family:
 
 ```bash
-MODEL_FAMILY=target_posttraining N_EPISODES=50 bash run_scripts/sbatch_groot_test.sh
+MODEL_FAMILY=target_posttraining N_EPISODES=50 bash eval/run_scripts/sbatch_groot_test.sh
 ```
 
 OpenPI evaluations:
 
 ```bash
-bash launch_openpi.sh
+bash eval/launch_openpi.sh
 ```
 
 To submit a single OpenPI variant:
 
 ```bash
-OPENPI_MODEL_VARIANT=pi0 OPENPI_MODEL_FAMILY=pretraining N_EPISODES=50 bash run_scripts/sbatch_openpi_test.sh
+OPENPI_MODEL_VARIANT=pi0 OPENPI_MODEL_FAMILY=pretraining N_EPISODES=50 bash eval/run_scripts/sbatch_openpi_test.sh
 ```
 
-Task lists are defined in `run_scripts/sbatch_groot_test.sh` and `run_scripts/sbatch_openpi_test.sh`.
+Task lists are defined in `eval/run_scripts/sbatch_groot_test.sh` and `eval/run_scripts/sbatch_openpi_test.sh`.
 
 ## Fixed-Scene (Identical Episode) Evaluation
 
@@ -246,12 +263,12 @@ launcher:
 TASK=PackIdenticalLunches N_EPISODES=50 SEED=42 bash groot-identical.sh
 ```
 
-This calls `Isaac-GR00T/scripts/run_single_task_identical.py`, which takes the
+This calls `eval/models/Isaac-GR00T_safemanip/scripts/run_single_task_identical.py`, which takes the
 same arguments as `run_single_task.py` but monkey-patches the environment factory
 so every reset reuses one seed. The scene is fully determined by `SEED`; changing
 `SEED` selects a different (but still single, repeated) scene. Outputs are written
 under `results/groot_identical/<model_family>/`. Checkpoint, conda, and scheduler
-settings are resolved from `run_scripts/.local_paths.sh` exactly as for the other
+settings are resolved from `eval/run_scripts/.local_paths.sh` exactly as for the other
 launchers (override `MODEL_PATH`, `TASK`, `SPLIT`, `N_EPISODES`, `SEED`, `VIDEO_DIR`
 via the environment).
 
@@ -324,7 +341,7 @@ During GR00T and OpenPI evaluations, monitor files are generated automatically w
 
 The following are intentionally ignored:
 
-- `run_scripts/.local_paths.sh`
+- `eval/run_scripts/.local_paths.sh`
 - `logs/`
 - `results/`
 - generated videos, checkpoints, caches, and Python build artifacts
