@@ -2,7 +2,7 @@
 #SBATCH --job-name=eval_groot_single_task
 #SBATCH --nodes=1
 #SBATCH --cpus-per-gpu=16
-#SBATCH --gpus-per-node="l40s:1"
+#SBATCH --gpus-per-node="a40:1"
 #SBATCH --qos="short"
 #SBATCH --mem-per-gpu=45G
 #SBATCH --time=24:00:00

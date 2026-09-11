@@ -214,7 +214,13 @@ if command -v nvidia-smi >/dev/null 2>&1; then
 fi
 
 server_log="${LOG_DIR}/server-${SLURM_JOB_ID:-local}-${SLURM_ARRAY_TASK_ID:-0}.log"
-python scripts/serve_policy.py \
+# serve_policy_wrapper.py (not scripts/serve_policy.py directly) -- sets
+# robocasa.macros.DATASET_BASE_PATH from the outside before serve_policy.py's
+# own openpi.training.config import resolves it, without writing a
+# macros_private.py into the pristine robocasa submodule. See that wrapper's
+# docstring for why a plain env var isn't enough here.
+ROBOCASA_DATASET_BASE_PATH="${ROBOCASA_DATASET_BASE_PATH:-${HOME}/flash/datasets/robocasa}" \
+python "${SINGLE_TASK_DIR}/serve_policy_wrapper.py" \
   --port="${PORT}" \
   policy:checkpoint \
   --policy.config="${OPENPI_CONFIG}" \

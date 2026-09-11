@@ -194,6 +194,41 @@ The equivalent helper command is:
 bash install.sh --with-openpi
 ```
 
+### Pristine `eval/simulators/robocasa` submodule setup (one-time, per checkout)
+
+`eval/simulators/robocasa` is a plain `git submodule` of upstream `robocasa/robocasa`
+with none of the asset binaries or local machine config a working RoboCasa
+checkout normally has -- both are one-time setup steps documented in
+robocasa's own README, run inside the `robocasa` conda env with
+`PYTHONPATH=.../eval/simulators/robocasa`:
+
+```bash
+cd eval/simulators/robocasa
+python -m robocasa.scripts.setup_macros              # creates robocasa/macros_private.py
+python -m robocasa.scripts.download_kitchen_assets   # ~10GB of object/texture/fixture binaries
+```
+
+Both write into `eval/simulators/robocasa/robocasa/` itself (gitignored by
+robocasa's own `.gitignore`, same as any other RoboCasa checkout) -- this is
+expected and matches robocasa's own documented setup, not an accidental
+submodule edit.
+
+**Exception -- `DATASET_BASE_PATH` is set from *outside* the submodule, not
+via `macros_private.py`.** `setup_macros` only creates the private macros
+file with `DATASET_BASE_PATH = None`; robocasa's own convention is to hand-edit
+that file afterward to point at the training dataset root. This repo instead
+leaves `macros_private.py` untouched (`DATASET_BASE_PATH` stays `None`) and
+sets it from the calling process instead, via
+`eval/single_task/serve_policy_wrapper.py` (used in place of openpi's own
+`scripts/serve_policy.py` by `eval_openpi_single_task.sh`) -- it monkeypatches
+`robocasa.macros.DATASET_BASE_PATH` before `openpi.training.config`'s own
+`from robocasa.macros import DATASET_BASE_PATH` resolves it, reading the
+value from the `ROBOCASA_DATASET_BASE_PATH` env var (default
+`~/flash/datasets/robocasa`, this machine's actual RoboCasa v1.0 dataset
+location). This only matters for OpenPI checkpoint loading (it needs
+`DATASET_BASE_PATH` to find the training dataset's normalization stats) --
+GR00T eval doesn't read this macro at all.
+
 ## Local Configuration
 
 Machine-specific paths, checkpoint locations, and scheduler settings should be placed in:
