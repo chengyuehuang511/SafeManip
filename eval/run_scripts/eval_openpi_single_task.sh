@@ -78,7 +78,15 @@ SINGLE_TASK_DIR="${PROJECT_ROOT}/eval/single_task"
 OPENPI_MODEL_VARIANT="${OPENPI_MODEL_VARIANT:-pi0}"
 OPENPI_MODEL_FAMILY="${OPENPI_MODEL_FAMILY:-pretraining}"
 OPENPI_CHECKPOINT_ROOT="${OPENPI_CHECKPOINT_ROOT:-${OPENPI_ROOT}/checkpoints}"
-LOG_DIR="${LOG_DIR:-${OPENPI_ROOT}/logs/eval/${OPENPI_MODEL_VARIANT}/${OPENPI_MODEL_FAMILY}}"
+# Always nested by TASK: eval_env's own stats.json/videos already nest by
+# env_name internally (evals_1.5/<split>/<env_name>/<timestamp>/), but our
+# own --replay_dir defaults to <log_dir>/replay with NO task nesting -- in
+# a --array sweep (one LOG_DIR value per model variant/family, not per
+# task) every array index would collide on the same replay output dir
+# without this. Confirmed as a real bug (caught before any job actually
+# ran) rather than assumed -- see the identical fix in
+# eval_groot_single_task.sh's VIDEO_DIR.
+LOG_DIR="${LOG_DIR:-${OPENPI_ROOT}/logs/eval/${OPENPI_MODEL_VARIANT}/${OPENPI_MODEL_FAMILY}}/${TASK}"
 if [[ -z "${PORT:-}" ]]; then
   PORT="$((8000 + (${SLURM_JOB_ID:-0} % 20000)))"
 fi

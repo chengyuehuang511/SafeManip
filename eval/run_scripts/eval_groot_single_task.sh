@@ -2,7 +2,12 @@
 #SBATCH --job-name=eval_groot_single_task
 #SBATCH --nodes=1
 #SBATCH --cpus-per-gpu=16
-#SBATCH --gpus-per-node="a40:1"
+# l40s here is the default for direct/standalone submission (quick debug
+# runs); sbatch_groot_test.sh (the full-sweep launcher used by
+# launch_groot.sh) overrides this to a40 via --gpus-per-node on the sbatch
+# CLI (which takes precedence over this #SBATCH directive) -- see GPU_TYPE
+# there.
+#SBATCH --gpus-per-node="l40s:1"
 #SBATCH --qos="short"
 #SBATCH --mem-per-gpu=45G
 #SBATCH --time=24:00:00
@@ -85,7 +90,12 @@ TASK="${TASK:-PrepareCoffee}"
 SPLIT="${SPLIT:-target}"
 TASK_SET="${TASK_SET:-}"
 MODEL_PATH="${MODEL_PATH:-}"
-VIDEO_DIR="${VIDEO_DIR:-${GROOT_ROOT}/videos_single_task}"
+# Always nested by TASK: sbatch_groot_test.sh's VIDEO_DIR is shared across
+# every task in a --array sweep (one value per model family, not per task),
+# so without this every array index would collide on the same output dir --
+# confirmed as a real bug (caught before any job actually ran) rather than
+# assumed.
+VIDEO_DIR="${VIDEO_DIR:-${GROOT_ROOT}/videos_single_task}/${TASK}"
 if [[ -z "${PORT:-}" ]]; then
   PORT="$((5555 + (${SLURM_JOB_ID:-0} % 20000)))"
 fi
