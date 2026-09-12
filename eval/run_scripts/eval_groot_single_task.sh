@@ -68,7 +68,15 @@ export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-/tmp/${USER}/triton-${SLURM_JOB_ID:
 mkdir -p "${TRITON_CACHE_DIR}"
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
 if [[ -z "${MUJOCO_EGL_DEVICE_ID:-}" ]]; then
-  export MUJOCO_EGL_DEVICE_ID="${CUDA_VISIBLE_DEVICES%%,*}"
+  # ${CUDA_VISIBLE_DEVICES:-0} (not a bare ${CUDA_VISIBLE_DEVICES%%,*}): under
+  # `set -u`, some nodes' Slurm GPU cgroup constraint doesn't export
+  # CUDA_VISIBLE_DEVICES at all (rather than leaving it empty) when the job
+  # only sees one GPU device-node -- confirmed by a real sweep failure
+  # ("line 47: CUDA_VISIBLE_DEVICES: unbound variable") that killed 7
+  # array tasks outright before the policy server even started (in
+  # eval_openpi_single_task.sh; this script has the identical pattern).
+  export MUJOCO_EGL_DEVICE_ID="${CUDA_VISIBLE_DEVICES:-0}"
+  export MUJOCO_EGL_DEVICE_ID="${MUJOCO_EGL_DEVICE_ID%%,*}"
 fi
 export MUJOCO_EGL_DEVICE_ID="${MUJOCO_EGL_DEVICE_ID:-0}"
 
