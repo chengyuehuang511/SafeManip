@@ -117,7 +117,9 @@ class ReplaySimulationInferenceClient(SimulationInferenceClient):
             # DataCollectionWrapper (holder_obj.env is currently that
             # wrapper) so one env.step()/reset() call drives both state and
             # video recording together -- see video_capture.py's docstring.
-            video_capture = MultiCameraVideoCapture(capture.holder_obj.env)
+            video_capture = MultiCameraVideoCapture(
+                capture.holder_obj.env, capture.output_dir / "lerobot"
+            )
             capture.holder_obj.env = video_capture
             self.video_captures.append(video_capture)
         return vec_env

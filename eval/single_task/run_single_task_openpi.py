@@ -114,7 +114,9 @@ def run_single_task(
             # -- one env.step()/reset() call drives both state and video
             # recording together. eval_env's own single-camera preview mp4s
             # (rollout_<idx>_<success>.mp4) are left alone/untouched.
-            video_capture = MultiCameraVideoCapture(capture.holder_obj.env)
+            video_capture = MultiCameraVideoCapture(
+                capture.holder_obj.env, capture.output_dir / "lerobot"
+            )
             capture.holder_obj.env = video_capture
             video_holder["capture"] = video_capture
             return gym_env
