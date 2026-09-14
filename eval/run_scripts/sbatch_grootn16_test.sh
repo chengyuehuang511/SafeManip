@@ -82,7 +82,7 @@ gpu_type="${GPU_TYPE:-a40}"
 
 sbatch_args=(
   --array="0-${array_end}" \
-  --export="ALL,SPLIT=target,TASK_LIST=${task_list},VIDEO_DIR=${video_dir},${run_env}" \
+  --export="ALL,SPLIT=${SPLIT:-target},TASK_LIST=${task_list},VIDEO_DIR=${video_dir},${run_env}" \
   --job-name="${job_name}" \
   --gpus-per-node="${gpu_type}:1" \
   --output="${output_dir}/${job_name}-slurm-%A_%a.out" \

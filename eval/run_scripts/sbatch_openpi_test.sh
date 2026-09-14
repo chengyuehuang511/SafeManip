@@ -99,7 +99,7 @@ array_end=$(( ${#task_names[@]} - 1 ))
 
 sbatch_args=(
   --array="0-${array_end}" \
-  --export="ALL,TASK_LIST=${task_list},SPLIT=target,SEED=${seed},N_EPISODES=${N_EPISODES:-50},SAVE_REPLAY=${save_replay},REPLAN_STEPS=${replan_steps},${model_env}" \
+  --export="ALL,TASK_LIST=${task_list},SPLIT=${SPLIT:-target},SEED=${seed},N_EPISODES=${N_EPISODES:-50},SAVE_REPLAY=${save_replay},REPLAN_STEPS=${replan_steps},${model_env}" \
   --job-name="${job_name}" \
   --output="${output_dir}/${job_name}-slurm-%A_%a.out" \
   --error="${output_dir}/${job_name}-slurm-%A_%a.err"
