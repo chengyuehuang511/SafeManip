@@ -12,10 +12,25 @@ set -euo pipefail
 
 # Runs eval/single_task/run_libero_suite_openpi.py against the PRISTINE
 # eval/models/openpi submodule's own examples/libero/main.py, unmodified.
-# Reuses eval/simulators/libero (the same shared LIBERO submodule, not
-# openpi's own uninitialized third_party/libero) on PYTHONPATH, matching
-# the "one shared upstream submodule per simulator" pattern already used
-# for robocasa across all the RoboCasa-benchmark models.
+#
+# Uses eval/simulators/libero_openpi, a DEDICATED, standalone submodule
+# pinned at f78abd68ee283de9f9be3c8f7e2a9ad60246e95c (Dec 2023) to exactly
+# match openpi's own third_party/libero pin -- NOT the shared
+# eval/simulators/libero submodule (currently pinned Mar 2025). Unlike
+# robocasa, where all models happened to pin compatible versions, LIBERO
+# has a documented history of eval numbers not reproducing across versions
+# (e.g. openvla's LIBERO results are known to shift with newer LIBERO
+# releases), and openpi's own pin is ~15 months older than our shared
+# submodule's. Deliberately NOT initializing openpi's own nested
+# third_party/libero submodule in place (that would leave files checked
+# out inside eval/models/openpi's own working tree, which we don't touch,
+# same as grootn16/RLDX-1's own nested robocasa forks are left
+# uninitialized) -- this is a separate clone of the identical pinned
+# commit, registered as its own top-level submodule instead.
+# RLDX-1's LIBERO eval, by contrast, DOES reuse the shared eval/simulators/
+# libero submodule -- confirmed via `diff -rq` to be content-identical to
+# RLDX-1's own vendored external_dependencies/LIBERO copy, so no version
+# drift there. See eval/EVAL_PROTOCOL_NOTES.md.
 #
 # Hyperparameters (resize_size=224, replan_steps=5, num_steps_wait=10,
 # num_trials_per_task=50, seed=7) are openpi's own official defaults from
@@ -36,7 +51,7 @@ if [[ -f "${RUN_SCRIPTS_DIR}/.local_paths.sh" ]]; then
   source "${RUN_SCRIPTS_DIR}/.local_paths.sh"
 fi
 OPENPI_ROOT="${PROJECT_ROOT}/eval/models/openpi"
-LIBERO_ROOT="${LIBERO_ROOT:-${PROJECT_ROOT}/eval/simulators/libero}"
+LIBERO_ROOT="${LIBERO_ROOT:-${PROJECT_ROOT}/eval/simulators/libero_openpi}"
 SINGLE_TASK_DIR="${PROJECT_ROOT}/eval/single_task"
 cd "${OPENPI_ROOT}"
 
