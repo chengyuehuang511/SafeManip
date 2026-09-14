@@ -51,8 +51,13 @@ def run_single_task(
 
     env_name = f"robocasa/{task}"
     if max_episode_steps is None:
-        # See run_single_task_grootn16.py for why this uses robocasa's own
-        # per-task horizon instead of a flat default.
+        # RLDX-1's own eval_robocasa365.sh uses a shorter, custom per-task
+        # horizon table (task_sets.yaml) instead of robocasa's own
+        # get_task_horizon() -- considered matching it exactly, but decided
+        # this particular knob isn't worth chasing; using robocasa's own
+        # per-task horizon here keeps this consistent with every other
+        # model in this repo (grootn16's own run_eval.py also calls
+        # get_task_horizon() directly, so this is the majority convention).
         max_episode_steps = get_task_horizon(task)
 
     replay_holder: Dict[str, ReplayCapture] = {}
