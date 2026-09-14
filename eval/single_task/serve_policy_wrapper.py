@@ -111,8 +111,15 @@ def _clear_data_dirs_on_all_configs() -> None:
 
 def _stub_missing_convert_stats_from_repo_meta() -> None:
     """See module docstring (c). Only adds the attribute if it's actually
-    missing -- a no-op on any commit where it's already implemented."""
-    import openpi.groot_utils.groot_openpi_dataset as _groot_openpi_dataset
+    missing -- a no-op on any commit where it's already implemented, and
+    also a no-op (via the ImportError branch) on official upstream openpi,
+    which doesn't have `openpi.groot_utils` at all -- that whole module is
+    robocasa-benchmark-fork-specific plumbing this fix works around, not
+    something official openpi ever needs."""
+    try:
+        import openpi.groot_utils.groot_openpi_dataset as _groot_openpi_dataset
+    except ImportError:
+        return
 
     if not hasattr(_groot_openpi_dataset, "_convert_stats_from_repo_meta"):
         _groot_openpi_dataset._convert_stats_from_repo_meta = lambda asset_id: None

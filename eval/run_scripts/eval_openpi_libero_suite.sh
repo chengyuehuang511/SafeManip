@@ -10,8 +10,15 @@
 
 set -euo pipefail
 
-# Runs eval/single_task/run_libero_suite_openpi.py against the PRISTINE
-# eval/models/openpi submodule's own examples/libero/main.py, unmodified.
+# Runs eval/single_task/run_libero_suite_openpi.py against
+# eval/models/openpi_official's own examples/libero/main.py, unmodified.
+# Uses openpi_official (official Physical-Intelligence/openpi) rather than
+# eval/models/openpi (the robocasa-benchmark fork used for RoboCasa) --
+# confirmed byte-identical examples/libero/main.py and scripts/
+# serve_policy.py between the two, but official's src/openpi/training/
+# config.py doesn't have the robocasa-fork-only broken norm-stats fallback
+# (see serve_policy_wrapper.py's fix (c)) at all, so this is a strictly
+# cleaner reproduction for LIBERO specifically.
 #
 # Uses eval/simulators/libero_openpi, a DEDICATED, standalone submodule
 # pinned at f78abd68ee283de9f9be3c8f7e2a9ad60246e95c (Dec 2023) to exactly
@@ -50,7 +57,7 @@ if [[ -f "${RUN_SCRIPTS_DIR}/.local_paths.sh" ]]; then
   # shellcheck disable=SC1091
   source "${RUN_SCRIPTS_DIR}/.local_paths.sh"
 fi
-OPENPI_ROOT="${PROJECT_ROOT}/eval/models/openpi"
+export OPENPI_ROOT="${OPENPI_ROOT:-${PROJECT_ROOT}/eval/models/openpi_official}"
 LIBERO_ROOT="${LIBERO_ROOT:-${PROJECT_ROOT}/eval/simulators/libero_openpi}"
 SINGLE_TASK_DIR="${PROJECT_ROOT}/eval/single_task"
 cd "${OPENPI_ROOT}"

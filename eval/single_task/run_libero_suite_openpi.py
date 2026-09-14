@@ -34,7 +34,7 @@ def _load_pristine_main_module():
     `if __name__ == "__main__": tyro.cli(eval_libero)` guard never fires --
     only `Args`/`eval_libero` are used."""
     openpi_root = Path(
-        __import__("os").environ.get("OPENPI_ROOT", THIS_DIR.parent / "models" / "openpi")
+        __import__("os").environ.get("OPENPI_ROOT", THIS_DIR.parent / "models" / "openpi_official")
     )
     main_path = openpi_root / "examples" / "libero" / "main.py"
     if not main_path.is_file():
