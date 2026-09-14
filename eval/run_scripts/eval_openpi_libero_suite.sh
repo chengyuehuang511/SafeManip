@@ -134,10 +134,10 @@ mkdir -p "${VIDEO_DIR}"
 
 server_log="${VIDEO_DIR}/server-${SLURM_JOB_ID:-local}-${SLURM_ARRAY_TASK_ID:-0}.log"
 python "${OPENPI_ROOT}/scripts/serve_policy.py" \
+  --port "${PORT}" \
   policy:checkpoint \
   --policy.config "${OPENPI_CONFIG}" \
   --policy.dir "${OPENPI_CHECKPOINT_DIR}" \
-  --port "${PORT}" \
   > "${server_log}" 2>&1 &
 server_pid=$!
 trap 'kill "${server_pid}" 2>/dev/null || true' EXIT
