@@ -68,6 +68,7 @@ task_names=(
 )
 seed="${SEED:-42}"
 save_replay="${SAVE_REPLAY:-1}"
+n_episodes="${N_EPISODES:-50}"
 foundation_model_root="${FOUNDATION_MODEL_ROOT:-${GROOT_CHECKPOINT_ROOT}/foundation_model_learning}"
 # MODEL_FAMILY choices:
 #   target_posttraining: task-set-specific checkpoints under target_posttraining/{atomic_seen,composite_seen,composite_unseen}
@@ -88,7 +89,7 @@ fi
 # understand (see git history for that version of this file), so this is
 # just SEED + whether to save a replayable rollout dataset alongside the
 # eval videos.
-run_env="SEED=${seed},SAVE_REPLAY=${save_replay}"
+run_env="SEED=${seed},SAVE_REPLAY=${save_replay},N_EPISODES=${n_episodes}"
 
 mkdir -p "${output_dir}"
 mkdir -p "${video_dir}"
