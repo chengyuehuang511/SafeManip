@@ -133,7 +133,7 @@ fi
 mkdir -p "${VIDEO_DIR}"
 
 server_log="${VIDEO_DIR}/server-${SLURM_JOB_ID:-local}-${SLURM_ARRAY_TASK_ID:-0}.log"
-python "${OPENPI_ROOT}/scripts/serve_policy.py" \
+python "${SINGLE_TASK_DIR}/serve_policy_wrapper.py" \
   --port "${PORT}" \
   policy:checkpoint \
   --policy.config "${OPENPI_CONFIG}" \

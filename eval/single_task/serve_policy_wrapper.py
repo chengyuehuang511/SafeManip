@@ -58,6 +58,26 @@ top-level code (imports included) fresh, in this same process, after our
 patches -- exactly like `python scripts/serve_policy.py` would, just with
 the patches already in place first.
 
+(c) `_groot_openpi_dataset._convert_stats_from_repo_meta` -- stubbing a
+    function this pinned commit references but never defines
+---------------------------------------------------------------------------
+`DataConfigFactory._load_norm_stats` (openpi/training/config.py) falls back
+to `_groot_openpi_dataset._convert_stats_from_repo_meta(asset_id)` whenever
+the checkpoint-relative `assets_dir/asset_id` path doesn't exist (true for
+every LIBERO config here, e.g. `pi05_libero` -- confirmed by a real crash:
+"Norm stats not found in .../assets/pi05_libero/physical-intelligence/
+libero" followed immediately by `AttributeError: module
+'openpi.groot_utils.groot_openpi_dataset' has no attribute
+'_convert_stats_from_repo_meta'`). The source has a literal `# TODO: fix`
+comment right above that call -- this is a genuine gap in this pinned
+commit, not an environment issue. Since `_load_norm_stats` is only ever
+supposed to return `None` when nothing can be loaded/converted (letting
+`create_trained_policy`'s own later, correct fallback -- the checkpoint's
+own precomputed `assets/norm_stats.json`, confirmed present -- take over,
+same principle as fix (b) above), this stubs the missing function to just
+return `None` directly rather than crash, instead of e.g. skipping the
+call entirely (which would also skip that later good fallback).
+
 Usage (drop-in replacement for `python scripts/serve_policy.py ...`):
     python eval/single_task/serve_policy_wrapper.py \\
         --port=8000 policy:checkpoint --policy.config=... --policy.dir=...
@@ -89,14 +109,29 @@ def _clear_data_dirs_on_all_configs() -> None:
         cfg.data = dataclasses.replace(cfg.data, data_dirs=None)
 
 
+def _stub_missing_convert_stats_from_repo_meta() -> None:
+    """See module docstring (c). Only adds the attribute if it's actually
+    missing -- a no-op on any commit where it's already implemented."""
+    import openpi.groot_utils.groot_openpi_dataset as _groot_openpi_dataset
+
+    if not hasattr(_groot_openpi_dataset, "_convert_stats_from_repo_meta"):
+        _groot_openpi_dataset._convert_stats_from_repo_meta = lambda asset_id: None
+
+
 def main() -> None:
-    dataset_base_path = os.environ.get("ROBOCASA_DATASET_BASE_PATH", DEFAULT_DATASET_BASE_PATH)
+    # robocasa isn't on PYTHONPATH for non-RoboCasa envs (e.g. LIBERO) --
+    # patch (a) is a no-op there since it's irrelevant to those configs.
+    try:
+        import robocasa.macros as _macros
+    except ImportError:
+        _macros = None
 
-    import robocasa.macros as _macros
-
-    _macros.DATASET_BASE_PATH = dataset_base_path
+    if _macros is not None:
+        dataset_base_path = os.environ.get("ROBOCASA_DATASET_BASE_PATH", DEFAULT_DATASET_BASE_PATH)
+        _macros.DATASET_BASE_PATH = dataset_base_path
 
     _clear_data_dirs_on_all_configs()
+    _stub_missing_convert_stats_from_repo_meta()
 
     openpi_root = Path(
         os.environ.get(
