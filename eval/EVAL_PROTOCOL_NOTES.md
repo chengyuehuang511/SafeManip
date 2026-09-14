@@ -147,8 +147,44 @@ only wall-clock time.
 2. **`n_episodes=50` for grootn16** instead of grootn16's own official 30
    -- a deliberate, requested override for comparability across our sweep,
    not an oversight.
+3. **`n_episodes=50` for RLDX-1's LIBERO eval** instead of RLDX-1's own
+   official per-suite split (50 for libero_10, only 20 for spatial/object/
+   goal) -- same override philosophy as (2), and it also brings RLDX-1
+   into line with openpi's own uniform `num_trials_per_task=50` for
+   LIBERO, so the two are directly comparable per-suite.
 
-Both are called out explicitly here so that any gap between our reproduced
-numbers and each submission's reported leaderboard numbers can be
-attributed correctly rather than assumed to be pure model-reproduction
+These are called out explicitly here so that any gap between our
+reproduced numbers and each submission's reported leaderboard numbers can
+be attributed correctly rather than assumed to be pure model-reproduction
 error.
+
+## LIBERO benchmark (separate from RoboCasa above)
+
+Covers openpi (pi0/pi0.5) and RLDX-1 -- plain LIBERO only (spatial/object/
+goal/10; no libero_90/LIBERO-Plus/LIBERO-Pro). Hyperparameters otherwise
+match each model's own official script exactly (see
+run_libero_suite_openpi.py / run_single_task_rldx1_libero.py docstrings for
+the full comparison tables), with `n_episodes` uniformly overridden to 50
+per discrepancy (3) above.
+
+**LIBERO version pinning turned out to matter.** LIBERO has a documented
+history of eval numbers not reproducing across versions (e.g. openvla's
+LIBERO results are known to shift when run against a newer LIBERO release
+than the one its numbers were measured on). Checked each model's own
+pinned commit before reusing the single shared `eval/simulators/libero`
+submodule (pinned Mar 2025) the way robocasa is shared across all 8
+RoboCasa models:
+
+- **RLDX-1**: confirmed via `diff -rq` that the shared submodule is
+  content-identical to RLDX-1's own vendored
+  `external_dependencies/LIBERO` copy -- no version drift, safe to reuse
+  the shared submodule as-is.
+- **openpi**: its own `third_party/libero` pins LIBERO @
+  `f78abd68ee283de9f9be3c8f7e2a9ad60246e95c` (Dec 2023) -- ~15 months
+  older than the shared submodule. Added a dedicated
+  `eval/simulators/libero_openpi` submodule pinned to that exact commit
+  instead of reusing the shared (newer) one. (First attempted
+  `git submodule update --init` directly on openpi's own nested
+  `third_party/libero`, but that populates files inside `eval/models/
+  openpi`'s own working tree, which we don't touch -- reverted and used a
+  separate standalone submodule pinned to the identical commit instead.)

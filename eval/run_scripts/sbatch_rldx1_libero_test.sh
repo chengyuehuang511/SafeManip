@@ -60,12 +60,16 @@ task_names=(
   "libero_sim/pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate"
   "libero_sim/pick_up_the_black_bowl_on_the_wooden_cabinet_and_place_it_on_the_plate"
 )
-# 10 libero_10 (50 ep) + 10 libero_goal (20 ep) + 10 libero_object (20 ep) + 10 libero_spatial (20 ep)
+# RLDX-1's own official eval_libero.sh uses 50 episodes for libero_10 but
+# only 20 for goal/object/spatial. Deliberately overridden to a uniform 50
+# across all 40 tasks here -- same "n_episodes always 50, everything else
+# matches official" override already applied to grootn16's RoboCasa sweep
+# (its own official protocol used 30) -- see eval/EVAL_PROTOCOL_NOTES.md.
 n_episodes_list=(
   50 50 50 50 50 50 50 50 50 50
-  20 20 20 20 20 20 20 20 20 20
-  20 20 20 20 20 20 20 20 20 20
-  20 20 20 20 20 20 20 20 20 20
+  50 50 50 50 50 50 50 50 50 50
+  50 50 50 50 50 50 50 50 50 50
+  50 50 50 50 50 50 50 50 50 50
 )
 
 model_path="${MODEL_PATH:-RLWRLD/RLDX-1-FT-LIBERO}"

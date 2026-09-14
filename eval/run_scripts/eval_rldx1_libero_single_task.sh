@@ -79,7 +79,10 @@ if [[ -z "${TASK}" && -n "${TASK_LIST}" ]]; then
   N_EPISODES="${N_EPISODES_LIST_ITEMS[SLURM_ARRAY_TASK_ID]}"
 fi
 TASK="${TASK:-libero_sim/pick_up_the_alphabet_soup_and_place_it_in_the_basket}"
-N_EPISODES="${N_EPISODES:-20}"
+# 50 default (not RLDX-1's own official per-suite 50/20/20/20 split) --
+# deliberately overridden to a uniform 50 everywhere, see
+# sbatch_rldx1_libero_test.sh's n_episodes_list.
+N_EPISODES="${N_EPISODES:-50}"
 MODEL_PATH="${MODEL_PATH:-RLWRLD/RLDX-1-FT-LIBERO}"
 # Nested by TASK from the start -- see eval_grootn16_single_task.sh.
 TASK_CLEAN="${TASK#libero_sim/}"

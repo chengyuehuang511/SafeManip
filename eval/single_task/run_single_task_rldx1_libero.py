@@ -6,10 +6,13 @@ used for the RoboCasa RLDX-1 runs -- see run_single_task_rldx1.py), just
 pointed at a `libero_sim/<task>` env instead of `robocasa/<task>`.
 
 Hyperparameters (n_action_steps=8, max_episode_steps=720, n_envs=1) match
-RLDX-1's own official run_scripts/eval/libero/eval_libero.sh -- including
-its per-suite n_episodes split (50 for libero_10, 20 for
-spatial/object/goal), which is NOT uniform like openpi's own
-num_trials_per_task=50 -- see eval/EVAL_PROTOCOL_NOTES.md.
+RLDX-1's own official run_scripts/eval/libero/eval_libero.sh. n_episodes
+itself is the one deliberate exception: RLDX-1's own script uses a
+per-suite split (50 for libero_10, only 20 for spatial/object/goal), but
+this project overrides it to a uniform 50 across all suites (matching
+openpi's own num_trials_per_task=50 convention, and the same "n_episodes
+always 50" override already applied to grootn16's RoboCasa sweep) -- see
+eval/EVAL_PROTOCOL_NOTES.md.
 
 No replay/video-capture wrapping here (unlike the RoboCasa RLDX-1 script) --
 not requested for LIBERO, and LIBERO's env stack (register_libero_envs())
