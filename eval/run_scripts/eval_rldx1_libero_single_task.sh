@@ -38,7 +38,11 @@ LIBERO_ROOT="${LIBERO_ROOT:-${PROJECT_ROOT}/eval/simulators/libero}"
 SINGLE_TASK_DIR="${PROJECT_ROOT}/eval/single_task"
 cd "${RLDX1_ROOT}"
 
-CONDA_ENV_NAME="${CONDA_ENV_NAME:-rldx1}"
+# Dedicated LIBERO env (rldx1-libero), not rldx1 -- LIBERO needs
+# robosuite==1.4.0, incompatible with RoboCasa's robosuite==1.5.2; cloned
+# from rldx1 then downgraded robosuite (+ installed LIBERO's own missing
+# deps: bddl, easydict, future, thop).
+CONDA_ENV_NAME="${CONDA_ENV_NAME:-rldx1-libero}"
 
 if [[ -f "${CONDA_SH}" ]]; then
   # shellcheck disable=SC1090

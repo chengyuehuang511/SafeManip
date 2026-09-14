@@ -62,7 +62,11 @@ LIBERO_ROOT="${LIBERO_ROOT:-${PROJECT_ROOT}/eval/simulators/libero_openpi}"
 SINGLE_TASK_DIR="${PROJECT_ROOT}/eval/single_task"
 cd "${OPENPI_ROOT}"
 
-OPENPI_CONDA_ENV_NAME="${OPENPI_CONDA_ENV_NAME:-${CONDA_ENV_NAME:-openpi-robocasa}}"
+# Dedicated LIBERO env (openpi-libero), not openpi-robocasa -- LIBERO
+# needs robosuite==1.4.0, incompatible with RoboCasa's robosuite==1.5.2;
+# cloned from openpi-robocasa then downgraded robosuite (+ installed
+# LIBERO's own missing deps: bddl, easydict, future, thop, matplotlib).
+OPENPI_CONDA_ENV_NAME="${OPENPI_CONDA_ENV_NAME:-${CONDA_ENV_NAME:-openpi-libero}}"
 
 if [[ -f "${CONDA_SH}" ]]; then
   # shellcheck disable=SC1090
