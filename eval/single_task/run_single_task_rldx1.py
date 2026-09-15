@@ -31,6 +31,32 @@ from replay_capture import ReplayCapture, capture_env_kwargs  # noqa: E402
 from video_capture import MultiCameraVideoCapture  # noqa: E402
 
 
+def _stub_robocasa_gym_utils_for_missing_module():
+    """RLDX-1's own `get_robocasa_env_fn` (rldx/eval/rollout_policy.py)
+    unconditionally does `from robocasa.utils.gym_utils import
+    GrootRoboCasaEnv` at the top of its `env_fn()`, even on the
+    `"robocasa/"`-prefix branch (the only one we ever use) where
+    `GrootRoboCasaEnv` is never referenced again afterward -- confirmed by
+    reading the file, it's dead code left over from merging what used to be
+    two separate env_fn variants (one for `robocasa_panda_omron`/`gr1`, one
+    for `robocasa`/RoboCasa365). Our pristine eval/simulators/robocasa pin
+    (upstream commit 4f8a298) predates that module entirely -- confirmed by
+    `find`, it doesn't exist -- so this import raises `ModuleNotFoundError`
+    before ever reaching the branch we actually need, crashing every
+    RLDX-1 rollout outright (confirmed by a real run's traceback). Since
+    the class is provably unused on our code path, stubbing it out (same
+    technique replay_capture.py uses for pynput) is safe and avoids editing
+    either submodule."""
+    import sys
+    import types
+
+    if "robocasa.utils.gym_utils" in sys.modules:
+        return
+    gym_utils_mod = types.ModuleType("robocasa.utils.gym_utils")
+    gym_utils_mod.GrootRoboCasaEnv = type("GrootRoboCasaEnv", (), {})
+    sys.modules["robocasa.utils.gym_utils"] = gym_utils_mod
+
+
 def run_single_task(
     *,
     model_path: str,
@@ -45,6 +71,8 @@ def run_single_task(
     replay_dir: Optional[str],
 ) -> Dict[str, Any]:
     import gymnasium as gym
+
+    _stub_robocasa_gym_utils_for_missing_module()
 
     from rldx.eval.rollout_policy import run_rldx_sim_policy
     from robocasa.utils.dataset_registry_utils import get_task_horizon
