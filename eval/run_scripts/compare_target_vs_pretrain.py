@@ -87,21 +87,25 @@ def main():
     root = Path(args.saved_eval_rollouts)
 
     print(
-        f"{'model':24s} {'target_sr':>10s} {'target_n':>9s} {'target_tasks':>13s} "
-        f"{'pretrain_sr':>12s} {'pretrain_n':>11s} {'pretrain_tasks':>15s} {'diff':>8s}"
+        f"{'model':24s} {'common_tasks':>13s} {'target_sr':>10s} {'pretrain_sr':>12s} {'diff':>8s}"
     )
     for label, subdir in MODEL_DIRS.items():
         target_tasks = collect(root / "target", subdir)
         pretrain_tasks = collect(root / "pretrain", subdir)
-        t_sr, t_n = weighted_mean(target_tasks)
-        p_sr, p_n = weighted_mean(pretrain_tasks)
+        # Only compare on the intersection of tasks completed on BOTH
+        # splits -- comparing "all 50 target tasks" against "whatever
+        # subset of pretrain happens to be done so far" would bias the
+        # comparison toward whichever tasks the scheduler happened to run
+        # first on the still-in-progress side.
+        common = sorted(set(target_tasks) & set(pretrain_tasks))
+        t_common = {k: target_tasks[k] for k in common}
+        p_common = {k: pretrain_tasks[k] for k in common}
+        t_sr, _ = weighted_mean(t_common)
+        p_sr, _ = weighted_mean(p_common)
         t_sr_str = f"{t_sr:.4f}" if t_sr is not None else "n/a"
         p_sr_str = f"{p_sr:.4f}" if p_sr is not None else "n/a"
         diff_str = f"{p_sr - t_sr:+.4f}" if (t_sr is not None and p_sr is not None) else "n/a"
-        print(
-            f"{label:24s} {t_sr_str:>10s} {t_n:>9d} {len(target_tasks):>10d}/50 "
-            f"{p_sr_str:>12s} {p_n:>11d} {len(pretrain_tasks):>12d}/50 {diff_str:>8s}"
-        )
+        print(f"{label:24s} {len(common):>10d}/50 {t_sr_str:>10s} {p_sr_str:>12s} {diff_str:>8s}")
 
 
 if __name__ == "__main__":
