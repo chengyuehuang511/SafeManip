@@ -162,10 +162,10 @@ async function initAnnotatorPicker() {
       // both the per-episode "you"/"others" annotated badges and (2026-09-15)
       // the verdict filter are annotator-scoped.
       if (tdState.task) {
-        await loadTrainingEpisodes(tdState.task);
+        await reloadCurrentTaskEpisodes();
       }
-      if (tdState.task && tdState.episode != null) {
-        await loadTrainingMonitor(tdState.task, tdState.episode, tdState.monitorMethod);
+      if (tdState.episodeTask && tdState.episode != null) {
+        await loadTrainingMonitor(tdState.episodeTask, tdState.episode, tdState.monitorMethod);
       }
     } else if (state.task && state.episode != null) {
       await selectEpisode(state.task, state.episode);
@@ -422,9 +422,19 @@ async function initTrainingData() {
 // whichever annotator is currently picked in the header (see annotatorQS/
 // server.py's episode_has_verdict). Just re-triggers the episode-list fetch
 // for the current task -- doesn't touch the task/property trees.
+// Re-fetches whichever episode list is currently showing (a single task, or
+// the "All tasks" aggregate) -- shared by every filter/annotator change that
+// needs the episode list refreshed without necessarily knowing which mode
+// is active.
+function reloadCurrentTaskEpisodes() {
+  if (tdState.task === ALL_TASKS_VALUE) return loadAllTaskEpisodes();
+  if (tdState.task) return loadTrainingEpisodes(tdState.task);
+  return Promise.resolve();
+}
+
 el("#td-verdict-select").addEventListener("change", (e) => {
   tdState.verdictFilter = e.target.value || null;
-  if (tdState.task) loadTrainingEpisodes(tdState.task);
+  reloadCurrentTaskEpisodes();
 });
 
 el("#td-sim-select").addEventListener("change", async (e) => {
@@ -458,7 +468,7 @@ async function initTrainingLtlPropertyList() {
 function selectTrainingProperty(property) {
   tdState.property = property || null;
   renderPropertyTree();
-  if (tdState.task) loadTrainingEpisodes(tdState.task);
+  reloadCurrentTaskEpisodes();
 }
 
 // Fetches the violation-count breakdown for the currently-selected
@@ -589,6 +599,14 @@ function renderTaskTree() {
     tdTaskTree.innerHTML = "<div class='muted'>no tasks found</div>";
     return;
   }
+  // "All tasks" (2026-09-15): same idea as the property tree's "All
+  // properties" row -- aggregates every task's episode list into one flat,
+  // task-labeled view (loadAllTaskEpisodes), mainly so the verdict filter
+  // can answer "every disputed episode, anywhere" in one shot.
+  const allTasksTotal = Object.values(tdViolationCounts.by_task || {}).reduce((s, t) => s + (t.total || 0), 0);
+  tdTaskTree.appendChild(
+    buildTreeRow("All tasks", allTasksTotal, tdState.task === ALL_TASKS_VALUE, () => loadAllTaskEpisodes(), null)
+  );
   if (tdSim !== "libero") {
     for (const t of tdTasksList) {
       tdTaskTree.appendChild(taskTreeRow(t));
@@ -663,6 +681,99 @@ function jumpToViolatingEpisode(property, task, episode) {
   loadTrainingEpisodes(task, episode);
 }
 
+// Shared row-builder for both the single-task list (loadTrainingEpisodes)
+// and the "All tasks" aggregate list (loadAllTaskEpisodes, 2026-09-15) --
+// factored out so the two don't drift out of sync on badge logic.
+// `showTask`: prefix the row with the episode's own task name -- only
+// meaningful in the aggregate view, where rows come from many different
+// tasks and the episode number alone would be ambiguous.
+function buildEpisodeRow(task, ep, showTask) {
+  const row = document.createElement("button");
+  // ep.success/num_violations are null (not the eval tab's guaranteed
+  // true/false/int) until SafeManip/monitor/extract_privileged_from_dataset.py
+  // has actually been run for this episode -- shown as a neutral "not
+  // analyzed" badge rather than misleadingly rendering as failure/0-viol.
+  const analyzed = ep.success != null;
+  row.className = "ep-row" + (analyzed ? (ep.success ? " success" : " failure") : "");
+  const successBadge = analyzed
+    ? `<span class="mini-badge ${ep.success ? "s-ok" : "s-fail"}">${ep.success ? "success" : "fail"}</span>`
+    : `<span class="mini-badge">not analyzed</span>`;
+  // Only the currently-selected/latest postprocess method's badge (not one
+  // per version -- with several vN_ dirs now kept around for history, a
+  // badge-per-method row got noisy fast; the left column should read as
+  // "is the latest design good," not a version comparison table).
+  const methodEntries = Object.entries(ep.methods || {}).filter(
+    ([key]) => key === tdState.monitorMethod
+  );
+  // When a single LTL property is selected (tdState.property), m.num_violations
+  // is 1/0/null (violated/satisfied/not-evaluated-for-this-episode) instead of
+  // an aggregate count -- worded as such rather than "N viol" for clarity.
+  const violBadges = methodEntries.length
+    ? methodEntries.map(([key, m]) => {
+        const label = tdMethodLabel(key);
+        if (tdState.property) {
+          if (m.num_violations == null) {
+            return `<span class="mini-badge" title="${key}">${label}: n/a</span>`;
+          }
+          return m.num_violations
+            ? `<span class="mini-badge viol" title="${key}">${label}: ✗</span>`
+            : `<span class="mini-badge ok" title="${key}">${label}: ✓</span>`;
+        }
+        return m.num_violations
+          ? `<span class="mini-badge viol" title="${key}">${label}: ${m.num_violations} viol</span>`
+          : `<span class="mini-badge ok" title="${key}">${label}: 0 viol</span>`;
+      }).join("\n      ")
+    : "";
+  // Per-episode "have I (a human) annotated this yet" indicator
+  // (2026-09-08) -- scoped to the currently-selected method, same as
+  // ep.annotated's own per-method shape (server.py's
+  // list_training_episodes/has_human_annotation). Deliberately excludes
+  // Claude-authored content (ai_draft/ai_draft_verdict, the structured
+  // entry["claude"] block) -- only counts verdict/note/entry["human"]/
+  // missed_notes/overall_verdict, all only ever set by the reviewer's own
+  // UI actions. A button, not just a badge, so it can jump straight into
+  // that episode without requiring a second click on the row first.
+  const isAnnotated = !!(ep.annotated || {})[tdState.monitorMethod];
+  const annotatedBtn = document.createElement("button");
+  annotatedBtn.type = "button";
+  annotatedBtn.className = "mini-badge annotate-btn" + (isAnnotated ? " annotated" : "");
+  annotatedBtn.title = isAnnotated ? "human-annotated -- click to open" : "not yet human-annotated -- click to open";
+  annotatedBtn.textContent = isAnnotated ? "✎ annotated" : "✎ annotate";
+  annotatedBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    selectTrainingEpisode(task, ep, row);
+  });
+
+  // "Who's already annotated this episode" (2026-09-10) -- server.py's
+  // ep.annotated_by[method] is the full list of registered annotator
+  // names with real content here, regardless of the currently-selected
+  // annotator filter. Split into "you" (folded into the annotate button's
+  // own state above) vs. everyone else, so a reviewer can tell at a
+  // glance whether someone already covered this episode before deciding
+  // whether it's worth their own time too.
+  const annotatedByAll = (ep.annotated_by || {})[tdState.monitorMethod] || [];
+  const others = annotatedByAll.filter((a) => a !== currentAnnotator);
+  const othersBadge = others.length
+    ? `<span class="mini-badge others-annotated" title="${others.join(", ")} also annotated this episode">by: ${others.join(", ")}</span>`
+    : "";
+  const taskBadge = showTask ? `<span class="mini-badge ep-task-badge" title="${task}">${task}</span>` : "";
+
+  row.innerHTML = `${taskBadge}<span class="ep-num">#${ep.episode}</span>
+    ${successBadge}
+    ${violBadges}
+    <span class="mini-badge">${orUnknown(ep.n_frames)} frames</span>
+    ${othersBadge}`;
+  row.appendChild(annotatedBtn);
+  row.addEventListener("click", () => selectTrainingEpisode(task, ep, row));
+  return row;
+}
+
+// Sentinel for tdState.task meaning "All tasks" (2026-09-15) -- the sidebar
+// row that aggregates episodes across every task instead of picking one, so
+// e.g. the verdict filter can answer "every disputed episode, anywhere"
+// without clicking through each task one at a time.
+const ALL_TASKS_VALUE = "__all_tasks__";
+
 async function loadTrainingEpisodes(task, targetEpisode) {
   // captured before tdState.task/episode get overwritten below -- used to
   // re-select the same episode after a property-filter change reloads this
@@ -695,83 +806,7 @@ async function loadTrainingEpisodes(task, targetEpisode) {
     return;
   }
   for (const ep of data.episodes) {
-    const row = document.createElement("button");
-    // ep.success/num_violations are null (not the eval tab's guaranteed
-    // true/false/int) until SafeManip/monitor/extract_privileged_from_dataset.py
-    // has actually been run for this episode -- shown as a neutral "not
-    // analyzed" badge rather than misleadingly rendering as failure/0-viol.
-    const analyzed = ep.success != null;
-    row.className = "ep-row" + (analyzed ? (ep.success ? " success" : " failure") : "");
-    const successBadge = analyzed
-      ? `<span class="mini-badge ${ep.success ? "s-ok" : "s-fail"}">${ep.success ? "success" : "fail"}</span>`
-      : `<span class="mini-badge">not analyzed</span>`;
-    // Only the currently-selected/latest postprocess method's badge (not one
-    // per version -- with several vN_ dirs now kept around for history, a
-    // badge-per-method row got noisy fast; the left column should read as
-    // "is the latest design good," not a version comparison table).
-    const methodEntries = Object.entries(ep.methods || {}).filter(
-      ([key]) => key === tdState.monitorMethod
-    );
-    // When a single LTL property is selected (tdState.property), m.num_violations
-    // is 1/0/null (violated/satisfied/not-evaluated-for-this-episode) instead of
-    // an aggregate count -- worded as such rather than "N viol" for clarity.
-    const violBadges = methodEntries.length
-      ? methodEntries.map(([key, m]) => {
-          const label = tdMethodLabel(key);
-          if (tdState.property) {
-            if (m.num_violations == null) {
-              return `<span class="mini-badge" title="${key}">${label}: n/a</span>`;
-            }
-            return m.num_violations
-              ? `<span class="mini-badge viol" title="${key}">${label}: ✗</span>`
-              : `<span class="mini-badge ok" title="${key}">${label}: ✓</span>`;
-          }
-          return m.num_violations
-            ? `<span class="mini-badge viol" title="${key}">${label}: ${m.num_violations} viol</span>`
-            : `<span class="mini-badge ok" title="${key}">${label}: 0 viol</span>`;
-        }).join("\n      ")
-      : "";
-    // Per-episode "have I (a human) annotated this yet" indicator
-    // (2026-09-08) -- scoped to the currently-selected method, same as
-    // ep.annotated's own per-method shape (server.py's
-    // list_training_episodes/has_human_annotation). Deliberately excludes
-    // Claude-authored content (ai_draft/ai_draft_verdict, the structured
-    // entry["claude"] block) -- only counts verdict/note/entry["human"]/
-    // missed_notes/overall_verdict, all only ever set by the reviewer's own
-    // UI actions. A button, not just a badge, so it can jump straight into
-    // that episode without requiring a second click on the row first.
-    const isAnnotated = !!(ep.annotated || {})[tdState.monitorMethod];
-    const annotatedBtn = document.createElement("button");
-    annotatedBtn.type = "button";
-    annotatedBtn.className = "mini-badge annotate-btn" + (isAnnotated ? " annotated" : "");
-    annotatedBtn.title = isAnnotated ? "human-annotated -- click to open" : "not yet human-annotated -- click to open";
-    annotatedBtn.textContent = isAnnotated ? "✎ annotated" : "✎ annotate";
-    annotatedBtn.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      selectTrainingEpisode(task, ep, row);
-    });
-
-    // "Who's already annotated this episode" (2026-09-10) -- server.py's
-    // ep.annotated_by[method] is the full list of registered annotator
-    // names with real content here, regardless of the currently-selected
-    // annotator filter. Split into "you" (folded into the annotate button's
-    // own state above) vs. everyone else, so a reviewer can tell at a
-    // glance whether someone already covered this episode before deciding
-    // whether it's worth their own time too.
-    const annotatedByAll = (ep.annotated_by || {})[tdState.monitorMethod] || [];
-    const others = annotatedByAll.filter((a) => a !== currentAnnotator);
-    const othersBadge = others.length
-      ? `<span class="mini-badge others-annotated" title="${others.join(", ")} also annotated this episode">by: ${others.join(", ")}</span>`
-      : "";
-
-    row.innerHTML = `<span class="ep-num">#${ep.episode}</span>
-      ${successBadge}
-      ${violBadges}
-      <span class="mini-badge">${orUnknown(ep.n_frames)} frames</span>
-      ${othersBadge}`;
-    row.appendChild(annotatedBtn);
-    row.addEventListener("click", () => selectTrainingEpisode(task, ep, row));
-    tdEpisodeList.appendChild(row);
+    tdEpisodeList.appendChild(buildEpisodeRow(task, ep, false));
   }
   // Re-select whichever episode was already open if this reload is for the
   // *same* task (e.g. the property filter just changed) and that episode
@@ -789,10 +824,61 @@ async function loadTrainingEpisodes(task, targetEpisode) {
   selectTrainingEpisode(task, data.episodes[keepIdx], rows[keepIdx]);
 }
 
+// "All tasks" mode (2026-09-15): fetches every task's episode list in
+// parallel (same property/method/verdict/annotator filters as the
+// single-task path) and merges them into one flat, task-labeled list --
+// mainly for the verdict filter, so "every disputed episode" doesn't
+// require clicking through each task one at a time. Sorted task-then-
+// episode for a stable, predictable order (not by violation count -- this
+// is a browse view, not a leaderboard).
+async function loadAllTaskEpisodes() {
+  tdState.task = ALL_TASKS_VALUE;
+  tdState.episode = null;
+  renderTaskTree();
+  tdEpisodeList.innerHTML = "<div class='loading'>loading episodes across all tasks…</div>";
+  await ensureTrainingMonitorMethods();
+  const propertyParam = tdState.property ? `&property=${encodeURIComponent(tdState.property)}` : "";
+  const methodParam = tdState.monitorMethod ? `&method=${encodeURIComponent(tdState.monitorMethod)}` : "";
+  const verdictParam = tdState.verdictFilter ? `&verdict=${encodeURIComponent(tdState.verdictFilter)}` : "";
+  const myGeneration = tdState.task;  // cheap guard: bail if the user picked a different task/mode meanwhile
+  const perTask = await Promise.all(
+    tdTasksList.map(async (t) => {
+      try {
+        const data = await fetchJSON(
+          `/api/td_episodes?task=${encodeURIComponent(t.task)}${propertyParam}${methodParam}${verdictParam}${tdSimQS()}${annotatorQS()}`
+        );
+        return (data.episodes || []).map((ep) => ({ task: t.task, ep }));
+      } catch (e) {
+        return [];  // one task's fetch failing shouldn't blank out the rest
+      }
+    })
+  );
+  if (tdState.task !== myGeneration) return;  // superseded while the fetches were in flight
+  const merged = perTask.flat().sort((a, b) => a.task.localeCompare(b.task) || a.ep.episode - b.ep.episode);
+  tdEpisodeList.innerHTML = "";
+  if (!merged.length) {
+    tdEpisodeList.innerHTML = tdState.verdictFilter
+      ? `<div class='muted'>no episodes with a "${tdState.verdictFilter}" verdict for this annotator, in any task</div>`
+      : "<div class='muted'>no reconstructed episodes yet</div>";
+    return;
+  }
+  for (const { task, ep } of merged) {
+    tdEpisodeList.appendChild(buildEpisodeRow(task, ep, true));
+  }
+  const rows = tdEpisodeList.querySelectorAll(".ep-row");
+  selectTrainingEpisode(merged[0].task, merged[0].ep, rows[0]);
+}
+
 function selectTrainingEpisode(task, ep, rowEl) {
   tdEpisodeList.querySelectorAll(".ep-row").forEach((r) => r.classList.remove("active"));
   if (rowEl) rowEl.classList.add("active");
 
+  // The real task this episode belongs to -- distinct from tdState.task,
+  // which can be ALL_TASKS_VALUE while browsing the aggregate list
+  // (2026-09-15). Anything that needs to re-fetch *this specific episode*
+  // (method-picker change, annotator change, ...) must use this, never
+  // tdState.task directly, or it'll pass the sentinel as a task name.
+  tdState.episodeTask = task;
   tdState.episode = ep.episode;
   tdEmptyState.classList.add("hidden");
   tdEpisodeView.classList.remove("hidden");
@@ -915,8 +1001,8 @@ el("#td-method-select").addEventListener("change", async () => {
   if (myGeneration !== tdLoadGeneration) return;
   renderTaskTree();
   renderPropertyTree();
-  if (tdState.task && tdState.episode != null) {
-    loadTrainingMonitor(tdState.task, tdState.episode, tdState.monitorMethod);
+  if (tdState.episodeTask && tdState.episode != null) {
+    loadTrainingMonitor(tdState.episodeTask, tdState.episode, tdState.monitorMethod);
   }
 });
 

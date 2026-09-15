@@ -184,6 +184,11 @@ header h1 { font-size: 18px; margin: 0; }
 .ep-row:hover { background: var(--bg-alt2); }
 .ep-row.active { background: var(--accent-bg); outline: 1px solid var(--accent); }
 .ep-num { font-weight: 600; min-width: 36px; }
+/* Task-name badge on episode rows in "All tasks" aggregate mode
+   (2026-09-15) -- see app.js's buildEpisodeRow's showTask param. Distinct
+   look (accent, not the neutral mini-badge gray) since it's identifying
+   info, not a status/count like the other badges on the row. */
+.mini-badge.ep-task-badge { background: var(--accent-bg); color: var(--accent-text); font-weight: 600; }
 
 .mini-badge {
   font-size: 10px;
