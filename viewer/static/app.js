@@ -24,7 +24,7 @@ const reconVideo = el("#recon-video");
 // picker, no monitor/violations (just ground-truth reconstructed video + the
 // recorded language instruction). See server.py's api_training_* /
 // replay/official_playback/README.md.
-const tdState = { task: null, episode: null, loaded: false, monitorMethod: null, property: null };
+const tdState = { task: null, episode: null, loaded: false, monitorMethod: null, property: null, verdictFilter: null };
 // Which simulator's training data the tab is currently showing ("robocasa" |
 // "libero") -- see server.py's sim= query param on /api/td_tasks,
 // /api/td_episodes, /api/training_monitor, /api/training_monitor_methods.
@@ -158,6 +158,12 @@ async function initAnnotatorPicker() {
       await refreshViolationCounts();
       renderTaskTree();
       renderPropertyTree();
+      // Episode list itself needs a re-fetch too, not just the trees --
+      // both the per-episode "you"/"others" annotated badges and (2026-09-15)
+      // the verdict filter are annotator-scoped.
+      if (tdState.task) {
+        await loadTrainingEpisodes(tdState.task);
+      }
       if (tdState.task && tdState.episode != null) {
         await loadTrainingMonitor(tdState.task, tdState.episode, tdState.monitorMethod);
       }
@@ -411,6 +417,16 @@ async function initTrainingData() {
 // Method list is sim-specific (RoboCasa's vN_.../ vs LIBERO's vN_..._libero_.../
 // under the same monitor/output/ dir), so it must reload too, not just the
 // task list.
+// Verdict filter (2026-09-15): only show episodes with at least one
+// violations/satisfied entry carrying the selected verdict, scoped to
+// whichever annotator is currently picked in the header (see annotatorQS/
+// server.py's episode_has_verdict). Just re-triggers the episode-list fetch
+// for the current task -- doesn't touch the task/property trees.
+el("#td-verdict-select").addEventListener("change", (e) => {
+  tdState.verdictFilter = e.target.value || null;
+  if (tdState.task) loadTrainingEpisodes(tdState.task);
+});
+
 el("#td-sim-select").addEventListener("change", async (e) => {
   tdSim = e.target.value;
   tdState.task = null;
@@ -668,11 +684,14 @@ async function loadTrainingEpisodes(task, targetEpisode) {
   // already reports every known method's counts unconditionally), so this
   // is a no-op query param there.
   const methodParam = tdState.monitorMethod ? `&method=${encodeURIComponent(tdState.monitorMethod)}` : "";
-  const data = await fetchJSON(`/api/td_episodes?task=${encodeURIComponent(task)}${propertyParam}${methodParam}${tdSimQS()}${annotatorQS()}`);
+  const verdictParam = tdState.verdictFilter ? `&verdict=${encodeURIComponent(tdState.verdictFilter)}` : "";
+  const data = await fetchJSON(`/api/td_episodes?task=${encodeURIComponent(task)}${propertyParam}${methodParam}${verdictParam}${tdSimQS()}${annotatorQS()}`);
   tdEpisodeList.innerHTML = "";
   if (!data.episodes.length) {
-    tdEpisodeList.innerHTML = "<div class='muted'>no reconstructed episodes yet for this task"
-      + " -- see replay/official_playback/submit_training_data.sh</div>";
+    tdEpisodeList.innerHTML = tdState.verdictFilter
+      ? `<div class='muted'>no episodes with a "${tdState.verdictFilter}" verdict for this task/annotator</div>`
+      : "<div class='muted'>no reconstructed episodes yet for this task"
+        + " -- see replay/official_playback/submit_training_data.sh</div>";
     return;
   }
   for (const ep of data.episodes) {
@@ -1177,6 +1196,48 @@ function otherAnnotatorsEpisodeBlock(otherAnn) {
     details.appendChild(row);
   }
   return details;
+}
+
+// Explicit "save" button (2026-09-15), alongside the existing auto-save
+// (verdict click saves immediately; note text saves 500ms after typing
+// stops -- see verdictControls/noteBox above). This doesn't replace either:
+// it's here so a reviewer gets an unambiguous, visible confirmation that a
+// note actually made it to disk, rather than trusting a silent debounce --
+// asked for after KhangH's annotations turned out to have almost no notes
+// saved despite 32 disputed/unsure verdicts. Flushes whatever's currently
+// in the note box, plus the currently-active verdict button if any (never
+// force-clears an existing verdict just because none is visibly active in
+// this specific card render).
+function saveRow(group, index, controlsWrap, noteEl) {
+  const row = document.createElement("div");
+  row.className = "save-row";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "save-btn";
+  btn.textContent = "💾 save";
+  const status = document.createElement("span");
+  status.className = "save-status";
+  btn.addEventListener("click", async () => {
+    const activeBtn = controlsWrap.querySelector(".verdict-btn.active");
+    const patch = { note: noteEl.value };
+    if (activeBtn) patch.verdict = activeBtn.dataset.verdict;
+    btn.disabled = true;
+    status.textContent = "saving…";
+    status.classList.remove("save-status-error");
+    try {
+      await saveAnnotation(group, index, patch);
+      status.textContent = "saved ✓";
+    } catch (e) {
+      status.textContent = "save failed";
+      status.classList.add("save-status-error");
+    } finally {
+      btn.disabled = false;
+      setTimeout(() => { status.textContent = ""; }, 2500);
+    }
+  });
+  row.appendChild(btn);
+  row.appendChild(status);
+  return row;
 }
 
 function noteBox(group, index, current) {
@@ -1902,8 +1963,11 @@ function renderViolation(v, ann, otherAnn) {
   const gt = groundTruthAnnotationBlock(current);
   if (gt) card.appendChild(gt);
 
-  card.appendChild(verdictControls("violations", v.index, current));
-  card.appendChild(noteBox("violations", v.index, current));
+  const violControls = verdictControls("violations", v.index, current);
+  const violNote = noteBox("violations", v.index, current);
+  card.appendChild(violControls);
+  card.appendChild(violNote);
+  card.appendChild(saveRow("violations", v.index, violControls, violNote));
   const others = otherAnnotatorsBlock("violations", v.index, otherAnn);
   if (others) card.appendChild(others);
   return card;
@@ -1946,8 +2010,11 @@ function renderSatisfied(s, ann, otherAnn) {
   const gt = groundTruthAnnotationBlock(current);
   if (gt) card.appendChild(gt);
 
-  card.appendChild(verdictControls("satisfied", s.index, current));
-  card.appendChild(noteBox("satisfied", s.index, current));
+  const satControls = verdictControls("satisfied", s.index, current);
+  const satNote = noteBox("satisfied", s.index, current);
+  card.appendChild(satControls);
+  card.appendChild(satNote);
+  card.appendChild(saveRow("satisfied", s.index, satControls, satNote));
   const others = otherAnnotatorsBlock("satisfied", s.index, otherAnn);
   if (others) card.appendChild(others);
   return card;
@@ -2131,6 +2198,43 @@ function renderMissedPanel(detail, containerEl, panelId) {
     overallWrap.appendChild(b);
   }
   panel.appendChild(overallWrap);
+
+  // Explicit save for the episode-level fields too (2026-09-15) -- same
+  // "don't just trust the debounce" reasoning as the per-instance saveRow
+  // above, flushing missed_notes + whichever overall verdict is currently
+  // active (if any -- never force-clears one that isn't visibly active).
+  const episodeSaveRow = document.createElement("div");
+  episodeSaveRow.className = "save-row";
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "save-btn";
+  saveBtn.textContent = "💾 save";
+  const saveStatus = document.createElement("span");
+  saveStatus.className = "save-status";
+  saveBtn.addEventListener("click", async () => {
+    const activeOverall = overallWrap.querySelector(".verdict-btn.active");
+    const patch = { missed_notes: ta.value };
+    if (activeOverall) {
+      const idx = Array.from(overallWrap.querySelectorAll(".verdict-btn")).indexOf(activeOverall);
+      patch.overall_verdict = ["matches", "mismatches", "partial"][idx];
+    }
+    saveBtn.disabled = true;
+    saveStatus.textContent = "saving…";
+    saveStatus.classList.remove("save-status-error");
+    try {
+      await saveAnnotation(null, null, patch);
+      saveStatus.textContent = "saved ✓";
+    } catch (e) {
+      saveStatus.textContent = "save failed";
+      saveStatus.classList.add("save-status-error");
+    } finally {
+      saveBtn.disabled = false;
+      setTimeout(() => { saveStatus.textContent = ""; }, 2500);
+    }
+  });
+  episodeSaveRow.appendChild(saveBtn);
+  episodeSaveRow.appendChild(saveStatus);
+  panel.appendChild(episodeSaveRow);
 
   const others = otherAnnotatorsEpisodeBlock(detail.other_annotations);
   if (others) panel.appendChild(others);

@@ -244,6 +244,23 @@
         <label>LTL property <span class="tree-hint">(violation count for selected method)</span></label>
         <div class="tree" id="td-property-tree"><div class="loading">loading…</div></div>
       </div>
+      <!-- Verdict filter (2026-09-15): scoped to whichever annotator is
+           selected in the header (or "anyone" if the header picker is on
+           "All annotators") -- only show episodes with at least one
+           violations/satisfied entry carrying the chosen verdict, checked
+           across every postprocess method's own annotation namespace, not
+           just the currently-selected one. See server.py's episode_has_
+           verdict/list_training_episodes' verdict_filter param. -->
+      <div class="picker" id="td-verdict-picker">
+        <label>Verdict filter</label>
+        <select id="td-verdict-select">
+          <option value="">any / all episodes</option>
+          <option value="confirmed">✓ confirmed</option>
+          <option value="disputed">✗ disputed</option>
+          <option value="unsure">? unsure</option>
+          <option value="unverifiable">⦸ unverifiable</option>
+        </select>
+      </div>
       <div class="episode-list" id="td-episode-list"></div>
     </aside>
 

@@ -800,7 +800,7 @@ def _property_status_for(mon, property_name):
     return None
 
 
-def list_training_episodes(task, property_filter=None, annotator=None):
+def list_training_episodes(task, property_filter=None, annotator=None, verdict_filter=None):
     """`property_filter`: if given, every returned num_violations/success
     pair is scoped to that single named LTL property instead of the
     all-properties aggregate -- lets the viewer show "does episode N violate
@@ -808,7 +808,12 @@ def list_training_episodes(task, property_filter=None, annotator=None):
     whole-episode violated-instance count. `annotator`: None/"__all__" means
     the per-episode "annotated" indicator reflects *any* registered
     annotator; a specific name scopes it to just that one (see
-    has_human_annotation)."""
+    has_human_annotation). `verdict_filter` (2026-09-15): if given
+    (confirmed/disputed/unsure/unverifiable), episodes with no entry
+    carrying that verdict anywhere -- across *every* postprocess method's
+    own annotation namespace, not just whichever one is currently selected
+    -- are dropped from the result entirely (unlike property_filter, which
+    reshapes badges but never removes a row)."""
     out_dir = TRAINING_OUTPUT_DIR / task
     episodes = []
     if not out_dir.is_dir():
@@ -889,6 +894,11 @@ def list_training_episodes(task, property_filter=None, annotator=None):
             entry["annotated_by"][method_key] = [
                 a for a in list_annotators() if _has_human_annotation_one(a, key, ep)
             ]
+        if verdict_filter and not any(
+            episode_has_verdict(f"training__{task}__{method_key}", ep, verdict_filter, annotator=annotator)
+            for method_key in _methods
+        ):
+            continue
         episodes.append(entry)
     episodes.sort(key=lambda e: e["episode"])
     return episodes
@@ -981,8 +991,10 @@ def api_training_tasks():
     return {"dataset_root": str(TRAINING_DATASET_ROOT), "tasks": list_training_tasks()}
 
 
-def api_training_episodes(task, property_filter=None, annotator=None):
-    episodes = list_training_episodes(task, property_filter=property_filter, annotator=annotator)
+def api_training_episodes(task, property_filter=None, annotator=None, verdict_filter=None):
+    episodes = list_training_episodes(
+        task, property_filter=property_filter, annotator=annotator, verdict_filter=verdict_filter
+    )
     for ep in episodes:
         cams = ep.get("camera_names") or []
         cam_paths = [training_original_video_path(task, ep["episode"], cam) for cam in cams]
@@ -1849,6 +1861,35 @@ def human_annotation_for_index(task, episode, group, index, annotator=None):
     return _human_annotation_for_index_one(annotator, task, episode, group, index)
 
 
+def _episode_has_verdict_one(annotator, task, episode, verdict):
+    p = annotation_path(annotator, task, episode)
+    if not p.is_file():
+        return False
+    try:
+        data = json.loads(p.read_text())
+    except Exception:
+        return False
+    for group in ("violations", "satisfied"):
+        for entry in (data.get(group) or {}).values():
+            if isinstance(entry, dict) and entry.get("verdict") == verdict:
+                return True
+    return False
+
+
+def episode_has_verdict(task, episode, verdict, annotator=None):
+    """Whether this (task, episode) annotation namespace has at least one
+    violations/satisfied entry carrying exactly this verdict
+    (confirmed/disputed/unsure/unverifiable) -- for the sidebar's verdict
+    filter (2026-09-15), so a reviewer can pull up e.g. every episode
+    someone's disputed without opening each one by hand. `annotator`:
+    None/"__all__" means "anyone" (True if *any* registered annotator has
+    that verdict here); a specific name scopes to just them -- same
+    convention as has_human_annotation/human_annotation_for_index."""
+    if annotator is None or annotator == _ALL_ANNOTATORS_SENTINEL:
+        return any(_episode_has_verdict_one(a, task, episode, verdict) for a in list_annotators())
+    return _episode_has_verdict_one(annotator, task, episode, verdict)
+
+
 def load_annotations(annotator, task, episode):
     p = annotation_path(annotator, task, episode)
     if not p.is_file():
@@ -2693,7 +2734,9 @@ def list_libero_training_tasks(base_dir):
     return tasks
 
 
-def list_libero_training_episodes(base_dir, task, method=None, property_filter=None, annotator=None):
+def list_libero_training_episodes(
+    base_dir, task, method=None, property_filter=None, annotator=None, verdict_filter=None
+):
     """Parallel to list_training_episodes, but episodes are discovered from
     privileged_information_<N>.json directly (no reconstructed-video glob to
     key off -- see this block's module comment). `method` (2026-09-09,
@@ -2774,6 +2817,11 @@ def list_libero_training_episodes(base_dir, task, method=None, property_filter=N
             f"/td_libero_original_video?task={quote(task)}&episode={ep}"
             if find_libero_hdf5_for_task(task) is not None else None
         )
+        if verdict_filter:
+            if method is None or not episode_has_verdict(
+                f"libero_training__{task}__{method}", ep, verdict_filter, annotator=annotator
+            ):
+                continue
         episodes.append(entry)
     episodes.sort(key=lambda e: e["episode"])
     return episodes
@@ -2851,13 +2899,14 @@ def api_libero_training_tasks(method=None):
     }
 
 
-def api_libero_training_episodes(task, method=None, property_filter=None, annotator=None):
+def api_libero_training_episodes(task, method=None, property_filter=None, annotator=None, verdict_filter=None):
     methods, default_method = _libero_training_monitor_state()
     if method is None or method not in methods:
         method = default_method
     episodes = (
         list_libero_training_episodes(
-            methods[method]["dir"], task, method=method, property_filter=property_filter, annotator=annotator
+            methods[method]["dir"], task, method=method, property_filter=property_filter,
+            annotator=annotator, verdict_filter=verdict_filter,
         )
         if method is not None else []
     )
@@ -3231,10 +3280,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"error": "missing task"}, 400)
             property_filter = qs.get("property", [None])[0] or None
             annotator = qs.get("annotator", [None])[0]
+            verdict_filter = qs.get("verdict", [None])[0] or None
             if sim == "libero":
                 method = qs.get("method", [None])[0]
-                return self._send_json(api_libero_training_episodes(task, method=method, property_filter=property_filter, annotator=annotator))
-            return self._send_json(api_training_episodes(task, property_filter=property_filter, annotator=annotator))
+                return self._send_json(api_libero_training_episodes(
+                    task, method=method, property_filter=property_filter,
+                    annotator=annotator, verdict_filter=verdict_filter,
+                ))
+            return self._send_json(api_training_episodes(
+                task, property_filter=property_filter, annotator=annotator, verdict_filter=verdict_filter,
+            ))
 
         if parsed.path == "/api/training_ltl_properties":
             sim = qs.get("sim", ["robocasa"])[0]
