@@ -26,6 +26,112 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 THIS_DIR = Path(__file__).resolve().parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(THIS_DIR))
+
+from replay_capture import finalize_libero_replay_dir, wrap_raw_libero_env_for_replay  # noqa: E402
+from video_capture import MultiCameraVideoCapture  # noqa: E402
+
+
+def _patch_libero_env_for_replay(main_module, base_replay_dir: Path):
+    """openpi's `eval_libero()` has no gym.Env at all -- unlike RLDX-1/
+    GR00T-N1.6 (gym-registered `libero_sim/<task>`, wrapped via
+    `ReplayCapture`/`locate_env_holder`), it calls `_get_libero_env(task,
+    resolution, seed)` once per task (creating a raw `OffScreenRenderEnv`
+    directly -- see main.py), then reuses that SAME env instance across
+    all `num_trials_per_task` episodes for that task via repeated
+    `env.reset()`/`env.set_init_state()`/`env.step()` calls, all proxied
+    through unchanged by `DataCollectionWrapper`'s own `__getattr__`.
+
+    Monkeypatches `main_module._get_libero_env` (not `main.py` itself) to
+    wrap the returned env with `DataCollectionWrapper` via
+    `wrap_raw_libero_env_for_replay`, and finalizes the PREVIOUS task's
+    collected episodes into `<base_replay_dir>/<task_name>/hdf5/demo.hdf5`
+    (LIBERO's own native format, via `finalize_libero_replay_dir`) each
+    time a NEW task's env is created -- since `eval_libero()` loops over
+    every task in the suite in one process, without finalizing per-task
+    like this, all 10 tasks' episodes would end up in one shared
+    raw_state_collection dir with only the LAST task's bddl_file, silently
+    corrupting the other 9 tasks' hdf5s.
+
+    Also layers our own `MultiCameraVideoCapture` around the same wrapped
+    env (in addition to, not instead of, openpi's own native
+    `replay_images`/`imageio.mimwrite` video-saving in `eval_libero()`
+    itself -- unlike RLDX-1/GR00T-N1.6, there's no `video_dir=None`-style
+    toggle to disable it, since it's unconditional, hardcoded logic inside
+    `eval_libero()`'s own loop, which we don't edit). Guarantees a
+    frame-count-synchronized video exists (matching the replay states 1:1)
+    even though openpi's own native video is left running alongside it --
+    openpi's own video also skips the `num_steps_wait` dummy-action phase
+    (confirmed by reading main.py: images are only appended to
+    `replay_images` outside that phase, but `env.step()` -- and therefore
+    `DataCollectionWrapper`'s own recording -- still runs during it), so
+    its own video isn't 1:1 with the states either, just off by a smaller,
+    fixed `num_steps_wait` amount rather than RLDX-1/GR00T's ~2x scaling
+    mismatch.
+
+    Returns a zero-arg `flush()` callable the caller must invoke once more
+    after `eval_libero()` returns, to finalize the LAST task's episodes
+    (which nothing else triggers, since there's no "next task" to prompt
+    it)."""
+    original_get_libero_env = main_module._get_libero_env
+    state: Dict[str, Any] = {"prev": None}
+
+    def _finalize_prev():
+        prev = state["prev"]
+        if prev is None:
+            return
+        wrapped_env, raw_dir, bddl_file, task_name, video_capture = prev
+        # DataCollectionWrapper only writes state_*.npz to disk every
+        # `flush_freq` (100) steps, or on `.close()`/the next `.reset()`
+        # (see robosuite.wrappers.data_collection_wrapper.DataCollectionWrapper
+        # ._flush/_start_new_episode/close) -- openpi's own eval_libero()
+        # never calls .close() on this env (it's reused across trials via
+        # reset(), then just dropped once the next task's env is
+        # requested), and a short last episode (< 100 steps, no
+        # subsequent reset) never reaches an automatic flush either. Left
+        # unflushed, raw_dir ends up with zero state_*.npz files, and
+        # gather_demonstrations_as_hdf5's own `env_name` stays `None`
+        # (never populated from any npz), crashing on
+        # `grp.attrs["env"] = None` (TypeError: object dtype has no
+        # native HDF5 equivalent) -- confirmed via a real run's traceback.
+        # Explicitly closing here (matching what RLDX-1/GR00T-N1.6's
+        # run_rollout_gymnasium_policy already does to their own
+        # gym-wrapped env at rollout end, which is why they don't hit
+        # this) forces the flush before raw_dir is read.
+        wrapped_env.close()
+        hdf5_dir = base_replay_dir / task_name / "hdf5"
+        hdf5_path = finalize_libero_replay_dir(raw_dir, hdf5_dir, bddl_file)
+        if hdf5_path is not None:
+            print(f"[replay] task={task_name!r} -> {hdf5_path}")
+        video_capture.finalize()
+
+    def _wrapped_get_libero_env(task, resolution, seed):
+        _finalize_prev()
+        env, task_description = original_get_libero_env(task, resolution, seed)
+        # Recomputed the same way _get_libero_env's own body does (via the
+        # module's own get_libero_path, so it resolves identically to
+        # whatever the actual env was just constructed with).
+        bddl_file = str(
+            Path(main_module.get_libero_path("bddl_files")) / task.problem_folder / task.bddl_file
+        )
+        # Matches main.py's own video-filename convention
+        # (task_segment = task_description.replace(" ", "_")), so replay
+        # and video output are trivially cross-referenced by task name.
+        task_name = task_description.replace(" ", "_")
+        task_replay_dir = base_replay_dir / task_name
+        wrapped_env, raw_dir = wrap_raw_libero_env_for_replay(env, task_replay_dir)
+        video_capture = MultiCameraVideoCapture(
+            wrapped_env,
+            task_replay_dir / "videos",
+            camera_names=("agentview", "robot0_eye_in_hand"),
+            double_flip=True,
+        )
+        state["prev"] = (wrapped_env, raw_dir, bddl_file, task_name, video_capture)
+        return video_capture, task_description
+
+    main_module._get_libero_env = _wrapped_get_libero_env
+    return _finalize_prev
 
 
 def _patch_disable_websocket_keepalive_timeout_client() -> None:
@@ -150,10 +256,16 @@ def run_single_suite(
     num_steps_wait: int,
     seed: int,
     video_out_path: str,
+    save_replay: bool = False,
+    replay_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     _patch_torch_load_weights_only_false()
     _patch_disable_websocket_keepalive_timeout_client()
     main_module = _load_pristine_main_module()
+
+    flush_replay = None
+    if save_replay:
+        flush_replay = _patch_libero_env_for_replay(main_module, Path(replay_dir))
 
     args = main_module.Args(
         host=host,
@@ -173,6 +285,8 @@ def run_single_suite(
         main_module.eval_libero(args)
     finally:
         logging.getLogger().removeHandler(capture)
+        if flush_replay is not None:
+            flush_replay()  # finalize the last task's episodes -- see _patch_libero_env_for_replay
 
     return {
         "task_suite_name": task_suite_name,
@@ -198,11 +312,23 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--video_out_path", required=True)
     ap.add_argument("--stats_path", default=None)
+    ap.add_argument("--save_replay", action="store_true")
+    ap.add_argument(
+        "--replay_dir",
+        default=None,
+        help="Defaults to <video_out_path>/replay if --save_replay is set and this is omitted.",
+    )
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO)
 
     Path(args.video_out_path).mkdir(parents=True, exist_ok=True)
+    replay_dir = args.replay_dir
+    if args.save_replay and replay_dir is None:
+        replay_dir = str(Path(args.video_out_path) / "replay")
+    if replay_dir is not None:
+        Path(replay_dir).mkdir(parents=True, exist_ok=True)
+
     stats = run_single_suite(
         task_suite_name=args.task_suite_name,
         host=args.host,
@@ -213,6 +339,8 @@ def main() -> None:
         num_steps_wait=args.num_steps_wait,
         seed=args.seed,
         video_out_path=args.video_out_path,
+        save_replay=args.save_replay,
+        replay_dir=replay_dir,
     )
 
     stats_path = Path(args.stats_path or (Path(args.video_out_path) / "stats.json"))

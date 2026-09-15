@@ -14,11 +14,25 @@ openpi's own num_trials_per_task=50 convention, and the same "n_episodes
 always 50" override already applied to grootn16's RoboCasa sweep) -- see
 eval/EVAL_PROTOCOL_NOTES.md.
 
-No replay/video-capture wrapping here (unlike the RoboCasa RLDX-1 script) --
-not requested for LIBERO, and LIBERO's env stack (register_libero_envs())
-hasn't been separately verified against replay_capture.py's
-locate_env_holder() the way robocasa's has. RLDX-1's own eval_libero.sh
-already writes its own per-episode rollout videos via `--video_dir`.
+Optional replay capture (`--save_replay`), producing LIBERO's own native
+training-data hdf5 format (`data/demo_N/{states,actions,model_file}` --
+NOT robocasa's extras/lerobot-style reformatting, since the goal is for
+saved LIBERO eval replays to look exactly like LIBERO's own training data,
+matched via LIBERO's own `gather_demonstrations_as_hdf5`, not a RoboCasa
+convention). See replay_capture.py's `finalize_libero_replay_dir` and
+`locate_env_holder` (extended to also recognize LIBERO's `LiberoEnv`,
+which stores its raw env at `self._env` rather than RoboCasaGymEnv's
+`self.env`) for the full mechanism.
+
+When `--save_replay` is set, this also replaces RLDX-1's own native
+per-episode video-saving (`--video_dir`, disabled via `video_dir=None`)
+with our own `MultiCameraVideoCapture`, wrapped at the exact same level as
+`DataCollectionWrapper` -- guarantees frame-count parity between the
+replay hdf5 and the saved video by construction, unlike RLDX-1's own video
+wrapper, which was confirmed (via a real reconstruction test) to record at
+a different frequency than the replay states (~2:1 states:video-frames).
+Without `--save_replay`, RLDX-1's own native video-saving is left
+untouched.
 
 `--no-strict` (patched in from outside, see `_patch_create_rldx_sim_policy_no_strict`)
 -------------------------------------------------------------------------------------
@@ -52,11 +66,14 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
+
+from replay_capture import ReplayCapture, finalize_libero_replay_dir  # noqa: E402
+from video_capture import MultiCameraVideoCapture  # noqa: E402
 
 
 def _patch_create_rldx_sim_policy_no_strict() -> None:
@@ -91,31 +108,117 @@ def run_single_task(
     n_episodes: int,
     n_action_steps: int,
     max_episode_steps: int,
+    save_replay: bool = False,
+    replay_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
+    import gymnasium as gym
+
     _patch_create_rldx_sim_policy_no_strict()
     from rldx.eval.rollout_policy import run_rldx_sim_policy
 
     env_name = f"libero_sim/{task}"
 
-    _, episode_successes, _ = run_rldx_sim_policy(
-        env_name=env_name,
-        n_episodes=n_episodes,
-        max_episode_steps=max_episode_steps,
-        model_path=model_path,
-        n_envs=1,
-        n_action_steps=n_action_steps,
-        video_dir=video_dir,
+    replay_holder: Dict[str, Any] = {}
+    original_make = gym.make
+
+    def _patched_make(*args, **kwargs):
+        if not save_replay:
+            return original_make(*args, **kwargs)
+        gym_env = original_make(*args, **kwargs)
+        # register_libero_envs() has already run by this point (it's the
+        # first thing get_libero_env_fn's env_fn() does, before calling
+        # gym.make -- see rldx/eval/rollout_policy.py), so the spec's own
+        # registered kwargs (the same ones LiberoEnv.__init__ was
+        # constructed with) are already available here rather than needing
+        # to be recomputed independently.
+        env_id = args[0] if args else kwargs.get("id")
+        bddl_file = gym.spec(env_id).kwargs["task_bddl_file"]
+        capture = ReplayCapture(gym_env, Path(replay_dir), env_kwargs={"bddl_file_name": bddl_file})
+        replay_holder["capture"] = capture
+        replay_holder["bddl_file"] = bddl_file
+        # Replace RLDX-1's own native video-saving (disabled below via
+        # video_dir=None) with our own MultiCameraVideoCapture, wrapped at
+        # the exact same level as DataCollectionWrapper -- guarantees
+        # frame-count parity between the replay hdf5 and the saved video by
+        # construction (both driven by the same .step() calls), unlike
+        # RLDX-1's own video wrapper, which recorded at a different
+        # frequency than the replay states (confirmed empirically: roughly
+        # a 2:1 states:video-frames ratio on a real run). LIBERO's own two
+        # cameras (agentview, robot0_eye_in_hand -- see
+        # eval/simulators/libero/libero/libero/envs/env_wrapper.py's
+        # default camera_names), and double_flip=True to match LIBERO's
+        # own 180-degree rotation convention (see video_capture.py).
+        video_capture = MultiCameraVideoCapture(
+            capture._wrapped,
+            Path(replay_dir) / "videos",
+            camera_names=("agentview", "robot0_eye_in_hand"),
+            double_flip=True,
+        )
+        setattr(capture.holder_obj, capture.holder_attr, video_capture)
+        replay_holder["video_capture"] = video_capture
+        return gym_env
+
+    # run_rldx_sim_policy never actually leaves video_dir=None in effect --
+    # if given None it auto-generates one via
+    # f"/tmp/.../{model_path.split('/')[-3]}_ac{...}_{uuid4()}" and always
+    # passes SOMETHING into VideoConfig(video_dir=...), so RLDX-1's own
+    # native video wrapper is never truly disabled (confirmed by reading
+    # rollout_policy.py directly) -- passing None here only matters
+    # insofar as it lets RLDX-1 pick that fallback path itself, which
+    # crashes for any HF-repo-style model_path with fewer than 3 '/'
+    # segments (confirmed by a real crash: `IndexError: list index out of
+    # range` on "RLWRLD/RLDX-1-FT-LIBERO".split('/')[-3]). Since RLDX-1's
+    # own native video output is functionally harmless to leave running
+    # alongside our own MultiCameraVideoCapture (same working pattern
+    # already used for RoboCasa in run_single_task_rldx1.py -- our capture
+    # replaces the raw env reference before RLDX-1's own video wrapper
+    # attaches on top, so its output is just an unused, ignorable /tmp
+    # video, not a conflict), the fix is simply to give it a valid throwaway
+    # path directly instead of relying on its own buggy auto-generation.
+    rldx1_native_video_dir = (
+        f"/tmp/{__import__('os').environ.get('USER', 'user')}/rldx1_libero_native_video_unused"
+        if save_replay
+        else video_dir
     )
+
+    gym.make = _patched_make
+    try:
+        _, episode_successes, _ = run_rldx_sim_policy(
+            env_name=env_name,
+            n_episodes=n_episodes,
+            max_episode_steps=max_episode_steps,
+            model_path=model_path,
+            n_envs=1,
+            n_action_steps=n_action_steps,
+            video_dir=rldx1_native_video_dir,
+        )
+    finally:
+        gym.make = original_make
 
     success_rate = float(sum(episode_successes)) / len(episode_successes) if episode_successes else 0.0
     print(f"Success rate: {success_rate:.2f}")
 
-    return {
+    stats = {
         "task": task,
         "num_episodes": len(episode_successes),
         "success_rate": success_rate,
         "video_dir": video_dir,
     }
+
+    if save_replay and "video_capture" in replay_holder:
+        written = replay_holder["video_capture"].finalize(num_episodes=len(episode_successes))
+        print(f"MultiCameraVideoCapture wrote {written} episode(s)' videos to {Path(replay_dir) / 'videos'}")
+
+    if save_replay and "capture" in replay_holder:
+        hdf5_dir = Path(replay_dir) / "hdf5"
+        hdf5_path = finalize_libero_replay_dir(
+            replay_holder["capture"].raw_dir, hdf5_dir, replay_holder["bddl_file"]
+        )
+        if hdf5_path is not None:
+            print(f"LIBERO-native replay hdf5 written to: {hdf5_path}")
+            stats["replay_hdf5_path"] = str(hdf5_path)
+
+    return stats
 
 
 def main() -> None:
@@ -126,6 +229,12 @@ def main() -> None:
     ap.add_argument("--n_episodes", type=int, required=True)
     ap.add_argument("--n_action_steps", type=int, default=8)
     ap.add_argument("--max_episode_steps", type=int, default=720)
+    ap.add_argument("--save_replay", action="store_true")
+    ap.add_argument(
+        "--replay_dir",
+        default=None,
+        help="Defaults to <video_dir>/replay if --save_replay is set and this is omitted.",
+    )
     args = ap.parse_args()
 
     video_dir = Path(args.video_dir)
@@ -138,6 +247,12 @@ def main() -> None:
     if task.startswith("libero_sim/"):
         task = task[len("libero_sim/") :]
 
+    replay_dir = args.replay_dir
+    if args.save_replay and replay_dir is None:
+        replay_dir = str(video_dir / "replay")
+    if replay_dir is not None:
+        Path(replay_dir).mkdir(parents=True, exist_ok=True)
+
     stats = run_single_task(
         model_path=args.model_path,
         task=task,
@@ -145,6 +260,8 @@ def main() -> None:
         n_episodes=args.n_episodes,
         n_action_steps=args.n_action_steps,
         max_episode_steps=args.max_episode_steps,
+        save_replay=args.save_replay,
+        replay_dir=replay_dir,
     )
 
     stats_path = video_dir / "stats.json"

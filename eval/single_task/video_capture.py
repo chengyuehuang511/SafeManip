@@ -60,6 +60,7 @@ class MultiCameraVideoCapture:
         height: int = 256,
         width: int = 256,
         fps: int = 20,
+        double_flip: bool = False,
     ):
         self.env = env
         self.lerobot_dir = Path(lerobot_dir)
@@ -67,6 +68,14 @@ class MultiCameraVideoCapture:
         self.height = height
         self.width = width
         self.fps = fps
+        # RoboCasa's own convention is a single vertical flip ([::-1]).
+        # LIBERO's is a full 180-degree flip ([::-1, ::-1]) -- confirmed
+        # from openpi's own examples/libero/main.py comment ("rotate 180
+        # degrees to match train preprocessing") and mirrored in
+        # reconstruct_libero_video.py's own reconstruction, so LIBERO
+        # callers must pass double_flip=True to match what the policy
+        # actually trained/was evaluated on, not RoboCasa's default.
+        self.double_flip = double_flip
         # Episodes are recorded strictly in rollout order (one per
         # env.reset(), same reasoning as finalize_replay_dir's own
         # chronological numbering), so a simple incrementing counter IS the
@@ -103,9 +112,8 @@ class MultiCameraVideoCapture:
         if not self._writers:
             self._open_writers()
         for cam in self.camera_names:
-            frame = self.env.sim.render(height=self.height, width=self.width, camera_name=cam)[
-                ::-1
-            ]
+            frame = self.env.sim.render(height=self.height, width=self.width, camera_name=cam)
+            frame = frame[::-1, ::-1] if self.double_flip else frame[::-1]
             self._writers[cam].append_data(np.asarray(frame, dtype=np.uint8))
         self._episode_has_frames = True
 

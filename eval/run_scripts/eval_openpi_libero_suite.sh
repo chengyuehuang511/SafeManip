@@ -78,6 +78,14 @@ fi
 
 conda activate "${OPENPI_CONDA_ENV_NAME}"
 
+# See _setup_libero_config.sh's own docstring: LIBERO's get_libero_path()
+# reads bddl_files/init_states/etc. from a machine-wide config file
+# entirely independent of PYTHONPATH -- this generates one pointing at our
+# actual LIBERO_ROOT (libero_openpi's own pin) instead of trusting whatever
+# ~/.libero/config.yaml happens to already contain on this machine.
+# shellcheck disable=SC1091
+source "${RUN_SCRIPTS_DIR}/_setup_libero_config.sh"
+
 export PYTHONPATH="${OPENPI_ROOT}:${OPENPI_ROOT}/src:${OPENPI_ROOT}/packages/openpi-client/src:${LIBERO_ROOT}:${SINGLE_TASK_DIR}:${PYTHONPATH:-}"
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
 if [[ -z "${MUJOCO_EGL_DEVICE_ID:-}" ]]; then
@@ -120,6 +128,12 @@ REPLAN_STEPS="${REPLAN_STEPS:-5}"
 RESIZE_SIZE="${RESIZE_SIZE:-224}"
 NUM_STEPS_WAIT="${NUM_STEPS_WAIT:-10}"
 SEED="${SEED:-7}"
+# Off by default, same convention as the RLDX-1/GR00T-N1.6 LIBERO
+# launchers -- opt in via SAVE_REPLAY=1. Produces LIBERO's own native
+# demo.hdf5 format, one per task (see run_libero_suite_openpi.py's
+# _patch_libero_env_for_replay).
+SAVE_REPLAY="${SAVE_REPLAY:-0}"
+REPLAY_DIR="${REPLAY_DIR:-${VIDEO_DIR}/replay}"
 
 if [[ -z "${PORT:-}" ]]; then
   PORT="$((8000 + (${SLURM_JOB_ID:-0} % 20000)))"
@@ -137,6 +151,7 @@ echo "REPLAN_STEPS=${REPLAN_STEPS}"
 echo "RESIZE_SIZE=${RESIZE_SIZE}"
 echo "NUM_STEPS_WAIT=${NUM_STEPS_WAIT}"
 echo "SEED=${SEED}"
+echo "SAVE_REPLAY=${SAVE_REPLAY}"
 if command -v nvidia-smi >/dev/null 2>&1; then
   nvidia-smi -L || true
 fi
@@ -168,6 +183,11 @@ for i in $(seq 1 120); do
 done
 sleep 5  # give the socket a moment past the log line, matching other launchers' convention
 
+EXTRA_ARGS=()
+if [[ "${SAVE_REPLAY}" == "1" ]]; then
+  EXTRA_ARGS+=(--save_replay --replay_dir "${REPLAY_DIR}")
+fi
+
 srun_status=0
 python "${SINGLE_TASK_DIR}/run_libero_suite_openpi.py" \
   --task_suite_name "${TASK_SUITE_NAME}" \
@@ -178,6 +198,7 @@ python "${SINGLE_TASK_DIR}/run_libero_suite_openpi.py" \
   --resize_size "${RESIZE_SIZE}" \
   --num_steps_wait "${NUM_STEPS_WAIT}" \
   --seed "${SEED}" \
-  --video_out_path "${VIDEO_DIR}" || srun_status="$?"
+  --video_out_path "${VIDEO_DIR}" \
+  "${EXTRA_ARGS[@]}" || srun_status="$?"
 
 exit "${srun_status}"

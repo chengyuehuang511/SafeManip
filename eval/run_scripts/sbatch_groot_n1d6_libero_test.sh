@@ -8,18 +8,26 @@ if [[ -f "${RUN_SCRIPTS_DIR}/.local_paths.sh" ]]; then
 fi
 cd "${PROJECT_ROOT}"
 
-job_name="eval_rldx1_libero_single_task"
+job_name="eval_groot_n1d6_libero_single_task"
 output_dir="logs/eval/${job_name}"
 # Matches RoboCasa's own eval/saved_eval_rollouts/<split>/<model> layout
-# (see eval/launch_pretrain_split.sh) rather than a separate results/ tree.
-base_video_dir="${VIDEO_DIR:-${BASE_VIDEO_DIR:-${PROJECT_ROOT}/eval/saved_eval_rollouts/libero/rldx1}}"
+# (see eval/launch_pretrain_split.sh) rather than a separate results/ tree
+# -- same convention as sbatch_openpi_libero_test.sh/
+# sbatch_rldx1_libero_test.sh.
+base_video_dir="${VIDEO_DIR:-${BASE_VIDEO_DIR:-${PROJECT_ROOT}/eval/saved_eval_rollouts/libero/grootn16}}"
 
-# All 40 individual LIBERO tasks (plain LIBERO only -- libero_10, libero_goal,
-# libero_object, libero_spatial), and each task's n_episodes, transcribed
-# verbatim from eval/models/RLDX-1/run_scripts/eval/libero/eval_libero.sh's
-# own ALL_TASKS/ALL_SUITES arrays: 50 episodes for libero_10, 20 for the
-# other three suites (RLDX-1's own official split, not uniform -- see
-# eval/EVAL_PROTOCOL_NOTES.md).
+# Same 40 individual LIBERO tasks, n_episodes, and per-suite max_episode_steps
+# as sbatch_rldx1_libero_test.sh -- GR00T-N1.6's own checkpoint
+# (0xAnkitSingh/GR00T-N1.6-LIBERO) is COMBINED across all 4 suites, same
+# convention as RLDX-1's, and its env id format (`libero_sim/<task>`) is
+# identical (confirmed identical gr00t.eval.sim.LIBERO.libero_env.
+# register_libero_envs implementation in both codebases -- see
+# run_single_task_groot_n1d6_libero.py's own docstring), so the task list
+# is transcribed verbatim rather than duplicated with any changes. Uniform
+# 50 episodes/task and openpi's own per-suite max_steps (spatial=220,
+# object=280, goal=300, libero_10=520) -- same "all 3 LIBERO models share
+# one consistent per-suite horizon convention" policy -- see
+# eval/EVAL_PROTOCOL_NOTES.md.
 task_names=(
   "libero_sim/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket"
   "libero_sim/LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_basket"
@@ -62,11 +70,6 @@ task_names=(
   "libero_sim/pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate"
   "libero_sim/pick_up_the_black_bowl_on_the_wooden_cabinet_and_place_it_on_the_plate"
 )
-# RLDX-1's own official eval_libero.sh uses 50 episodes for libero_10 but
-# only 20 for goal/object/spatial. Deliberately overridden to a uniform 50
-# across all 40 tasks here -- same "n_episodes always 50, everything else
-# matches official" override already applied to grootn16's RoboCasa sweep
-# (its own official protocol used 30) -- see eval/EVAL_PROTOCOL_NOTES.md.
 n_episodes_list=(
   50 50 50 50 50 50 50 50 50 50
   50 50 50 50 50 50 50 50 50 50
@@ -75,13 +78,7 @@ n_episodes_list=(
 )
 # task_names above is grouped in blocks of 10 by suite, in this exact
 # order (matching RLDX-1's own eval_libero.sh ALL_TASKS loop order):
-# libero_10, libero_goal, libero_object, libero_spatial. RLDX-1's own
-# official max_episode_steps is a single flat 720 for all 40 tasks --
-# deliberately overridden here to openpi's own per-suite max_steps values
-# (examples/libero/main.py: spatial=220, object=280, goal=300, 10=520) so
-# all 3 LIBERO models (openpi/RLDX-1/GR00T) share one consistent per-suite
-# horizon convention instead of each picking their own -- see
-# eval/EVAL_PROTOCOL_NOTES.md.
+# libero_10, libero_goal, libero_object, libero_spatial.
 max_episode_steps_list=(
   520 520 520 520 520 520 520 520 520 520
   300 300 300 300 300 300 300 300 300 300
@@ -89,11 +86,14 @@ max_episode_steps_list=(
   220 220 220 220 220 220 220 220 220 220
 )
 
-model_path="${MODEL_PATH:-RLWRLD/RLDX-1-FT-LIBERO}"
+model_path="${MODEL_PATH:-0xAnkitSingh/GR00T-N1.6-LIBERO}"
 video_dir="${VIDEO_OUTPUT_DIR:-${base_video_dir}}"
 n_action_steps="${N_ACTION_STEPS:-8}"
 
 run_env="MODEL_PATH=${model_path},N_ACTION_STEPS=${n_action_steps}"
+if [[ -n "${SAVE_REPLAY:-}" ]]; then
+  run_env="${run_env},SAVE_REPLAY=${SAVE_REPLAY}"
+fi
 
 mkdir -p "${output_dir}"
 mkdir -p "${video_dir}"
