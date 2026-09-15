@@ -101,11 +101,17 @@ task_list=$(IFS=:; echo "${task_names[*]}")
 n_episodes_str=$(IFS=:; echo "${n_episodes_list[*]}")
 max_episode_steps_str=$(IFS=:; echo "${max_episode_steps_list[*]}")
 array_end=$(( ${#task_names[@]} - 1 ))
+# Overridable so a subset of tasks (e.g. ones that failed on a shared-node
+# issue) can be resubmitted without redoing the whole sweep -- e.g.
+# ARRAY_RANGE="0,1,7,8" bash sbatch_rldx1_libero_test.sh. Indices still
+# index into the SAME full task_names/n_episodes_list/max_episode_steps_list
+# arrays above, unaffected by this override.
+array_range="${ARRAY_RANGE:-0-${array_end}}"
 
 gpu_type="${GPU_TYPE:-a40}"
 
 sbatch_args=(
-  --array="0-${array_end}" \
+  --array="${array_range}" \
   --export="ALL,TASK_LIST=${task_list},N_EPISODES_LIST=${n_episodes_str},MAX_EPISODE_STEPS_LIST=${max_episode_steps_str},VIDEO_DIR=${video_dir},${run_env}" \
   --job-name="${job_name}" \
   --gpus-per-node="${gpu_type}:1" \

@@ -40,11 +40,16 @@ mkdir -p "${output_dir}"
 mkdir -p "${video_dir}"
 task_suite_list=$(IFS=:; echo "${task_suites[*]}")
 array_end=$(( ${#task_suites[@]} - 1 ))
+# Overridable so a subset of suites (e.g. one that failed) can be
+# resubmitted without redoing the whole sweep -- e.g. ARRAY_RANGE="3"
+# bash sbatch_openpi_libero_test.sh. Indices still index into the SAME
+# full task_suites array above, unaffected by this override.
+array_range="${ARRAY_RANGE:-0-${array_end}}"
 
 gpu_type="${GPU_TYPE:-a40}"
 
 sbatch_args=(
-  --array="0-${array_end}" \
+  --array="${array_range}" \
   --export="ALL,TASK_SUITE_LIST=${task_suite_list},VIDEO_DIR=${video_dir},${run_env}" \
   --job-name="${job_name}" \
   --gpus-per-node="${gpu_type}:1" \

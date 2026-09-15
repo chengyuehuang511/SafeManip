@@ -16,17 +16,18 @@ output_dir="logs/eval/${job_name}"
 # sbatch_rldx1_libero_test.sh/sbatch_groot_n1d6_libero_test.sh.
 base_video_dir="${VIDEO_DIR:-${BASE_VIDEO_DIR:-${PROJECT_ROOT}/eval/saved_eval_rollouts/libero/grootn15}}"
 
-# Plain LIBERO only (no libero_plus/libero_pro) -- same 5-suite set as
-# eval_groot_n1d5_libero_suite.sh's own per-suite checkpoint table (from
-# NVIDIA's own examples/Libero/README.md), one array task per suite (each
-# suite needs its OWN checkpoint + server, unlike openpi/RLDX-1's single
-# unified checkpoint).
+# Plain LIBERO, 4 suites only -- matches the same scope as
+# sbatch_openpi_libero_test.sh/sbatch_rldx1_libero_test.sh/
+# sbatch_groot_n1d6_libero_test.sh (none of which evaluate libero_90 in
+# this project), even though NVIDIA's own examples/Libero/README.md
+# checkpoint table also documents a libero_90 checkpoint. One array task
+# per suite (each suite needs its OWN checkpoint + server, unlike
+# openpi/RLDX-1's single unified checkpoint).
 task_suites=(
   "libero_spatial"
   "libero_object"
   "libero_goal"
   "libero_10"
-  "libero_90"
 )
 
 num_trials_per_task="${NUM_TRIALS_PER_TASK:-50}"
