@@ -139,6 +139,15 @@ NUM_STEPS_WAIT="${NUM_STEPS_WAIT:-10}"
 # via SAVE_REPLAY=1.
 SAVE_REPLAY="${SAVE_REPLAY:-0}"
 REPLAY_DIR="${REPLAY_DIR:-${VIDEO_DIR}/replay}"
+# LIBERO-specific value, matching N1.6/RLDX-1's own official LIBERO
+# convention (8) and the community LIBERO fine-tune's own documented eval
+# convention (also 8) -- NOT the RoboCasa fork's generic default (16),
+# which is a different benchmark's convention. See
+# run_libero_suite_groot_n1d5.py's GR00T_N1D5_N_ACTION_STEPS comment for
+# the full reasoning. N1.5's pristine run_libero_eval.py has no chunking
+# at all (re-queries every env step); run_libero_suite_groot_n1d5.py
+# patches this in via _patch_action_chunking.
+N_ACTION_STEPS="${N_ACTION_STEPS:-8}"
 
 if [[ -z "${PORT:-}" ]]; then
   PORT="$((8000 + (${SLURM_JOB_ID:-0} % 20000)))"
@@ -154,6 +163,7 @@ echo "VIDEO_DIR=${VIDEO_DIR}"
 echo "PORT=${PORT}"
 echo "NUM_TRIALS_PER_TASK=${NUM_TRIALS_PER_TASK}"
 echo "NUM_STEPS_WAIT=${NUM_STEPS_WAIT}"
+echo "N_ACTION_STEPS=${N_ACTION_STEPS}"
 echo "SAVE_REPLAY=${SAVE_REPLAY}"
 if command -v nvidia-smi >/dev/null 2>&1; then
   nvidia-smi -L || true
@@ -206,6 +216,7 @@ python "${SINGLE_TASK_DIR}/run_libero_suite_groot_n1d5.py" \
   --port "${PORT}" \
   --num_trials_per_task "${NUM_TRIALS_PER_TASK}" \
   --num_steps_wait "${NUM_STEPS_WAIT}" \
+  --n_action_steps "${N_ACTION_STEPS}" \
   --headless \
   --video_out_path "${VIDEO_DIR}" \
   "${EXTRA_ARGS[@]}" || srun_status="$?"

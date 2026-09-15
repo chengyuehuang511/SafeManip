@@ -45,6 +45,31 @@ THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
+# torch>=2.6 changed `torch.load`'s default `weights_only` from False to
+# True -- this breaks LIBERO's own `benchmark.get_task_init_states()`
+# (eval/simulators/libero/libero/libero/benchmark/__init__.py), which does
+# a plain `torch.load(init_states_path)` on its own committed,
+# numpy-pickled init-state files (predates torch 2.6's stricter default).
+# N1.5's own eval_libero() is the only one of the 4 LIBERO launchers that
+# actually calls this (RLDX-1/GR00T-N1.6's real gym-env reset path never
+# does -- only their unused `if __name__ == "__main__"` demo blocks call
+# it), so this is patched here rather than project-wide. These are the
+# project's own trusted, committed LIBERO files (not arbitrary/untrusted
+# input), so restoring the pre-2.6 default (weights_only=False) is safe --
+# confirmed via a real crash (`_pickle.UnpicklingError: Weights only load
+# failed ... Unsupported global: GLOBAL numpy.core.multiarray._reconstruct`).
+import torch  # noqa: E402
+
+_original_torch_load = torch.load
+
+
+def _torch_load_weights_only_false(*args, **kwargs):
+    kwargs.setdefault("weights_only", False)
+    return _original_torch_load(*args, **kwargs)
+
+
+torch.load = _torch_load_weights_only_false
+
 from replay_capture import finalize_libero_replay_dir, wrap_raw_libero_env_for_replay  # noqa: E402
 from video_capture import MultiCameraVideoCapture  # noqa: E402
 
@@ -61,11 +86,44 @@ UNIFIED_MAX_STEPS = {
 }
 
 
+# The two per-suite max_steps literals inside eval_libero()'s own hardcoded
+# if/elif chain (examples/Libero/eval/run_libero_eval.py) that disagree
+# with this project's unified LIBERO horizon convention (see
+# UNIFIED_MAX_STEPS above / eval/EVAL_PROTOCOL_NOTES.md) -- goal=600 (vs
+# 300) and libero_10=1000 (vs 520). Patched via a source-text substitution
+# in `_load_pristine_main_module` below (see its own docstring for why),
+# rather than left as the previous no-op placeholder.
+_MAX_STEPS_SOURCE_OVERRIDES = [
+    (
+        'max_steps = 600  # longest training demo has 270 steps',
+        'max_steps = 300  # overridden: unified LIBERO horizon convention (was 600)',
+    ),
+    (
+        'max_steps = 1000  # longest training demo has 505 steps',
+        'max_steps = 520  # overridden: unified LIBERO horizon convention (was 1000)',
+    ),
+]
+
+
 def _load_pristine_main_module():
     """Loads examples/Libero/eval/run_libero_eval.py as a module object via
     file path (not a normal `import`, matching
     run_libero_suite_openpi.py's `_load_pristine_main_module`), so its
-    `if __name__ == "__main__": ...` guard never fires."""
+    `if __name__ == "__main__": ...` guard never fires.
+
+    Also applies `_MAX_STEPS_SOURCE_OVERRIDES` to the source text before
+    compiling/exec'ing it (the file on disk is never touched -- only the
+    in-memory module object reflects the override, same
+    doesn't-modify-the-submodule principle as every other patch in this
+    file). This replaces an earlier no-op `_patch_unified_max_steps`
+    placeholder: eval_libero()'s per-suite max_steps are hardcoded literal
+    if/elif branches inside the function body, not a module-level
+    attribute or argument, so there is no object to monkeypatch after the
+    fact -- the only way to override them non-invasively is to patch the
+    source text itself before it becomes bytecode. Each substring is
+    required to match exactly once; a missing match (e.g. after an
+    upstream submodule update changes the literals) raises immediately
+    rather than silently leaving the override unapplied."""
     import os
 
     n1d5_root = Path(
@@ -85,9 +143,23 @@ def _load_pristine_main_module():
     # working setup).
     if str(n1d5_root) not in sys.path:
         sys.path.insert(0, str(n1d5_root))
+
+    source = main_path.read_text()
+    for old, new in _MAX_STEPS_SOURCE_OVERRIDES:
+        count = source.count(old)
+        if count != 1:
+            raise RuntimeError(
+                f"_load_pristine_main_module: expected exactly one occurrence of "
+                f"{old!r} in {main_path}, found {count} -- upstream source may have "
+                f"changed; update _MAX_STEPS_SOURCE_OVERRIDES."
+            )
+        source = source.replace(old, new)
+
     spec = importlib.util.spec_from_file_location("groot_n1d5_libero_main", main_path)
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    code = compile(source, str(main_path), "exec")
+    sys.modules[spec.name] = module
+    exec(code, module.__dict__)
     return module
 
 
@@ -128,8 +200,16 @@ def _patch_libero_env_for_replay(main_module, base_replay_dir: Path):
     def _wrapped_get_libero_env(task, resolution=256):
         _finalize_prev()
         env, task_description = original_get_libero_env(task, resolution=resolution)
+        # Unlike openpi's main.py (which does `from libero.libero import
+        # get_libero_path` at its own top level, so `main_module.
+        # get_libero_path` resolves), N1.5's run_libero_eval.py only
+        # imports `benchmark` from `libero.libero` -- confirmed by reading
+        # its own import block. Import get_libero_path directly here
+        # instead of assuming it's on main_module.
+        from libero.libero import get_libero_path
+
         bddl_file = str(
-            Path(main_module.get_libero_path("bddl_files")) / task.problem_folder / task.bddl_file
+            Path(get_libero_path("bddl_files")) / task.problem_folder / task.bddl_file
         )
         task_name = task_description.replace(" ", "_")
         task_replay_dir = base_replay_dir / task_name
@@ -147,30 +227,71 @@ def _patch_libero_env_for_replay(main_module, base_replay_dir: Path):
     return _finalize_prev
 
 
+# N1.5's own pristine run_libero_eval.py does NOT chunk actions at all --
+# its `GR00TPolicy.get_action` always takes only `_convert_to_libero_action
+# (action_chunk, idx=0)` and discards the rest of the returned chunk,
+# re-querying the server on every single `env.step()` (see eval_libero()'s
+# main loop, which calls `gr00t_policy.get_action(...)` once per iteration
+# of its `while t < max_steps + ...` loop).
+#
+# `examples/Libero/custom_data_config.py:56` (`action_indices =
+# list(range(16))`) confirms these LIBERO checkpoints were TRAINED with a
+# 16-step action-prediction horizon -- but that's the model's max
+# PREDICTABLE chunk length, not how many of those predicted actions
+# should actually be EXECUTED open-loop before re-planning (a separate,
+# independent choice that's normally <= the horizon). The community
+# LIBERO fine-tune twanghcmut/GR00T-N1.5-LIBERO-4suite-combined (built on
+# this same NVIDIA training recipe/action_horizon=16) documents its own
+# eval convention as n_action_steps=8 -- direct, LIBERO-specific evidence
+# that agrees with N1.6/RLDX-1's own official LIBERO value (8), unlike
+# the RoboCasa fork's generic default (16, gr00t/eval/simulation.py /
+# scripts/run_eval.py in eval/models/Isaac-GR00T) which is a DIFFERENT
+# benchmark's convention, not LIBERO's. Using 8.
+GR00T_N1D5_N_ACTION_STEPS = 8
+
+
+def _patch_action_chunking(main_module, n_action_steps: int = GR00T_N1D5_N_ACTION_STEPS) -> None:
+    """Monkeypatches `main_module.GR00TPolicy` (the class name `eval_libero()`
+    looks up as a global -- `GR00TPolicy(host=..., port=..., headless=...)`
+    at its own call site -- to a subclass whose `get_action` caches
+    `n_action_steps` actions from each policy query and serves them one at
+    a time, only re-querying once the cache is empty. This changes
+    `eval_libero()`'s effective behavior (queries the server every
+    `n_action_steps` env steps instead of every step) without editing the
+    submodule or touching its loop body at all -- `GR00TPolicy` is looked
+    up as a plain module-global at call time, so replacing the attribute
+    on the module object before `eval_libero(cfg)` runs is enough."""
+    original_cls = main_module.GR00TPolicy
+
+    class _ChunkedGR00TPolicy(original_cls):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._action_queue: list = []
+
+        def get_action(self, observation_dict, lang: str):
+            if not self._action_queue:
+                obs_dict = self._process_observation(observation_dict, lang)
+                action_chunk = self.policy.get_action(obs_dict)
+                self._action_queue = [
+                    self._convert_to_libero_action(action_chunk, i)
+                    for i in range(n_action_steps)
+                ]
+            return self._action_queue.pop(0)
+
+    main_module.GR00TPolicy = _ChunkedGR00TPolicy
+
+
+# NOTE: this used to be a documented no-op placeholder (the per-suite
+# max_steps discrepancy -- goal=600 vs 300, libero_10=1000 vs 520 -- was
+# left as a deferred, flagged known issue). It's now actually fixed via
+# `_MAX_STEPS_SOURCE_OVERRIDES` in `_load_pristine_main_module` above
+# (source-text patch applied before the module is compiled/exec'd), so
+# there's nothing left for this function to do -- kept only so any
+# external caller still invoking it by name doesn't break.
 def _patch_unified_max_steps(main_module, task_suite_name: str) -> None:
-    """N1.5's eval_libero() hardcodes its own per-suite max_steps as
-    literal if/elif branches inside the function body (not a
-    module-level dict we could monkeypatch) -- so this can't be patched
-    the way a data attribute could. Instead this monkeypatches
-    `main_module.eval_libero` itself: wraps the original, and inside the
-    wrapper, monkeypatches the specific comparison the function's own
-    if/elif chain depends on is infeasible without bytecode surgery, so
-    instead we take the simplest robust route -- construct our own
-    GenerateConfig-driven loop is out of scope (would duplicate the whole
-    function); instead this project's unified max_steps values happen to
-    be uniformly <= N1.5's own hardcoded ones for every suite except
-    libero_goal/libero_10 where they're smaller (220<=220, 280<=280,
-    300<600, 520<1000, so ours are never larger) -- since a SMALLER
-    max_steps only means episodes can end up to that many steps sooner
-    (early-terminating on wait+max_steps, never later), the cleanest
-    non-invasive fix is a post-hoc truncation: cap num_steps_wait+max_steps
-    from the outside is not directly exposed either. Given the added
-    complexity of overriding a hardcoded if/elif chain from outside without
-    editing the submodule, and that this discrepancy is a smaller
-    magnitude than the RLDX-1/GR00T-N1.6 flat-720-vs-per-suite case, this
-    is left as a DEFERRED, explicitly-flagged known discrepancy for now --
-    see eval/EVAL_PROTOCOL_NOTES.md. `task_suite_name` is accepted (unused)
-    to keep this function's signature ready for a future real fix."""
+    """Superseded by `_MAX_STEPS_SOURCE_OVERRIDES`/`_load_pristine_main_module`
+    -- see that function's docstring for the real fix. Kept as a no-op for
+    backward compatibility with any existing call site."""
     return
 
 
@@ -198,6 +319,7 @@ def run_single_suite(
     headless: bool,
     save_replay: bool = False,
     replay_dir: Optional[str] = None,
+    n_action_steps: int = GR00T_N1D5_N_ACTION_STEPS,
 ) -> Dict[str, Any]:
     main_module = _load_pristine_main_module()
 
@@ -205,6 +327,7 @@ def run_single_suite(
     if save_replay:
         flush_replay = _patch_libero_env_for_replay(main_module, Path(replay_dir))
     _patch_unified_max_steps(main_module, task_suite_name)
+    _patch_action_chunking(main_module, n_action_steps=n_action_steps)
 
     cfg = main_module.GenerateConfig(
         task_suite_name=task_suite_name,
@@ -251,6 +374,7 @@ def main() -> None:
     ap.add_argument("--num_trials_per_task", type=int, default=50)
     ap.add_argument("--num_steps_wait", type=int, default=10)
     ap.add_argument("--headless", action="store_true", default=True)
+    ap.add_argument("--n_action_steps", type=int, default=GR00T_N1D5_N_ACTION_STEPS)
     ap.add_argument("--stats_path", default=None)
     ap.add_argument("--save_replay", action="store_true")
     ap.add_argument("--replay_dir", default=None)
@@ -275,6 +399,7 @@ def main() -> None:
         headless=args.headless,
         save_replay=args.save_replay,
         replay_dir=replay_dir,
+        n_action_steps=args.n_action_steps,
     )
 
     stats_path = Path(args.stats_path or (Path(args.video_out_path) / "stats.json"))
