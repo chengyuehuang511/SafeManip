@@ -71,25 +71,40 @@ n_episodes_list=(
   50 50 50 50 50 50 50 50 50 50
   50 50 50 50 50 50 50 50 50 50
 )
+# task_names above is grouped in blocks of 10 by suite, in this exact
+# order (matching RLDX-1's own eval_libero.sh ALL_TASKS loop order):
+# libero_10, libero_goal, libero_object, libero_spatial. RLDX-1's own
+# official max_episode_steps is a single flat 720 for all 40 tasks --
+# deliberately overridden here to openpi's own per-suite max_steps values
+# (examples/libero/main.py: spatial=220, object=280, goal=300, 10=520) so
+# all 3 LIBERO models (openpi/RLDX-1/GR00T) share one consistent per-suite
+# horizon convention instead of each picking their own -- see
+# eval/EVAL_PROTOCOL_NOTES.md.
+max_episode_steps_list=(
+  520 520 520 520 520 520 520 520 520 520
+  300 300 300 300 300 300 300 300 300 300
+  280 280 280 280 280 280 280 280 280 280
+  220 220 220 220 220 220 220 220 220 220
+)
 
 model_path="${MODEL_PATH:-RLWRLD/RLDX-1-FT-LIBERO}"
 video_dir="${VIDEO_OUTPUT_DIR:-${base_video_dir}}"
 n_action_steps="${N_ACTION_STEPS:-8}"
-max_episode_steps="${MAX_EPISODE_STEPS:-720}"
 
-run_env="MODEL_PATH=${model_path},N_ACTION_STEPS=${n_action_steps},MAX_EPISODE_STEPS=${max_episode_steps}"
+run_env="MODEL_PATH=${model_path},N_ACTION_STEPS=${n_action_steps}"
 
 mkdir -p "${output_dir}"
 mkdir -p "${video_dir}"
 task_list=$(IFS=:; echo "${task_names[*]}")
 n_episodes_str=$(IFS=:; echo "${n_episodes_list[*]}")
+max_episode_steps_str=$(IFS=:; echo "${max_episode_steps_list[*]}")
 array_end=$(( ${#task_names[@]} - 1 ))
 
 gpu_type="${GPU_TYPE:-a40}"
 
 sbatch_args=(
   --array="0-${array_end}" \
-  --export="ALL,TASK_LIST=${task_list},N_EPISODES_LIST=${n_episodes_str},VIDEO_DIR=${video_dir},${run_env}" \
+  --export="ALL,TASK_LIST=${task_list},N_EPISODES_LIST=${n_episodes_str},MAX_EPISODE_STEPS_LIST=${max_episode_steps_str},VIDEO_DIR=${video_dir},${run_env}" \
   --job-name="${job_name}" \
   --gpus-per-node="${gpu_type}:1" \
   --output="${output_dir}/${job_name}-slurm-%A_%a.out" \

@@ -188,3 +188,131 @@ RoboCasa models:
   `third_party/libero`, but that populates files inside `eval/models/
   openpi`'s own working tree, which we don't touch -- reverted and used a
   separate standalone submodule pinned to the identical commit instead.)
+
+**RLDX-1 LIBERO requires `--no-strict` (a real gap in RLDX-1's own
+`check_action`, not a checkpoint/action-space incompatibility).** Running
+RLDX-1's LIBERO checkpoint via `rollout_policy.run_rldx_sim_policy` (the
+same ready-made entry point used for RoboCasa) crashes on every episode
+with `AssertionError: Action key 'action.eef_pos_delta' must be in
+action`. Root cause, confirmed by reading `rldx/policy/rldx_policy.py`
+directly: `RLDXSimPolicyWrapper._get_action` already has a
+`# ===== LIBERO KEY MAPPING =====` branch (`is_libero`) that remaps the
+model's raw output keys (`eef_pos_delta`/`eef_rot_delta`/`gripper_close`)
+into the flat sim keys the LIBERO env actually expects
+(`action.x/y/z/roll/pitch/yaw/gripper`) -- but `check_action`, called
+unconditionally right after via `BasePolicy.get_action`, has no matching
+`is_libero` branch: it validates the (already-remapped) flat action dict
+against the *raw* modality keys, so it always fails for LIBERO regardless
+of whether the rollout itself is correct. RLDX-1's own official
+`run_scripts/eval/libero/eval_libero.sh` passes `--no-strict` (which sets
+`strict=False` on `RLDXSimPolicyWrapper`, skipping `check_action`/
+`check_observation` entirely per `rldx/policy/policy.py`'s `get_action`) --
+i.e. RLDX-1's own maintainers route around this gap rather than fix it.
+`run_rldx_sim_policy` → `create_rldx_sim_policy`, however, hardcodes
+`strict=True` with no passthrough. Since editing `eval/models/RLDX-1` is
+off-limits, `run_single_task_rldx1_libero.py` monkeypatches
+`rollout_policy.create_rldx_sim_policy` from the outside (before calling
+`run_rldx_sim_policy`) to construct the identical objects with
+`strict=False` -- reproducing the official script's own workaround exactly,
+without touching the submodule or the validation logic itself.
+
+Smoke-tested (job 3824826, `libero_sim/pick_up_the_alphabet_soup_and_place_
+it_in_the_basket`): no more `eef_pos_delta` assertion, rollout proceeds
+normally episode-by-episode.
+
+**openpi LIBERO also needed a `torch.load` compat patch (unrelated to the
+above).** `eval/simulators/libero_openpi`'s pinned (Dec 2023)
+`libero/libero/benchmark/__init__.py::get_task_init_states` calls plain
+`torch.load(init_states_path)` -- PyTorch 2.6 flipped the default
+`weights_only` from `False` to `True`, so under this machine's newer torch
+it crashes with `UnpicklingError: ... Unsupported global: GLOBAL
+numpy.core.multiarray._reconstruct`. The init-states files are LIBERO's own
+trusted, pinned per-task numpy-array assets (not attacker-controlled
+input), so `run_libero_suite_openpi.py` patches `torch.load` from the
+outside to default `weights_only=False` when the caller doesn't specify it,
+rather than editing the submodule.
+
+**openpi LIBERO also silently returned 0% success rate on its first real
+run (job 3824862) -- root cause was a websocket keepalive timeout, not the
+checkpoint.** The server log showed exactly ONE connection opened/closed
+across the whole ~30-minute, 500-episode `libero_spatial` run; the client
+(`examples/libero/main.py`, unmodified) logged the identical "Caught
+exception: sent 1011 (internal error) keepalive ping timeout; no close
+frame received" for every one of the 500 episodes, so every "Success:
+False" was actually a dropped connection, not a real (failed) rollout.
+Root cause: `WebsocketPolicyServer._handler` calls `self._policy.infer(obs)`
+synchronously inside its asyncio handler with no `await`, blocking the
+whole event loop for the duration of inference -- and pi0's very first
+inference call after server startup incurs JAX JIT compilation, which
+routinely exceeds `websockets`' default 20s `ping_timeout`. The server
+can't answer its own keepalive ping during that window, so the library
+closes the connection right after the first request; `main.py` doesn't
+reconnect on failure, so the rest of the suite silently fails on the same
+dead connection. Fixed via `serve_policy_wrapper.py`'s new patch (d):
+monkeypatches `websockets.asyncio.server.serve` (the function
+`WebsocketPolicyServer.run()` calls) to default `ping_interval`/
+`ping_timeout` to `None`, disabling the keepalive check entirely so no
+inference latency can ever trigger this -- again without touching
+`eval/models/openpi_official` itself.
+
+**Correction: the server-side keepalive patch alone wasn't sufficient.**
+Re-testing after the server-side fix (job 3824891, `NUM_TRIALS_PER_TASK=3`)
+still failed identically on every episode. Root cause:
+`openpi_client.websocket_client_policy.WebsocketClientPolicy` connects via
+`websockets.sync.client.connect(...)`, which has its own, entirely
+independent `ping_interval=20, ping_timeout=20` defaults -- the client's
+own keepalive thread times out waiting for a pong while the server is
+blocked on a slow/JIT-heavy `infer()` call, regardless of what the
+server's `ping_interval`/`ping_timeout` are set to. Fixed by adding a
+matching client-side patch, `run_libero_suite_openpi.py`'s
+`_patch_disable_websocket_keepalive_timeout_client`, which monkeypatches
+`websockets.sync.client.connect` itself the same way. Both the client-side
+and server-side patches are needed together.
+
+**Correction: matched values to the fork's own proven fix instead of fully
+disabling keepalive.** Diffing `eval/models/openpi` (the robocasa-benchmark
+fork used for RoboCasa) against `eval/models/openpi_official` revealed the
+fork's own `websocket_client_policy.py` already independently hit and
+fixed this exact bug -- it raises `ping_interval`/`ping_timeout` from the
+library defaults (20s/20s) to `120s`/`600s` (configurable via
+`OPENPI_WS_PING_INTERVAL`/`OPENPI_WS_PING_TIMEOUT`), rather than disabling
+the check outright, and only patches the client side (its
+`websocket_policy_server.py` is byte-identical to official's -- confirmed
+via `diff`). This is corroborated by all 139 completed RoboCasa openpi
+tasks showing zero keepalive failures. Updated both
+`run_libero_suite_openpi.py`'s client-side patch and
+`serve_policy_wrapper.py`'s server-side patch to use the same `120`/`600`
+values instead of `None`/`None` -- functionally equivalent for our
+purposes (a slow first-JIT call is well within 120s/600s), but keeps a
+genuinely-dead connection detectable instead of hanging forever, matching
+the fork's own tested behavior rather than inventing a new convention.
+
+## LIBERO `max_episode_steps` (per-suite horizon) -- unified to openpi's convention
+
+Unlike RoboCasa (which uses `get_task_horizon(task)`, a genuinely
+per-*task* value, uniformly for all 8 models), LIBERO's per-model horizon
+conventions found in each codebase were much coarser and inconsistent with
+each other:
+
+- **openpi** (`examples/libero/main.py`): per-*suite* fixed `max_steps`
+  hardcoded inside `eval_libero()` -- 220/280/300/520/400 for spatial/
+  object/goal/10/90 (uniform across all 10 tasks within a suite).
+- **RLDX-1** (`run_scripts/eval/libero/eval_libero.sh`): a single flat
+  `--max_episode_steps 720` for literally all 40 tasks across all 4
+  suites -- no per-suite variation at all.
+- **GR00T** (N1.5/N1.6): no LIBERO-specific horizon convention found in
+  either codebase at time of writing.
+
+**Decision: unify all LIBERO models onto openpi's own per-suite values**
+(220/280/300/520 for spatial/object/goal/10 -- libero_90 excluded, out of
+scope). This is the same "pick the officially-published, more principled
+convention and apply it uniformly" reasoning already used for RoboCasa's
+`get_task_horizon()`. Implemented via a `MAX_EPISODE_STEPS_LIST` parallel
+array (mirroring the existing `N_EPISODES_LIST` pattern) in
+`sbatch_rldx1_libero_test.sh` (grouped in blocks of 10 matching
+`task_names`' suite order: libero_10, libero_goal, libero_object,
+libero_spatial) and `eval_groot_n1d6_libero_single_task.sh`
+(list support added, not yet wired into a sweep launcher since GR00T
+LIBERO hasn't been run yet). `n_action_steps` was already consistent
+per-model between RoboCasa and LIBERO (openpi 5, RLDX-1 8, GR00T-N1.6 8)
+and needed no change.

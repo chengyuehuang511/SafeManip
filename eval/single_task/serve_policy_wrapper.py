@@ -78,6 +78,17 @@ same principle as fix (b) above), this stubs the missing function to just
 return `None` directly rather than crash, instead of e.g. skipping the
 call entirely (which would also skip that later good fallback).
 
+(d) websockets keepalive ping timeout -- see `_patch_disable_websocket_keepalive_timeout`
+---------------------------------------------------------------------------
+Disables the server-side keepalive ping timeout (defaults to 20s), which a
+slow/JIT-heavy first inference call can trip, silently killing the
+connection (and every subsequent episode that reuses it) well before any
+model/checkpoint issue would ever come into play. See that function's
+docstring for the full root-cause writeup (confirmed via a real crash on
+job 3824862: 500/500 LIBERO episodes reported "Success: False" with the
+identical "keepalive ping timeout" client-side error, from a single
+connection that died after its first request).
+
 Usage (drop-in replacement for `python scripts/serve_policy.py ...`):
     python eval/single_task/serve_policy_wrapper.py \\
         --port=8000 policy:checkpoint --policy.config=... --policy.dir=...
@@ -125,6 +136,54 @@ def _stub_missing_convert_stats_from_repo_meta() -> None:
         _groot_openpi_dataset._convert_stats_from_repo_meta = lambda asset_id: None
 
 
+def _patch_disable_websocket_keepalive_timeout() -> None:
+    """Extend the websockets library's default keepalive ping
+    interval/timeout (20s/20s) on the server side to 120s/600s (name kept
+    for continuity with the client-side patch of the same era, even
+    though it no longer fully disables the check -- see below).
+
+    `WebsocketPolicyServer._handler` (openpi/src/openpi/serving/
+    websocket_policy_server.py) calls `self._policy.infer(obs)`
+    synchronously inside its asyncio handler coroutine -- there's no
+    `await`/yield around it, so it blocks the whole event loop for as long
+    as inference takes. JAX/pi0's very first inference call after server
+    startup incurs JIT compilation, which routinely takes well over 20s on
+    this hardware. During that window the server can't answer its own
+    keepalive ping, so `websockets` (default `ping_timeout=20`) closes the
+    connection with code 1011 right after the first request -- confirmed
+    by a real smoke-test run (job 3824862): the server log shows exactly
+    ONE connection opened/closed across the whole ~30-minute suite, and
+    the client (`examples/libero/main.py`) logged "Caught exception: sent
+    1011 (internal error) keepalive ping timeout; no close frame received"
+    identically for all 500 episodes, since it doesn't reconnect after a
+    drop -- i.e. this silently zeroed out the entire suite's success rate
+    with nothing to do with the checkpoint or the eval logic.
+
+    In practice the client's own independent keepalive (see
+    run_libero_suite_openpi.py's matching client-side patch) was the one
+    actually responsible for the observed failures, and
+    eval/models/openpi's (robocasa-benchmark fork) own fix for this bug
+    only touches the client side too -- this server-side patch is
+    defensive/likely redundant, kept for safety margin rather than
+    necessity. Uses the same 120s/600s values as the client-side patch
+    (not fully disabled) for the same reason: detect a genuinely-dead
+    server eventually instead of hanging forever. Patched on the
+    underlying `websockets.asyncio.server.serve` function itself (not on
+    `openpi.serving.websocket_policy_server`'s copy of the name) so it
+    takes effect no matter which module reference calls it, as long as
+    this runs before `serve_forever()` actually starts listening."""
+    import websockets.asyncio.server as _server
+
+    _orig_serve = _server.serve
+
+    def _serve_no_keepalive_timeout(*args, **kwargs):
+        kwargs.setdefault("ping_interval", 120)
+        kwargs.setdefault("ping_timeout", 600)
+        return _orig_serve(*args, **kwargs)
+
+    _server.serve = _serve_no_keepalive_timeout
+
+
 def main() -> None:
     # robocasa isn't on PYTHONPATH for non-RoboCasa envs (e.g. LIBERO) --
     # patch (a) is a no-op there since it's irrelevant to those configs.
@@ -139,6 +198,7 @@ def main() -> None:
 
     _clear_data_dirs_on_all_configs()
     _stub_missing_convert_stats_from_repo_meta()
+    _patch_disable_websocket_keepalive_timeout()
 
     openpi_root = Path(
         os.environ.get(

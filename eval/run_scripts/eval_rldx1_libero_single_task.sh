@@ -68,9 +68,12 @@ TASK="${TASK:-}"
 TASK_LIST="${TASK_LIST:-}"
 N_EPISODES="${N_EPISODES:-}"
 N_EPISODES_LIST="${N_EPISODES_LIST:-}"
+MAX_EPISODE_STEPS="${MAX_EPISODE_STEPS:-}"
+MAX_EPISODE_STEPS_LIST="${MAX_EPISODE_STEPS_LIST:-}"
 if [[ -z "${TASK}" && -n "${TASK_LIST}" ]]; then
   IFS=':' read -r -a TASK_LIST_ITEMS <<< "${TASK_LIST}"
   IFS=':' read -r -a N_EPISODES_LIST_ITEMS <<< "${N_EPISODES_LIST}"
+  IFS=':' read -r -a MAX_EPISODE_STEPS_LIST_ITEMS <<< "${MAX_EPISODE_STEPS_LIST}"
   if [[ -z "${SLURM_ARRAY_TASK_ID:-}" ]]; then
     echo "TASK_LIST provided but SLURM_ARRAY_TASK_ID is missing." >&2
     exit 1
@@ -81,6 +84,9 @@ if [[ -z "${TASK}" && -n "${TASK_LIST}" ]]; then
   fi
   TASK="${TASK_LIST_ITEMS[SLURM_ARRAY_TASK_ID]}"
   N_EPISODES="${N_EPISODES_LIST_ITEMS[SLURM_ARRAY_TASK_ID]}"
+  if [[ -n "${MAX_EPISODE_STEPS_LIST}" ]]; then
+    MAX_EPISODE_STEPS="${MAX_EPISODE_STEPS_LIST_ITEMS[SLURM_ARRAY_TASK_ID]}"
+  fi
 fi
 TASK="${TASK:-libero_sim/pick_up_the_alphabet_soup_and_place_it_in_the_basket}"
 # 50 default (not RLDX-1's own official per-suite 50/20/20/20 split) --
@@ -92,6 +98,12 @@ MODEL_PATH="${MODEL_PATH:-RLWRLD/RLDX-1-FT-LIBERO}"
 TASK_CLEAN="${TASK#libero_sim/}"
 VIDEO_DIR="${VIDEO_DIR:-${RLDX1_ROOT}/videos_libero}/${TASK_CLEAN}"
 N_ACTION_STEPS="${N_ACTION_STEPS:-8}"
+# 720 (RLDX-1's own flat, suite-agnostic official value) is now only a
+# fallback for single-task manual invocation -- sbatch_rldx1_libero_test.sh
+# passes MAX_EPISODE_STEPS_LIST with openpi's own per-suite max_steps
+# values (220/280/300/520 for spatial/object/goal/10) instead, so all
+# three LIBERO models (openpi/RLDX-1/GR00T) share one consistent per-suite
+# horizon convention -- see eval/EVAL_PROTOCOL_NOTES.md.
 MAX_EPISODE_STEPS="${MAX_EPISODE_STEPS:-720}"
 
 echo "Hostname: $(hostname)"

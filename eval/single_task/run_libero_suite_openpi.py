@@ -28,6 +28,75 @@ from typing import Any, Dict, Optional
 THIS_DIR = Path(__file__).resolve().parent
 
 
+def _patch_disable_websocket_keepalive_timeout_client() -> None:
+    """Client-side counterpart to serve_policy_wrapper.py's server-side
+    patch of the same name.
+
+    Disabling the keepalive ping timeout on the server alone (see
+    serve_policy_wrapper.py's `_patch_disable_websocket_keepalive_timeout`
+    docstring for the full root-cause writeup) turned out not to be
+    enough: `openpi_client.websocket_client_policy.WebsocketClientPolicy`
+    connects via `websockets.sync.client.connect(...)`, which defaults to
+    its own, entirely independent `ping_interval=20, ping_timeout=20` --
+    confirmed by a real re-test (job 3824891) that still failed with the
+    identical "Caught exception: sent 1011 (internal error) keepalive ping
+    timeout; no close frame received" on every episode even after the
+    server-side fix, since the CLIENT's own keepalive thread times out
+    waiting for a pong while the server is blocked on a slow/JIT-heavy
+    `infer()` call, independent of anything the server's own
+    ping_interval/ping_timeout settings control.
+
+    Values (120s/600s, not disabled entirely) match
+    eval/models/openpi's (the robocasa-benchmark fork used for RoboCasa)
+    own `websocket_client_policy.py`, which independently hit and fixed
+    this exact bug already -- confirmed via `diff` against
+    eval/models/openpi_official's copy, and via 139 completed RoboCasa
+    openpi tasks with zero keepalive failures. Reusing their proven
+    values here (rather than disabling the check outright) keeps a
+    genuinely-dead server detectable instead of hanging forever, same as
+    their fix.
+
+    Patches `websockets.sync.client.connect` itself (not
+    `openpi_client.websocket_client_policy`'s copy of the name) so it
+    takes effect regardless of which module reference calls it, as long
+    as this runs before `main_module.eval_libero(args)` constructs its
+    `WebsocketClientPolicy`."""
+    import websockets.sync.client as _client
+
+    _orig_connect = _client.connect
+
+    def _connect_long_keepalive_timeout(*args, **kwargs):
+        kwargs.setdefault("ping_interval", 120)
+        kwargs.setdefault("ping_timeout", 600)
+        return _orig_connect(*args, **kwargs)
+
+    _client.connect = _connect_long_keepalive_timeout
+
+
+def _patch_torch_load_weights_only_false() -> None:
+    """PyTorch 2.6 flipped `torch.load`'s default `weights_only` from False
+    to True. `eval/simulators/libero_openpi`'s own
+    `libero/libero/benchmark/__init__.py` (`get_task_init_states`) calls
+    plain `torch.load(init_states_path)` with no `weights_only` kwarg --
+    that pinned (Dec 2023) commit predates the PyTorch default change, so
+    under a newer torch it now crashes with `UnpicklingError: Weights only
+    load failed ... Unsupported global: GLOBAL numpy.core.multiarray.
+    _reconstruct`. The init-states files are LIBERO's own trusted pinned
+    per-task numpy-array assets, checked into this exact submodule commit
+    (not attacker-controlled input), so defaulting `weights_only=False`
+    when the caller doesn't specify it is safe here. Patched from the
+    outside rather than editing the submodule."""
+    import torch
+
+    _orig_load = torch.load
+
+    def _load_default_weights_only_false(*args, **kwargs):
+        kwargs.setdefault("weights_only", False)
+        return _orig_load(*args, **kwargs)
+
+    torch.load = _load_default_weights_only_false
+
+
 def _load_pristine_main_module():
     """Loads examples/libero/main.py as a module object via file path (not a
     normal `import`, since there's no __init__.py under examples/) so its
@@ -82,6 +151,8 @@ def run_single_suite(
     seed: int,
     video_out_path: str,
 ) -> Dict[str, Any]:
+    _patch_torch_load_weights_only_false()
+    _patch_disable_websocket_keepalive_timeout_client()
     main_module = _load_pristine_main_module()
 
     args = main_module.Args(

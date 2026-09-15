@@ -19,6 +19,34 @@ not requested for LIBERO, and LIBERO's env stack (register_libero_envs())
 hasn't been separately verified against replay_capture.py's
 locate_env_holder() the way robocasa's has. RLDX-1's own eval_libero.sh
 already writes its own per-episode rollout videos via `--video_dir`.
+
+`--no-strict` (patched in from outside, see `_patch_create_rldx_sim_policy_no_strict`)
+-------------------------------------------------------------------------------------
+RLDX-1's own official run_scripts/eval/libero/eval_libero.sh passes
+`--no-strict` to run_rldx_server.py, which sets `strict=False` on the
+`RLDXSimPolicyWrapper` it constructs. This isn't cosmetic: with
+`strict=True` (the default), `RLDXSimPolicyWrapper.check_action` -- called
+unconditionally after every `_get_action()` -- validates the *flat sim*
+action dict against the *raw model* modality keys (`eef_pos_delta`,
+`eef_rot_delta`, `gripper_close`), not the LIBERO-remapped
+`action.x/y/z/roll/pitch/yaw/gripper` keys that `_get_action`'s own
+`is_libero` branch just produced a few lines above -- so it always raises
+`AssertionError: Action key 'action.eef_pos_delta' must be in action` for
+every LIBERO task/checkpoint, regardless of whether the model's actual
+rollout is correct. This is a real gap in `check_action` (it has no
+`is_libero` branch mirroring `_get_action`'s), which RLDX-1's own official
+script routes around via `--no-strict` rather than fixing -- so we do the
+same rather than patching their validation logic ourselves.
+
+`rldx.eval.rollout_policy.run_rldx_sim_policy` (the entry point this script
+reuses unmodified) calls `create_rldx_sim_policy(...)`, which hardcodes
+`RLDXSimPolicyWrapper(RLDXPolicy(...))` with no `strict` passthrough at all
+(unlike run_rldx_server.py's own `--no-strict` flag). Since editing
+eval/models/RLDX-1 itself is off-limits, this monkeypatches
+`rollout_policy.create_rldx_sim_policy` from the outside, before calling
+`run_rldx_sim_policy`, to construct the exact same objects with
+`strict=False` -- matching the official script's behavior exactly, without
+touching the submodule.
 """
 import argparse
 import json
@@ -31,6 +59,30 @@ if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
 
+def _patch_create_rldx_sim_policy_no_strict() -> None:
+    """See module docstring. Replaces rollout_policy.create_rldx_sim_policy
+    (referenced by name, at call time, inside run_rldx_sim_policy -- so
+    reassigning it here on the module object takes effect) with a version
+    identical to the original except `strict=False` on RLDXSimPolicyWrapper,
+    matching RLDX-1's own official eval_libero.sh --no-strict flag."""
+    import rldx.eval.rollout_policy as _rollout_policy
+    from rldx.policy.rldx_policy import RLDXPolicy, RLDXSimPolicyWrapper
+
+    def _create_rldx_sim_policy_no_strict(
+        model_path, embodiment_tag, policy_client_host="", policy_client_port=None
+    ):
+        if policy_client_host and policy_client_port:
+            from rldx.policy.server_client import PolicyClient
+
+            return PolicyClient(host=policy_client_host, port=policy_client_port)
+        return RLDXSimPolicyWrapper(
+            RLDXPolicy(embodiment_tag=embodiment_tag, model_path=model_path, device=0),
+            strict=False,
+        )
+
+    _rollout_policy.create_rldx_sim_policy = _create_rldx_sim_policy_no_strict
+
+
 def run_single_task(
     *,
     model_path: str,
@@ -40,6 +92,7 @@ def run_single_task(
     n_action_steps: int,
     max_episode_steps: int,
 ) -> Dict[str, Any]:
+    _patch_create_rldx_sim_policy_no_strict()
     from rldx.eval.rollout_policy import run_rldx_sim_policy
 
     env_name = f"libero_sim/{task}"
