@@ -119,7 +119,13 @@ def make_env(bddl_path):
 
 def extract_episode(env, task_name, task_description, demo_group, ep_num, dataset_dir):
     states = demo_group["states"][()]
-    init_state = demo_group.attrs["init_state"]
+    # Added 2026-09-16 (explicit user decision): eval-rollout hdf5s (see the
+    # env_args fallback above) have no init_state attribute at all, only the
+    # states dataset -- states[0] is the same 110-dim full-state vector
+    # format and represents exactly the initial state, so it's a direct,
+    # safe substitute; the per-frame loop below immediately overwrites the
+    # sim state again at t=0 via set_state_from_flattened anyway.
+    init_state = demo_group.attrs.get("init_state", states[0])
 
     _reset_privileged_accumulators(env.env)
     env.reset()
@@ -141,6 +147,41 @@ def extract_episode(env, task_name, task_description, demo_group, ep_num, datase
         if static_info is None:
             static_info = _to_json_serializable(info["static"])
         dynamic_frames.append({"step": int(t), "data": _to_json_serializable(info["dynamic"])})
+
+    # 2026-09-16 root-cause fix: LIBERO's own gather_demonstrations_as_hdf5
+    # (eval/simulators/libero/scripts/collect_demonstration.py) does
+    # `del states[-1]` before writing this hdf5, unconditionally dropping
+    # the *last* recorded state -- exactly the post-final-action, terminal
+    # state that `_check_success()` needs to see (confirmed empirically:
+    # `states[-1]` here is one action short of success on episodes whose
+    # live eval rollout genuinely succeeded, tracing e.g. an object still
+    # visibly mid-fall into its target container at `states[-1]`). The
+    # action that produced that deleted state is NOT deleted -- it's still
+    # `actions[-1]` -- so replay it open-loop once more (robosuite's own
+    # `DataCollectionWrapper` docstring documents this exact
+    # states[t]/actions[t] pairing precisely so demonstrations can be
+    # "played back deterministically by using the recorded actions
+    # open loop") to reconstruct the true terminal state.
+    #
+    # This reconstructed frame is a REAL frame the live rollout actually
+    # produced (not a synthetic/extrapolated one) -- it was just never
+    # written to disk. So it's appended as one more genuine entry in
+    # `dynamic_frames` (step == traj_len, i.e. the (traj_len+1)-th frame)
+    # and folded into `replayed_episode_length`, exactly like every other
+    # frame -- everything downstream that reads `privileged_dynamic_info`
+    # (in particular `run_monitor_on_privileged.py`'s LTL evaluation, not
+    # just this function's own `_check_success()` call below) sees it too,
+    # rather than only the final success flag being patched up in isolation.
+    if "actions" in demo_group and demo_group["actions"].shape[0] == traj_len:
+        last_action = demo_group["actions"][()][-1]
+        try:
+            env.step(last_action)
+            env.env.timestep = traj_len + 1
+            info = env.env.get_privileged_information()
+            dynamic_frames.append({"step": int(traj_len), "data": _to_json_serializable(info["dynamic"])})
+            traj_len += 1
+        except Exception:
+            pass
 
     success = None
     try:
@@ -219,7 +260,27 @@ def process_task_file(hdf5_path, output_root, n_demos, run_monitor, skip_existin
         data_grp = f["data"]
         bddl_file_name = data_grp.attrs["bddl_file_name"]
         bddl_path = LIBERO_REPO_ROOT / bddl_file_name
-        env_args = json.loads(data_grp.attrs["env_args"])
+        # Added 2026-09-16 (explicit user decision): eval-rollout hdf5s are
+        # always literally named "demo.hdf5" (not "<task>_demo.hdf5"), so
+        # the stem-based task_name above resolves to the useless literal
+        # "demo" for every task -- every task for a model would collide
+        # into the same output/demo/ directory. Fall back to the real
+        # bddl file's own stem (already resolved above from this file's own
+        # metadata, so it's correct regardless of directory naming) whenever
+        # the hdf5 filename itself doesn't carry the real task name.
+        if task_name == "demo":
+            task_name = Path(str(bddl_file_name)).stem
+        # Added 2026-09-16 (explicit user decision): eval-rollout hdf5s
+        # (eval/saved_eval_rollouts/libero/<model>/<task>/replay/hdf5/demo.hdf5,
+        # written by the eval harness, not LIBERO's own demo-collection
+        # script) have bddl_file_name/problem_info but no env_args attribute
+        # at all -- env_args is only ever read below for task_description
+        # (cosmetic), so fall back to problem_info's own "problem_name"
+        # (present in both formats) instead of hard-failing.
+        if "env_args" in data_grp.attrs:
+            env_args = json.loads(data_grp.attrs["env_args"])
+        else:
+            env_args = json.loads(data_grp.attrs.get("problem_info", "{}"))
         all_demo_names = sorted(
             (k for k in data_grp.keys() if k.startswith("demo_")),
             key=lambda s: int(s.split("_")[1]),
@@ -310,6 +371,7 @@ def main():
     ap.add_argument("--hdf5", help="path to a single task's *_demo.hdf5 file")
     ap.add_argument("--task", help="task name (looked up by <dataset_root>/<suite>/<task>_demo.hdf5 across DEFAULT_SUITES) -- alternative to --hdf5, for per-episode SLURM array parity with extract_privileged_from_dataset.py's --task/--episode")
     ap.add_argument("--episode", type=int, help="single episode index (used with --task, one array-task-per-episode granularity)")
+    ap.add_argument("--episodes", help="explicit episode index list/ranges, e.g. '12-61' or '1,3,5-8' (alternative to --episode for a non-contiguous or offset selection)")
     ap.add_argument("--suite", help="one of libero_10/libero_goal/libero_object/libero_spatial (or any subdir name under --dataset_root)")
     ap.add_argument("--all", action="store_true", help="process every *_demo.hdf5 in --suite (or all DEFAULT_SUITES if --suite is omitted)")
     ap.add_argument("--dataset_root", default=DEFAULT_DATASET_ROOT)
@@ -320,7 +382,19 @@ def main():
     args = ap.parse_args()
 
     dataset_root = Path(args.dataset_root)
-    episodes = [args.episode] if args.episode is not None else None
+    if args.episodes:
+        episodes = []
+        for part in args.episodes.split(","):
+            part = part.strip()
+            if "-" in part:
+                lo, hi = part.split("-")
+                episodes.extend(range(int(lo), int(hi) + 1))
+            else:
+                episodes.append(int(part))
+    elif args.episode is not None:
+        episodes = [args.episode]
+    else:
+        episodes = None
     if args.task:
         hdf5_files = [find_hdf5_for_task(args.task, dataset_root=dataset_root)]
     elif args.hdf5:

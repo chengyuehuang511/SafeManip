@@ -130,6 +130,31 @@ def extract_episode_sampled(env, dataset_dir, ep_num, trajectory_horizon, sample
             "data": _to_json_serializable(info["dynamic"]),
         })
 
+    # 2026-09-16 root-cause fix -- see extract_privileged_from_dataset.py's
+    # extract_episode / extract_privileged_from_dataset_libero.py's
+    # extract_episode for the full derivation: gather_demonstrations_as_hdf5
+    # (RoboCasa's own, upstream of this lerobot dataset's conversion) does
+    # `del states[-1]`, dropping exactly the post-final-action terminal
+    # state `_check_success()` needs. The action that produced it is still
+    # `actions[-1]` -- replay it open-loop once more and fold the result in
+    # as one more genuine `dynamic_frames` entry (not just used in isolation
+    # for the success check below), so `run_monitor_on_privileged.py`'s LTL
+    # evaluation sees it too, same as every other frame.
+    try:
+        actions = LU.get_episode_actions(dataset_dir, ep_num)
+    except Exception:
+        actions = None
+    if actions is not None and actions.shape[0] == traj_len:
+        last_action = actions[-1]
+        try:
+            env.step(last_action)
+            env.timestep = traj_len + 1
+            info = env.get_privileged_information(trajectory_horizon=trajectory_horizon)
+            dynamic_frames.append({"step": int(traj_len), "data": _to_json_serializable(info["dynamic"])})
+            traj_len += 1
+        except Exception:
+            pass
+
     success = None
     try:
         success = bool(env._check_success())

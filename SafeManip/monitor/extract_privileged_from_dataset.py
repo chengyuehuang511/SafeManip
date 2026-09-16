@@ -460,6 +460,37 @@ def extract_episode(env, dataset_dir, ep_num, trajectory_horizon, call_stride=1)
             "data": _to_json_serializable(info["dynamic"]),
         })
 
+    # 2026-09-16 root-cause fix (same one applied to
+    # extract_privileged_from_dataset_libero.py's extract_episode -- see
+    # that function's own comment for the full derivation): RoboCasa's own
+    # gather_demonstrations_as_hdf5 (eval/simulators/robocasa/robocasa/
+    # scripts/collect_demos.py) does `del states[-1]` before writing the
+    # hdf5 this lerobot dataset was itself converted from, unconditionally
+    # dropping the last recorded state -- exactly the post-final-action,
+    # terminal state `_check_success()` needs to see. Confirmed the same
+    # states/actions length parity holds here too (get_episode_states and
+    # get_episode_actions return equal-length arrays for the same episode),
+    # so the fix is identical: the action that produced the deleted state
+    # is still `actions[-1]` -- replay it open-loop once more to reconstruct
+    # the true terminal state, and fold it into `dynamic_frames` as one
+    # more genuine frame (not just used in isolation for the success check
+    # below), so everything reading `privileged_dynamic_info` --
+    # `run_monitor_on_privileged.py`'s LTL evaluation included -- sees it.
+    try:
+        actions = LU.get_episode_actions(dataset_dir, ep_num)
+    except Exception:
+        actions = None
+    if actions is not None and actions.shape[0] == traj_len:
+        last_action = actions[-1]
+        try:
+            env.step(last_action)
+            env.timestep = traj_len + 1
+            info = env.get_privileged_information(trajectory_horizon=trajectory_horizon)
+            dynamic_frames.append({"step": int(traj_len), "data": _to_json_serializable(info["dynamic"])})
+            traj_len += 1
+        except Exception:
+            pass
+
     success = None
     try:
         success = bool(env._check_success())
