@@ -316,3 +316,44 @@ libero_spatial) and `eval_groot_n1d6_libero_single_task.sh`
 LIBERO hasn't been run yet). `n_action_steps` was already consistent
 per-model between RoboCasa and LIBERO (openpi 5, RLDX-1 8, GR00T-N1.6 8)
 and needed no change.
+
+## Comparison against the RoboCasa leaderboard (grootn16, RLDX-1)
+
+The RoboCasa leaderboard (https://github.com/robocasa-benchmark/leaderboard)
+reports RoboCasa's Multitask Learning setting as three category averages
+rather than 50 flat per-task numbers:
+[`gr00t_n1.6_2026_05_14.md`](https://github.com/robocasa-benchmark/leaderboard/blob/main/submissions_md/gr00t_n1.6_2026_05_14.md),
+[`rldx-1_2026_05_20.md`](https://github.com/robocasa-benchmark/leaderboard/blob/main/submissions_md/rldx-1_2026_05_20.md).
+Both submissions' listed commit hashes match this project's own pinned
+submodule commits exactly (`grootn16` @ `a21fc9af...`, `RLDX-1` @
+`ef05cd4a...`), confirming we're running the identical checkpoint/code the
+leaderboard numbers were measured on.
+
+**Category derivation.** `eval/simulators/robocasa/robocasa/utils/
+dataset_registry.py` tags each task's data path with `atomic`/`composite`
+and `pretrain`/`target`. Checked all 50 tasks in our shared `task_names`
+array (`sbatch_grootn16_test.sh`/`sbatch_rldx1_test.sh`/etc.) against this
+registry: the array's first 18 are all `atomic` (all have a `pretrain`
+path -> **Atomic-Seen**), the next 16 are `composite` with a `pretrain`
+path (-> **Composite-Seen**), and the last 16 are `composite` with only a
+`target` path, no `pretrain` path at all (-> **Composite-Unseen**, i.e.
+tasks genuinely absent from the pretraining corpus, not just held-out
+scenes of an otherwise-seen task) -- 18+16+16=50, exactly matching the
+leaderboard's three-category breakdown.
+
+**Results** (our `pretrain`-split reruns, weighted mean success rate per
+category, n=50 episodes/task in every cell):
+
+| Model | Category | Reproduced | Reported | Diff |
+|---|---|---|---|---|
+| grootn16 | Atomic-Seen | 52.6% | 51.1% | +1.5pp |
+| grootn16 | Composite-Seen | 7.5% | 9.4% | -1.9pp |
+| grootn16 | Composite-Unseen | 1.0% | 1.7% | -0.7pp |
+| RLDX-1 | Atomic-Seen | 67.2% | 67.6% | -0.4pp |
+| RLDX-1 | Composite-Seen | 26.1% | 27.9% | -1.8pp |
+| RLDX-1 | Composite-Unseen | 10.5% | 8.5% | +2.0pp |
+
+All six numbers land within ±2 percentage points of the leaderboard's
+reported values -- a faithful reproduction, well within the noise expected
+from a 50-episode-per-task sample and the known deliberate discrepancies
+already logged above (RLDX-1's task horizon in particular).
