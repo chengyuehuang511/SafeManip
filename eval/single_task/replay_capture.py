@@ -454,7 +454,15 @@ def finalize_replay_dir(
     env_info = json.dumps(env_kwargs, default=str)
     hdf5_dir = output_dir / "hdf5"
     hdf5_dir.mkdir(parents=True, exist_ok=True)
-    hdf5_path = gather_demonstrations_as_hdf5(str(raw_dir), str(hdf5_dir), env_info, verbose=True)
+    try:
+        hdf5_path = gather_demonstrations_as_hdf5(str(raw_dir), str(hdf5_dir), env_info, verbose=True)
+    except TypeError:
+        # Some robocasa forks (e.g. cosmos-policy's own
+        # eval/models/cosmos-policy-robocasa submodule) ship an older
+        # gather_demonstrations_as_hdf5 without a `verbose` kwarg at all
+        # -- fall back to the positional-only call rather than assuming
+        # every robocasa checkout shares the same (newer) signature.
+        hdf5_path = gather_demonstrations_as_hdf5(str(raw_dir), str(hdf5_dir), env_info)
     if not hdf5_path:
         print("ReplayCapture: no episodes recorded, nothing to finalize.")
         return None
