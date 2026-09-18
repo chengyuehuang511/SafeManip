@@ -34,7 +34,16 @@ never-implemented -- matters and is called out explicitly below, per-family.
       gripper_away_from_object, object_settled, object_settle_timeout,
       release_object_settle_timeout, gripper_is_opening/closing.
     - skill_onset + pick_preconditions: skill_pick_onset, object_region_clear,
-      preconditions_satisfied_pick.
+      object_upright_if_receptacle (2026-09-16: now actually emitted -- was
+      computed but silently absent from the predicates dict before),
+      preconditions_satisfied_pick (2026-09-16: composition corrected to
+      `object_region_clear and focus_pick_stable` only, matching RoboCasa's
+      REAL preconditions_satisfied_pick, predicates.py:4000 -- RoboCasa's own
+      code never ANDs object_upright_if_receptacle into this, despite the
+      generic top-level monitor/predicates.py fallback and specs.py's
+      docstring text both describing it as included; this file mirrors the
+      simulator override actually used at runtime, not the unused generic
+      default).
     - place_preconditions: skill_place_onset (== object_released),
       support_region_clear, support_stable, preconditions_satisfied_place
       (support_geometry_valid explicitly stubbed True -- see below).
@@ -89,9 +98,8 @@ never-implemented -- matters and is called out explicitly below, per-family.
       some *other* movable object, not just the robot), continue_fixture_
       open/close, fixture_open/close_obstacle_hit (persistence-debounced over
       CONTACT_PERSISTENCE_FRAMES), fixture_open/close_retracting,
-      fixture_open/close_retract_resolved (reaches the opposite extreme, or
-      retracting has held continuously for FIXTURE_RETRACT_RESOLVE_TIMEOUT_
-      FRAMES). Empirically active on the microwave-door task in this
+      fixture_open/close_retract_timeout (too long since the obstacle hit
+      without retracting starting, RETRACT_TIMEOUT_FRAMES). Empirically active on the microwave-door task in this
       corpus's smoke test -- worth flagging as noisier than the rest: the
       obstacle-hit counter can fire on a real but arguably-benign event (the
       manipulated object itself resting against the appliance interior while
@@ -140,6 +148,27 @@ never-implemented -- matters and is called out explicitly below, per-family.
       bodies don't translate in this corpus -- only their door/drawer/knob
       joints articulate -- so root-body position stability holds by
       construction, not by measurement.
+    - support_type_matches_object (2026-09-16, audited and confirmed NOT a
+      quick fix, catalogued rather than attempted): RoboCasa's real version
+      (predicates.py's `_object_support_type_matches_any`, feeding both
+      object_settled's composition and, separately, place preconditions'
+      own support_type_matches_object) requires a food-type manipulated
+      object to be resting on/in an actual fixture or object, specifically
+      EXCLUDING bare floor support (`_fixture_is_floor`). LIBERO has no
+      fixture-registered equivalent of "the tabletop/counter surface" --
+      this corpus's 6 fixtures (desk_caddy, flat_stove, microwave,
+      white_cabinet, wine_rack, wooden_cabinet) don't include the literal
+      surface most objects rest directly on in nearly every scene. Porting
+      the real floor-exclusion logic as-is would misclassify ordinary
+      table-resting food/drink objects (alphabet_soup, bbq_sauce, butter,
+      chocolate_pudding, cookies, cream_cheese, ketchup, milk, orange_juice,
+      salad_dressing, tomato_sauce, wine_bottle -- all food/drink-tagged in
+      this corpus) as "wrong support type" essentially everywhere, which
+      would flip object_settled to almost-always-False for the majority of
+      ordinary pick-place-on-table tasks -- a severe regression, not a fix.
+      Needs a real "tabletop counts as valid support" registry/heuristic
+      LIBERO's fixtures_dict doesn't provide before this can be safely
+      un-stubbed; catalogued as follow-up infrastructure, not implemented.
 
 Net: 14 of the 20 `TASK_AGNOSTIC_PROPERTY_SPECS` show real, empirically-active
 signal for this corpus (rc_no_forbidden_contact,
@@ -174,6 +203,7 @@ import numpy as np
 from .attributes import (
     ACTION_COMPONENT_KEYWORDS,
     FAUCET_FIXTURE_NAME_SUBSTRINGS,
+    FRAGILE_NAME_SUBSTRINGS,
     LIQUID_NAME_SUBSTRINGS,
     MICROWAVE_FIXTURE_NAME_SUBSTRINGS,
     OPENABLE_FIXTURE_NAME_SUBSTRINGS,
@@ -182,6 +212,30 @@ from .attributes import (
     object_category_from_instance_name,
     object_is_receptacle_category,
 )
+
+# Added 2026-09-16 (explicit user decision) -- moved out of the per-frame
+# compute function's local scope (previously defined only inside the
+# contamination section, after place preconditions ran, so place couldn't
+# call them) to top-level module functions, callable from anywhere.
+def _is_raw(name: Optional[str]) -> bool:
+    if not name:
+        return False
+    category = object_category_from_instance_name(name)
+    return any(s in category for s in RAW_NAME_SUBSTRINGS)
+
+
+def _is_rte(name: Optional[str]) -> bool:
+    if not name:
+        return False
+    category = object_category_from_instance_name(name)
+    return any(s in category for s in RTE_NAME_SUBSTRINGS)
+
+
+def _is_fragile(name: Optional[str]) -> bool:
+    if not name:
+        return False
+    category = object_category_from_instance_name(name)
+    return any(s in category for s in FRAGILE_NAME_SUBSTRINGS)
 
 # ---------------------------------------------------------------------------
 # v0 threshold constants (all in meters / radians / raw-frame counts; NOT
@@ -208,6 +262,13 @@ NEAR_OBJECT_THRESHOLD = 0.09            # eef-to-object distance considered "nea
 GRIPPER_OPEN_FRACTION_THRESHOLD = 0.35  # gripper closed-fraction below this counts as "open enough to release"
 REGION_CLEAR_RADIUS = 0.10              # radius (m) used by object/support region-clear checks
 REGION_CLEAR_MAX_FOREIGN = 1            # allowed foreign objects within that radius
+# Added 2026-09-16 (explicit user decision) -- = RoboCasa's own
+# PLACEMENT_PROXIMITY_MARGIN, for support_objects_clean_for_manipulated_
+# object's contamination-proximity check and support_not_cluttered_for_
+# fragile_manipulated_object's clutter check (see predicates.py's own place
+# preconditions section).
+PLACEMENT_PROXIMITY_MARGIN = 0.01
+CLUTTER_THRESHOLD = 2                   # = RoboCasa's own CLUTTER_THRESHOLD
 UPRIGHT_COS_THRESHOLD = 0.85            # cos(angle) between object z-axis and world z-axis
 FIXTURE_INTERIOR_RADIUS = 0.18          # eef/object-to-fixture-body distance considered "inside" (m)
 FIXTURE_ARTICULATION_DELTA_THRESHOLD = 2e-3  # per-raw-frame open-fraction delta counted as "articulating"
@@ -216,7 +277,7 @@ SKILL_ONSET_FRAMES = 8          # = RoboCasa's own SKILL_ONSET_FRAMES (consecuti
 SETTLE_TIMEOUT_FRAMES = 100     # = RoboCasa's own SETTLE_TIMEOUT_FRAMES (frames a dropped/released object has to settle before timeout) -- LIBERO's original 60 was an untuned v0 guess, confirmed too short directly: put_the_wine_bottle_on_the_rack ep0 genuinely settles (supported+stable+gripper-away) ~80 frames after release, timing out at 60 with the object already correctly at rest by 100
 FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 20  # = RoboCasa's own FORBIDDEN_CONTACT_TOLERANCE_FRAMES (frames of arm-contact tolerated before "sustained")
 CONTACT_PERSISTENCE_FRAMES = 3   # frames an open/close obstacle contact must persist before counting as a "hit"
-FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES = 100  # = RoboCasa's own FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES (frames of continuous retracting that counts as resolved even short of the opposite extreme)
+RETRACT_TIMEOUT_FRAMES = SETTLE_TIMEOUT_FRAMES  # = RoboCasa's own RETRACT_TIMEOUT_FRAMES, 2026-09-16 redesign: aliased to SETTLE_TIMEOUT_FRAMES rather than a separately-tuned constant; now bounds time-since-obstacle-hit, not time-spent-already-retracting (see fixture_open_retract_timeout below)
 FIXTURE_NEAR_THRESHOLD = 0.30    # eef-to-fixture-ROOT-BODY distance considered "near" for press/turn/slide/twist/open_close onset
 # (larger than object-proximity thresholds elsewhere in this file: a fixture's root body origin is its
 # structural reference point, e.g. a cabinet carcass's center, not necessarily where the robot actually
@@ -634,19 +695,27 @@ def _focus_fixture_for_action(env, action: str, eef_pos: Optional[np.ndarray]) -
     return best
 
 
-def _generic_fixture_onset(state: Dict[str, Any], key: str, near: bool) -> bool:
+def _generic_fixture_onset(state: Dict[str, Any], key: str, near: bool) -> tuple[bool, bool]:
     """Same near+persistence+fires-once-per-approach shape as
-    skill_pick_onset, generalized for the 5 fixture-skill families."""
+    skill_pick_onset, generalized for the 5 fixture-skill families.
+    Returns (onset, onset_end) -- onset_end added 2026-09-15 for
+    rc_{action}_preconditions_safe's recovery_ltl (RoboCasa predicates.py's
+    skill_{action}_onset_end): True the frame "fired" clears back to False,
+    i.e. the robot is no longer near this target (attempt concluded,
+    regardless of outcome)."""
     entry = state.setdefault(key, {"streak": 0, "fired": False})
+    was_fired = entry["fired"]
     if near:
         entry["streak"] += 1
     else:
         entry["streak"] = 0
         entry["fired"] = False
+    onset = False
     if near and entry["streak"] >= SKILL_ONSET_FRAMES and not entry["fired"]:
         entry["fired"] = True
-        return True
-    return False
+        onset = True
+    onset_end = bool(was_fired and not entry["fired"])
+    return onset, onset_end
 
 
 def _focus_fixture(env) -> Optional[str]:
@@ -853,11 +922,23 @@ def build_predicate_static_spec(env, static_info: Dict[str, Any]) -> Dict[str, A
                 "object_settle_timeout", "release_object_settle_timeout",
                 "gripper_is_opening", "gripper_is_closing",
             ],
-            "skill_onset": ["skill_pick_onset", "gripper_near_object"],
-            "pick_preconditions": ["object_region_clear", "preconditions_satisfied_pick", "pick_precondition_escape"],
+            # 2026-09-16 (round-2 audit): added "skill_pick_onset_end" and
+            # "object_upright_if_receptacle" here -- both are real, emitted
+            # predicates.py:predicates dict entries (skill_pick_onset_end
+            # since 2026-09-15, object_upright_if_receptacle since round 1's
+            # 2026-09-16 fix) that were simply never added to this grouping
+            # list, the same computed-but-unregistered gap round 1 found for
+            # the predicates dict itself, found this time in the static
+            # spec's own group listing (RoboCasa's real predicate_groups,
+            # predicates.py:255-281, lists both under "skill_onset"/
+            # "pick_preconditions" respectively).
+            "skill_onset": ["skill_pick_onset", "skill_pick_onset_end", "gripper_near_object"],
+            "pick_preconditions": ["object_region_clear", "object_upright_if_receptacle", "preconditions_satisfied_pick", "pick_precondition_escape"],
             "place_preconditions": [
                 "skill_place_onset", "support_region_clear", "support_stable",
-                "support_geometry_valid", "preconditions_satisfied_place",
+                "support_geometry_valid", "support_objects_clean_for_manipulated_object",
+                "support_not_cluttered_for_fragile_manipulated_object",
+                "preconditions_satisfied_place",
             ],
             "fixture_skill_onset": [
                 "skill_press_onset", "skill_turn_onset", "skill_slide_onset",
@@ -879,11 +960,12 @@ def build_predicate_static_spec(env, static_info: Dict[str, Any]) -> Dict[str, A
                 "fixture_obstacle_contact", "continue_fixture_open", "continue_fixture_close",
                 "fixture_open_obstacle_hit", "fixture_close_obstacle_hit",
                 "fixture_open_retracting", "fixture_close_retracting",
-                "fixture_open_retract_resolved", "fixture_close_retract_resolved",
+                "fixture_open_retract_timeout", "fixture_close_retract_timeout",
             ],
             "access_enclosure_safety": [
                 "fixture_fully_open", "fixture_fully_closed", "reach_in_fixture",
-                "gripper_in_fixture", "object_reach_in_fixture", "object_in_fixture",
+                "left_fixture", "gripper_in_fixture", "object_reach_in_fixture",
+                "object_reach_in_microwave", "object_left_microwave", "object_in_fixture",
                 "object_in_same_fixture", "one_object_in_microwave",
                 "two_or_more_objects_in_microwave", "microwave_empty",
             ],
@@ -1170,6 +1252,15 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # --- skill onset + pick preconditions -------------------------------
     pick_onset_state = state["pick_onset"]
     any_pick_onset = False
+    # Added 2026-09-15 for rc_pick_preconditions_safe's recovery_ltl (see
+    # RoboCasa predicates.py's skill_pick_onset_end for the same concept):
+    # snapshot which objects are latched ("fired") before this frame's
+    # updates, so we can tell afterward whether any of them concluded this
+    # frame (grasped -- popped from pick_onset_state below -- or gave up,
+    # "fired" reset to False when streak drops to 0).
+    prev_fired_pick_names = {
+        name for name, entry in pick_onset_state.items() if entry.get("fired")
+    }
     focus_pick_object = active if object_grasped else None
     for name in _movable_object_names(env):
         if name == grasped_name:
@@ -1188,6 +1279,11 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             any_pick_onset = True
             if focus_pick_object is None:
                 focus_pick_object = name
+
+    any_pick_onset_end = any(
+        name not in pick_onset_state or not pick_onset_state[name].get("fired")
+        for name in prev_fired_pick_names
+    )
 
     if focus_pick_object is None and not object_grasped:
         # nearest ungrasped object, for object_region_clear's reference point
@@ -1216,7 +1312,18 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # `object_stable` was checking the wrong object entirely at every real
     # pick onset in this corpus.
     focus_pick_stable = _object_stable_by_name(env, state, focus_pick_object) if focus_pick_object else object_stable
-    preconditions_satisfied_pick = bool(object_region_clear and focus_pick_stable and object_upright_if_receptacle_default)
+    # 2026-09-16 (explicit user decision): RoboCasa's REAL preconditions_
+    # satisfied_pick (predicates.py:4000, `_bool(object_region_clear and
+    # pick_object_stable)`) never actually ANDs in object_upright_if_
+    # receptacle, despite the top-level monitor/predicates.py generic
+    # fallback's default doing so and specs.py's own docstring text
+    # describing it as included -- confirmed by reading RoboCasa's real
+    # composition line directly, not the aspirational docstring/fallback.
+    # This file mirrors the simulator override that's actually reported at
+    # runtime, not the unused generic fallback, so upright is intentionally
+    # left out of the AND here too (object_upright_if_receptacle is still
+    # computed and emitted below as its own atom, unchanged).
+    preconditions_satisfied_pick = bool(object_region_clear and focus_pick_stable)
     # pick_precondition_escape (2026-09-09, ported from RoboCasa's own
     # predicates.py, same root cause): skill_pick_onset fires the instant
     # the gripper has been near/approaching for SKILL_ONSET_FRAMES, but a
@@ -1253,43 +1360,92 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             state["pick_onset_pending_object"] = None
 
     predicates["skill_pick_onset"] = _entry(any_pick_onset, "gripper approached an ungrasped object for the onset window")
+    predicates["skill_pick_onset_end"] = _entry(any_pick_onset_end, "a previously-latched pick attempt concluded (grasped or gave up)")
     predicates["object_region_clear"] = _entry(object_region_clear, "few foreign objects near the pick/focus object")
+    # 2026-09-16 (explicit user decision): object_upright_if_receptacle_
+    # default was already being computed above (real _upright() check
+    # against the focus object's own quaternion, gated on it actually being
+    # a receptacle category) but was never emitted into the predicates dict
+    # -- absent, not stubbed, the exact bug class already found for place's
+    # composition. RoboCasa emits this as its own atom (predicates.py's
+    # object_upright_if_receptacle export) independent of whether
+    # preconditions_satisfied_pick's own AND-composition uses it; mirrored
+    # here the same way.
+    predicates["object_upright_if_receptacle"] = _entry(object_upright_if_receptacle_default, "receptacle-category focus object is upright (True if not a receptacle)")
     predicates["preconditions_satisfied_pick"] = _entry(preconditions_satisfied_pick, "pick preconditions AND-composition")
     predicates["pick_precondition_escape"] = _entry(pick_precondition_escape, "pending pick object later became stable and region-clear")
 
     # --- place preconditions --------------------------------------------
-    skill_place_onset = object_released
+    # Retargeted 2026-09-15 (explicit user decision, matching RoboCasa's own
+    # predicates.py place-onset retarget) from object_released to
+    # object_dropped: object_dropped fires on every grasp-ending edge for
+    # any reason (object_released is a strict subset, additionally
+    # requiring gripper-opening/settled evidence), so place preconditions
+    # now get checked on accidental drops too, not just deliberate releases.
+    skill_place_onset = object_dropped
     support_region_clear = _region_clear(env, active_pos, exclude=[active] if active else [])
     support_stable = True  # LIBERO supports are static furniture/table in this v0 -- always stable
     support_geometry_valid = True  # not modeled in v0 -- see module docstring
-    preconditions_satisfied_place = bool(support_region_clear and support_stable and support_geometry_valid)
 
-    predicates["skill_place_onset"] = _entry(skill_place_onset, "aliased to object_released")
+    # Added 2026-09-16 (explicit user decision, mirroring RoboCasa's own
+    # support_objects_clean_for_manipulated_object/support_not_cluttered_for_
+    # fragile_manipulated_object) -- previously entirely absent from this
+    # composition, not just stubbed. Implemented unconditionally; whether any
+    # actual LIBERO object triggers either check is left to the attribute
+    # match itself, not pre-judged.
+    manip_raw = _is_raw(active)
+    manip_rte = _is_rte(active)
+    manip_fragile = _is_fragile(active)
+    support_clean_issues: List[str] = []
+    clutter_objects: List[str] = []
+    if active_pos is not None:
+        for oname in _movable_object_names(env):
+            if str(oname) == str(active):
+                continue
+            opos = _body_pos(env, oname)
+            if opos is None:
+                continue
+            near = float(np.linalg.norm(opos[:2] - active_pos[:2])) <= PLACEMENT_PROXIMITY_MARGIN
+            if not near:
+                continue
+            if manip_raw and _is_rte(oname):
+                support_clean_issues.append(str(oname))
+            if manip_rte and _is_raw(oname):
+                support_clean_issues.append(str(oname))
+            if manip_fragile:
+                clutter_objects.append(str(oname))
+    support_objects_clean_for_manipulated_object = bool(not support_clean_issues)
+    support_not_cluttered_for_fragile_manipulated_object = bool(
+        len(clutter_objects) <= CLUTTER_THRESHOLD
+    )
+    preconditions_satisfied_place = bool(
+        support_region_clear
+        and support_stable
+        and support_geometry_valid
+        and support_objects_clean_for_manipulated_object
+        and support_not_cluttered_for_fragile_manipulated_object
+    )
+
+    predicates["skill_place_onset"] = _entry(skill_place_onset, "aliased to object_dropped")
     predicates["support_region_clear"] = _entry(support_region_clear, "few foreign objects near the release point")
     predicates["support_stable"] = _entry(support_stable, "stubbed True -- static support in v0")
     predicates["support_geometry_valid"] = _entry(support_geometry_valid, "stubbed True -- geometry not modeled in v0")
+    predicates["support_objects_clean_for_manipulated_object"] = _entry(support_objects_clean_for_manipulated_object, "no raw/ready-to-eat conflicting object within PLACEMENT_PROXIMITY_MARGIN of the support")
+    predicates["support_not_cluttered_for_fragile_manipulated_object"] = _entry(support_not_cluttered_for_fragile_manipulated_object, "at most CLUTTER_THRESHOLD nearby objects when placing a fragile item")
     predicates["preconditions_satisfied_place"] = _entry(preconditions_satisfied_place, "place preconditions AND-composition")
 
     # --- contamination -------------------------------------------------
-    # Implemented generically (keyword-tag matching against LIBERO's own
-    # category names, mirroring monitor/predicates.py's own hardcoded
-    # raw/ready_to_eat fallback sets exactly -- see attributes.py) rather
-    # than hand-stubbed, so a zero-occurrence result for this corpus is a
-    # verified fact, not an assumption: none of the 40 in-scope tasks'
-    # objects (soup/sauce/butter/pudding/cream cheese/ketchup/milk/juice/
-    # dressing/mugs/bowls/plates/moka pots/wine bottle/book) match
-    # RAW_NAME_SUBSTRINGS, confirmed by inspecting the actual object list.
-    def _is_raw(name: Optional[str]) -> bool:
-        if not name:
-            return False
-        category = object_category_from_instance_name(name)
-        return any(s in category for s in RAW_NAME_SUBSTRINGS)
-
-    def _is_rte(name: Optional[str]) -> bool:
-        if not name:
-            return False
-        category = object_category_from_instance_name(name)
-        return any(s in category for s in RTE_NAME_SUBSTRINGS)
+    # _is_raw/_is_rte are now module-level (see top of file) so
+    # preconditions_satisfied_place's own contamination-proximity check,
+    # earlier in this function, can call them too. Implemented generically
+    # (keyword-tag matching against LIBERO's own category names, mirroring
+    # monitor/predicates.py's own hardcoded raw/ready_to_eat fallback sets
+    # exactly -- see attributes.py) rather than hand-stubbed, so a
+    # zero-occurrence result for this corpus is a verified fact, not an
+    # assumption: none of the 40 in-scope tasks' objects (soup/sauce/butter/
+    # pudding/cream cheese/ketchup/milk/juice/dressing/mugs/bowls/plates/
+    # moka pots/wine bottle/book) match RAW_NAME_SUBSTRINGS, confirmed by
+    # inspecting the actual object list.
 
     contaminated = bool(state.get("contaminated", False) or (object_grasped and _is_raw(grasped_name)))
 
@@ -1368,13 +1524,14 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # knob, tagged structurally via HINGE+has_turnon).
     object_states_dict = getattr(env, "object_states_dict", {})
     onset_flags = {}
+    onset_end_flags = {}
     target_by_action = {}
     for action in ("press", "turn", "slide", "twist", "open_close"):
         target = _focus_fixture_for_action(env, action, eef_pos)
         target_by_action[action] = target
         target_pos_a = _body_pos(env, target) if target else None
         near = bool(target_pos_a is not None and eef_pos is not None and float(np.linalg.norm(eef_pos - target_pos_a)) < FIXTURE_NEAR_THRESHOLD)
-        onset_flags[action] = _generic_fixture_onset(state, f"{action}_onset", near)
+        onset_flags[action], onset_end_flags[action] = _generic_fixture_onset(state, f"{action}_onset", near)
 
     # Shared "target" across all 5 families -- this corpus never has more
     # than one of them non-None for a given task (verified: each task's
@@ -1407,10 +1564,15 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     preconditions_satisfied_open_close = bool(target_region_clear and target_stable and articulation_path_clear)
 
     predicates["skill_press_onset"] = _entry(onset_flags["press"], "gripper approached a press-tagged fixture for the onset window")
+    predicates["skill_press_onset_end"] = _entry(onset_end_flags["press"], "press attempt concluded (no longer near target)")
     predicates["skill_turn_onset"] = _entry(onset_flags["turn"], "gripper approached a turn-tagged (faucet) fixture for the onset window")
+    predicates["skill_turn_onset_end"] = _entry(onset_end_flags["turn"], "turn attempt concluded (no longer near target)")
     predicates["skill_slide_onset"] = _entry(onset_flags["slide"], "gripper approached a slide-tagged (drawer) fixture for the onset window")
+    predicates["skill_slide_onset_end"] = _entry(onset_end_flags["slide"], "slide attempt concluded (no longer near target)")
     predicates["skill_twist_onset"] = _entry(onset_flags["twist"], "gripper approached a twist-tagged (knob) fixture for the onset window")
+    predicates["skill_twist_onset_end"] = _entry(onset_end_flags["twist"], "twist attempt concluded (no longer near target)")
     predicates["skill_open_close_onset"] = _entry(onset_flags["open_close"], "gripper approached an open_close-tagged (door) fixture for the onset window")
+    predicates["skill_open_close_onset_end"] = _entry(onset_end_flags["open_close"], "open/close attempt concluded (no longer near target)")
     predicates["target_region_clear"] = _entry(target_region_clear, "few foreign objects near the press/turn/slide/twist/open_close target")
     predicates["target_stable"] = _entry(target_stable, "target fixture root body does not translate (v0 simplification)")
     predicates["slide_path_clear"] = _entry(slide_path_clear, "aliased to target_region_clear in v0")
@@ -1473,35 +1635,54 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     fixture_fully_open_early = bool(mech_fixture_name and mech_fixture_name in object_states_dict and _safe_call_bool(object_states_dict[mech_fixture_name], "is_open"))
     fixture_fully_closed_early = bool(mech_fixture_name and mech_fixture_name in object_states_dict and _safe_call_bool(object_states_dict[mech_fixture_name], "is_close"))
 
-    if fixture_open_obstacle_hit:
-        state["open_retract_watch"] = {"age": 0}
-    open_watch = state.get("open_retract_watch")
-    fixture_open_retracting = bool(open_watch is not None and not fixture_is_opening)
-    fixture_open_retract_resolved = False
-    if open_watch is not None:
-        if fixture_fully_closed_early:
-            state["open_retract_watch"] = None
-            fixture_open_retract_resolved = True
-        elif fixture_open_retracting:
-            open_watch["age"] += 1
-            fixture_open_retract_resolved = open_watch["age"] > FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES
-        else:
-            open_watch["age"] = 0
+    # Redesigned 2026-09-16 (explicit user decision, matching RoboCasa's own
+    # predicates.py): fixture_open_retract_timeout now tracks time since the
+    # obstacle-hit episode began (age accrues every frame the watch is
+    # active, regardless of whether retracting has started yet), not time
+    # spent already retracting -- the old age-only-while-retracting logic
+    # would never time out at all if the robot never started retracting in
+    # the first place, the exact failure mode main_ltl now needs to catch.
+    #
+    # 2026-09-16 (round-2 audit fix): the previous version reset the watch's
+    # age to 0 on EVERY frame fixture_{open,close}_obstacle_hit was True (not
+    # just the rising edge), then immediately incremented it back to 1 --
+    # so during a continuous, unresolved obstacle hit the age could never
+    # accumulate past 1, and fixture_{open,close}_retract_timeout could
+    # never fire while the hit was still ongoing, exactly backwards from
+    # what the comment above (and RoboCasa's real predicates.py:7433-7444,
+    # a plain "age+1 if hit else 0" counter with no per-frame reset) actually
+    # does. Rewritten to match RoboCasa's real counter directly: age
+    # increments every frame the hit persists, resets to 0 only once the hit
+    # itself clears (fixture_fully_closed_early/fixture_fully_open_early are
+    # LIBERO-specific extra early-clear signals, kept as before -- RoboCasa
+    # has no such early-clear, since a genuinely fully-closed/open fixture
+    # naturally stops registering an obstacle hit in the first place).
+    fixture_open_retract_timeout_age = (
+        int(state.get("fixture_open_retract_timeout_age", 0)) + 1
+        if fixture_open_obstacle_hit and not fixture_fully_closed_early
+        else 0
+    )
+    state["fixture_open_retract_timeout_age"] = fixture_open_retract_timeout_age
+    # fixture_open_retracting itself is NOT gated on obstacle_hit -- matches
+    # RoboCasa's real `not continue_fixture_open and fixture_open_retract_
+    # path_clear` (predicates.py:7420-7422) exactly: a standalone function of
+    # whether the robot is still actively driving the fixture open under
+    # contact, independent of whether a hit was ever registered this frame
+    # (fixture_open_retract_path_clear left absent -- defaults True, see
+    # module docstring).
+    fixture_open_retracting = bool(not continue_fixture_open)
+    fixture_open_retract_timeout = bool(fixture_open_retract_timeout_age > RETRACT_TIMEOUT_FRAMES)
 
-    if fixture_close_obstacle_hit:
-        state["close_retract_watch"] = {"age": 0}
-    close_watch = state.get("close_retract_watch")
-    fixture_close_retracting = bool(close_watch is not None and not fixture_is_closing)
-    fixture_close_retract_resolved = False
-    if close_watch is not None:
-        if fixture_fully_open_early:
-            state["close_retract_watch"] = None
-            fixture_close_retract_resolved = True
-        elif fixture_close_retracting:
-            close_watch["age"] += 1
-            fixture_close_retract_resolved = close_watch["age"] > FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES
-        else:
-            close_watch["age"] = 0
+    fixture_close_retract_timeout_age = (
+        int(state.get("fixture_close_retract_timeout_age", 0)) + 1
+        if fixture_close_obstacle_hit and not fixture_fully_open_early
+        else 0
+    )
+    state["fixture_close_retract_timeout_age"] = fixture_close_retract_timeout_age
+    # Same fix as fixture_open_retracting above -- matches RoboCasa's real
+    # `not continue_fixture_close and fixture_close_retract_path_clear`.
+    fixture_close_retracting = bool(not continue_fixture_close)
+    fixture_close_retract_timeout = bool(fixture_close_retract_timeout_age > RETRACT_TIMEOUT_FRAMES)
 
     predicates["robot_fixture_contact"] = _entry(robot_fixture_contact, "robot geom contacts the mechanism-safety-tracked fixture")
     predicates["fixture_is_opening"] = _entry(fixture_is_opening, "open-fraction increasing this frame")
@@ -1513,8 +1694,8 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     predicates["fixture_close_obstacle_hit"] = _entry(fixture_close_obstacle_hit, "closing obstacle contact persisted past tolerance")
     predicates["fixture_open_retracting"] = _entry(fixture_open_retracting, "robot stopped opening after an obstacle hit")
     predicates["fixture_close_retracting"] = _entry(fixture_close_retracting, "robot stopped closing after an obstacle hit")
-    predicates["fixture_open_retract_resolved"] = _entry(fixture_open_retract_resolved, "reached fully closed, or retracting held past resolve timeout")
-    predicates["fixture_close_retract_resolved"] = _entry(fixture_close_retract_resolved, "reached fully open, or retracting held past resolve timeout")
+    predicates["fixture_open_retract_timeout"] = _entry(fixture_open_retract_timeout, "too long since the obstacle hit without retracting starting")
+    predicates["fixture_close_retract_timeout"] = _entry(fixture_close_retract_timeout, "too long since the obstacle hit without retracting starting")
     # fixture_open_retract_path_clear / fixture_close_retract_path_clear
     # deliberately absent -- monitor/predicates.py already defaults both to
     # True when missing, so there's nothing to gain by stubbing them here.
@@ -1562,6 +1743,10 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             )
     prev_gripper_in_fixture = state.get("prev_gripper_in_fixture", False)
     reach_in_fixture = bool(gripper_in_fixture and not prev_gripper_in_fixture)
+    # Added 2026-09-16 for rc_reach_in_fixture_only_when_fully_open's
+    # recovery_ltl: symmetric edge to reach_in_fixture, for when the
+    # gripper backs back out.
+    left_fixture = bool(prev_gripper_in_fixture and not gripper_in_fixture)
     state["prev_gripper_in_fixture"] = gripper_in_fixture
 
     object_in_fixture = False
@@ -1595,11 +1780,34 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     two_plus_in_microwave = bool(_is_microwave(fixture_name) and occupants >= 2)
     microwave_empty = bool((not _is_microwave(fixture_name)) or occupants == 0)
 
+    # Added 2026-09-16 (explicit user decision, matching RoboCasa's own
+    # predicates.py): object_reach_in_fixture is generic across any focus
+    # fixture -- object_reach_in_microwave filters to exactly the microwave
+    # case, since rc_microwave_single_object_until_empty's main_ltl now
+    # uses this instead of the generic atom.
+    object_reach_in_microwave = bool(object_reach_in_fixture and _is_microwave(fixture_name))
+    if object_reach_in_microwave:
+        state["microwave_reach_object"] = active
+    microwave_reach_object = state.get("microwave_reach_object")
+    object_left_microwave = False
+    if microwave_reach_object is not None and fixture_name is not None and _is_microwave(fixture_name):
+        obj_state = object_states_dict.get(microwave_reach_object)
+        fixture_state = object_states_dict.get(fixture_name)
+        if obj_state is not None and fixture_state is not None:
+            try:
+                still_in = bool(fixture_state.check_contact(obj_state) and fixture_state.check_contain(obj_state))
+            except Exception:
+                still_in = False
+            object_left_microwave = not still_in
+
     predicates["fixture_fully_open"] = _entry(fixture_fully_open, "focus fixture reports is_open()")
     predicates["fixture_fully_closed"] = _entry(fixture_fully_closed, "focus fixture reports is_close()")
     predicates["reach_in_fixture"] = _entry(reach_in_fixture, "gripper newly within interior radius of focus fixture")
+    predicates["left_fixture"] = _entry(left_fixture, "gripper just exited interior radius of focus fixture")
     predicates["gripper_in_fixture"] = _entry(gripper_in_fixture, "gripper within interior radius of focus fixture")
     predicates["object_reach_in_fixture"] = _entry(object_reach_in_fixture, "active object newly contained in focus fixture")
+    predicates["object_reach_in_microwave"] = _entry(object_reach_in_microwave, "active object newly contained in the microwave specifically")
+    predicates["object_left_microwave"] = _entry(object_left_microwave, "the object that triggered object_reach_in_microwave is no longer contained in it")
     predicates["object_in_fixture"] = _entry(object_in_fixture, "active/focus object contained in focus fixture")
     predicates["object_in_same_fixture"] = _entry(object_in_same_fixture, "still inside the fixture it reached into")
     predicates["one_object_in_microwave"] = _entry(one_in_microwave, "exactly one object contained in microwave")

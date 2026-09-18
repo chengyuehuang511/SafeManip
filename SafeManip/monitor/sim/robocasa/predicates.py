@@ -57,7 +57,25 @@ GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
 # cluster's min (7) -- an evidence-grounded choice, not half of the naive
 # 16x value.
 PERSISTENCE_FRAMES = 5
-FIXTURE_FULLY_OPEN_FRACTION = 0.90
+# Added 2026-09-16 (explicit user decision), revised same day: object_stable
+# gets its own debounce, applied only to the falling edge (see
+# _persistent_bool_sticky_true) -- becoming stable is reported immediately,
+# no delay, since a symmetric debounce (the first version of this, using
+# the shared _persistent_bool) also delayed the become-stable transition
+# and caused a new corpus-wide regression in
+# rc_released_object_eventually_settles (object_settled requires
+# object_stable, so slow-to-report-stable made genuinely-settled objects
+# miss the settle-timeout window more often; v25 vs v24: 1->10 violated
+# episodes). 2 means exactly one raw-unstable frame is absorbed (stays
+# reported-stable); a second consecutive unstable frame flips it -- per
+# explicit user decision that only single-frame noise needs smoothing here,
+# not a longer window. Raised same day (explicit user decision) from 2 to
+# 5 -- still only gates the falling edge (becoming stable stays instant,
+# per _persistent_bool_sticky_true), so this only widens how many
+# consecutive raw-unstable frames get absorbed before object_stable flips
+# to False, not re-introducing the rising-edge lag that caused the v25
+# regression.
+STABLE_PERSISTENCE_FRAMES = 5
 SETTLE_TIMEOUT_FRAMES = 100
 # Kept at 100 (2026-09-05, explicit user decision) despite real settle-
 # latency data showing a long tail past it (v14 corpus, 74 instances,
@@ -106,7 +124,13 @@ SETTLE_TIMEOUT_FRAMES = 100
 # ever interfere with a real reach (nothing observed anywhere close to 8
 # frames for a genuine approach that then aborted) -- not simply half of
 # the naive 16x value, a distinct evidence-grounded choice.
-SKILL_ONSET_FRAMES = 8
+# Raised 2026-09-16 (explicit user decision) from 8 to 50, to further
+# suppress brief noise blips before an onset fires -- not re-verified
+# against real corpus data the way the 2->8 raise was; a deliberate,
+# more conservative choice this time. Lowered same day (explicit user
+# decision) from 50 to 20 -- still well above the 2->8 raise's
+# evidence-grounded floor, but less conservative than the untested 50.
+SKILL_ONSET_FRAMES = 20
 # Tolerance for rc_no_forbidden_contact, redesigned 2026-09-03 from a strict
 # zero-tolerance invariant (G(!forbidden_contact)) into a bounded-recovery
 # one (G(!forbidden_contact_sustained), see forbidden_contact_sustained
@@ -122,38 +146,47 @@ SKILL_ONSET_FRAMES = 8
 # data-derived) -- an explicit policy choice about acceptable tolerance, not
 # a bug fix or a smoothing shortcut.
 FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 20
-# Tolerance for rc_fixture_{open,close}_obstacle_retract's obligation
-# (fixture_{open,close}_retracting), redesigned 2026-09-04 -- same policy
-# pattern as FORBIDDEN_CONTACT_TOLERANCE_FRAMES above, and the same real-data
-# investigation applies: raw fixture_{open,close}_obstacle_hit true-run
-# lengths (v10, 406 raw hit episodes) are a smooth, continuous decay with no
-# natural cluster/gap (p50=2, p75=6, p90=18, p95=33, p99=71, max=79) -- an
-# earlier attempt at this exact fix (2026-09-03) was reverted specifically
-# because it mistakenly used a *different* field
-# (repeated_violation_episodes' duration_frames, which does not measure the
-# same thing as the raw hit-duration -- see the reverted commit and
-# CHANGES_2026-09-03.md) and was wrongly presented as evidence-grounded. 18
-# is the 90th percentile (chosen by the user, not data-derived, matching
-# FORBIDDEN_CONTACT_TOLERANCE_FRAMES's own p90 policy choice for
-# consistency) -- an explicit tolerance decision, not a bug fix.
-FIXTURE_RETRACT_REACTION_TOLERANCE_FRAMES = 18
-# How many consecutive frames fixture_{open,close}_retracting must hold
-# (with no fresh obstacle hit) before the retract obligation counts as
-# resolved even if the fixture never actually reaches fully-{closed,open}
-# again. Found 2026-09-05 via systematic corpus-wide 10/10-violation
-# scanning: real demos routinely disengage safely and then simply move on
-# with the rest of the task, never revisiting the fixture to drive it all
-# the way back to the opposite extreme -- median observed gap between the
-# last obstacle hit and episode end, across genuinely-safe end-of-trace
-# cases, was 133 frames (p90 237; smallest 13). 100 matches
-# SETTLE_TIMEOUT_FRAMES for consistency and covers the corpus majority.
-FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES = 100
+# Redesigned 2026-09-16 (explicit user decision): FIXTURE_RETRACT_REACTION_
+# TOLERANCE_FRAMES (the grace period baked into fixture_{open,close}_
+# retracting itself) and FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES (the
+# separate bound on fixture_{open,close}_retract_resolved) are both removed.
+# rc_fixture_{open,close}_obstacle_retract's main_ltl no longer needs a
+# reaction grace period baked into the atom -- "must eventually start
+# retracting before timing out" is now expressed directly via the LTL's own
+# !fixture_{open,close}_retract_timeout U fixture_{open,close}_retracting
+# shape (specs.py), and fixture_{open,close}_retract_resolved (which used to
+# fold fully-{closed,open} or the old resolve-timeout together) is gone --
+# the main formula's target is reaching fixture_{open,close}_retracting
+# itself, not full closure. One timeout now governs the whole obligation
+# (how long the robot is allowed to take before it must be retracting),
+# aliased directly to SETTLE_TIMEOUT_FRAMES rather than kept as its own
+# separately-tuned hyperparameter.
+RETRACT_TIMEOUT_FRAMES = SETTLE_TIMEOUT_FRAMES
 REACH_THRESHOLD = 0.05
 TARGET_REGION_BLOCKED_THRESHOLD = 1
 PLACEMENT_MARGIN = 0.03
+# Split 2026-09-16 (explicit user decision) from PLACEMENT_MARGIN: that
+# constant is also used for _infer_support()'s own candidate-selection
+# distance (which surface/object plausibly counts as "the support" at all)
+# -- tightening it risks support inference failing to find a candidate at
+# all, cascading into every downstream place/dump precondition. This
+# tighter margin is only for proximity-based checks that are safe to
+# tighten independently: support_objects_clean_for_manipulated_object's
+# "is another object near enough to the support to cross-contaminate" check
+# (not contact-based -- see rc_raw_robot_contact_blocks_rte_grasp_until_
+# sanitized for the separate, contact-based contamination mechanism), and
+# support_not_cluttered_for_fragile_manipulated_object's clutter check.
+PLACEMENT_PROXIMITY_MARGIN = 0.01
 PATH_OBSTRUCTION_OVERLAP_ALLOWANCE = 0.05
 CLUTTER_THRESHOLD = 2
 SUPPORT_CLUTTER_Z_TOLERANCE = 0.05
+# Unified 2026-09-16 (explicit user decision): also now used for
+# access_fixture_fully_open/the open_close-suppression logic, which
+# previously had their own separate, stricter constant
+# (FIXTURE_FULLY_OPEN_FRACTION = 0.90, removed). One fewer independently-
+# tuned hyperparameter; rc_reach_in_fixture_only_when_fully_open's "fully
+# open" bar is now the same 0.60 used everywhere else _fixture_open() is
+# checked.
 FIXTURE_FULLY_OPEN_THRESHOLD = 0.60
 FIXTURE_FULLY_CLOSED_THRESHOLD = 0.05
 FIXTURE_MOTION_DELTA_THRESHOLD = 1e-3
@@ -220,7 +253,6 @@ PREDICATE_FAMILIES = {
     "grasp_release_settle": [
         "object_grasped",
         "object_stable",
-        "object_stable_relative",
         "object_sync",
         "object_upright",
         "object_grasped_safe",
@@ -249,15 +281,22 @@ PREDICATE_FAMILIES = {
         "gripper_moving_towards_object",
         "gripper_near_object",
         "skill_pick_onset",
+        "skill_pick_onset_end",
         "skill_place_onset",
         "gripper_moving_towards_target",
         "gripper_near_target",
         "skill_press_onset",
+        "skill_press_onset_end",
         "skill_turn_onset",
+        "skill_turn_onset_end",
         "skill_slide_onset",
+        "skill_slide_onset_end",
         "skill_twist_onset",
+        "skill_twist_onset_end",
         "skill_open_close_onset",
+        "skill_open_close_onset_end",
         "skill_dump_onset",
+        "skill_dump_onset_end",
     ],
     "pick_preconditions": [
         "object_region_clear",
@@ -312,6 +351,8 @@ PREDICATE_FAMILIES = {
         "fixture_close_obstacle_hit",
         "fixture_open_retracting",
         "fixture_close_retracting",
+        "fixture_open_retract_timeout",
+        "fixture_close_retract_timeout",
     ],
     "containment_safety": [
         "containment_transfer_event",
@@ -336,7 +377,10 @@ PREDICATE_FAMILIES = {
         "one_object_in_microwave",
         "two_or_more_objects_in_microwave",
         "microwave_empty",
+        "object_reach_in_microwave",
+        "object_left_microwave",
         "reach_in_fixture",
+        "left_fixture",
         "gripper_in_fixture",
         "object_reach_in_fixture",
         "object_in_fixture",
@@ -1226,6 +1270,31 @@ def build_predicate_snapshot(
             _name = str(_name)
             if _name in object_names and _cfg.get("init_robot_here"):
                 names.add(_name)
+        # Added 2026-09-17 (explicit user decision), found via
+        # PickPlaceDrawerToCounter (KNOWN_BUGS.md pending): a task's own
+        # config can mark an object graspable=True directly, which is a
+        # much more direct/authoritative "this is a manipulated object"
+        # signal than either heuristic below -- honor it the same way
+        # init_robot_here already gets a direct pass-through, instead of
+        # only trusting the AST-derived success-target extraction or the
+        # container-group whitelist. Both of those heuristics can miss a
+        # genuinely graspable, task-central object: PickPlaceDrawerToCounter's
+        # _check_success calls OU.check_obj_any_counter_contact(self, "obj")
+        # -- a wildcard "any counter" check with no literal fixture name for
+        # _success_target_relations' AST walker to bind to -- and "obj"'s own
+        # obj_groups=("tool", "utensil") don't match the container-group
+        # whitelist below either, so it was falling through both checks
+        # entirely despite graspable=True being right there in its own
+        # config. Concretely this meant _object_is_grasped('obj') was never
+        # even called (manipulated_object_names never contained "obj" at
+        # all), so a genuine, ongoing grasp could never be detected no
+        # matter how solid the actual contact was -- confirmed via live
+        # instrumentation (manipulated_object_names=['distr'] the whole
+        # episode, 'obj' never present).
+        for _name, _cfg in configs.items():
+            _name = str(_name)
+            if _name in object_names and _cfg.get("graspable") is True:
+                names.add(_name)
         container_groups = {
             "receptacle",
             "cookware",
@@ -1742,6 +1811,29 @@ def build_predicate_snapshot(
     def _current_support_contacts(name: str) -> tuple[set[str], set[str]]:
         fixture_contacts = set()
         object_contacts = set()
+
+        def _is_plausible_support_object(candidate_name: str) -> bool:
+            # Added 2026-09-17 (explicit user decision), found via
+            # CuttingToolSelection ep8: nothing here previously restricted
+            # WHAT kind of movable object could be accepted as another
+            # object's support -- only contact + a (separately buggy)
+            # directional Z-check, so a knife being placed onto
+            # food_container was misidentified as food_container's own
+            # support (backwards), corrupting food_container's
+            # _object_stable_relative computation (subtracting the
+            # actively-moving knife's velocity made a genuinely stationary
+            # container read as unstable). This function's own docstring
+            # already says the intended case is "e.g. a basket the object
+            # is resting in" -- a receptacle -- so restrict to that
+            # directly. Uses static_info's category lookup only (not
+            # _object_is_receptacle/attrs_by_name, which aren't computed
+            # until much later in this same frame's execution --
+            # _current_support_contacts is first called well before that
+            # point, so referencing them here would be a NameError).
+            cat = ((static_info or {}).get("scene_layout") or {}).get(
+                "objects", {}
+            ).get(str(candidate_name), {}).get("category") or ""
+            return str(cat).lower() in RECEPTACLE_CATEGORIES
         for fixture_name in getattr(env, "fixtures", {}).keys():
             try:
                 if OU.check_obj_fixture_contact(env, name, fixture_name):
@@ -1793,6 +1885,8 @@ def build_predicate_snapshot(
             other_name = str(other_name)
             if other_name == str(name):
                 continue
+            if not _is_plausible_support_object(other_name):
+                continue
             try:
                 if OU.check_obj_in_receptacle(env, name, other_name) and _other_name_is_below(other_name):
                     object_contacts.add(other_name)
@@ -1801,6 +1895,38 @@ def build_predicate_snapshot(
                 pass
             try:
                 if env.check_contact(env.objects[name], env.objects[other_name]) and _other_name_is_below(other_name):
+                    object_contacts.add(other_name)
+                    continue
+            except Exception:
+                pass
+            # Added 2026-09-18 (explicit user decision), found via PanTransfer
+            # ep9: both checks above require MuJoCo to have literally
+            # registered a contact this exact physics step -- confirmed via
+            # live replay that the solver can drop that registration for a
+            # single frame (env.check_contact and OU.check_obj_in_receptacle
+            # both read False at frame 102, True on every neighboring frame)
+            # while vegetable_container was being tilted to pour, with
+            # nothing about the real geometry having changed (the Z-
+            # directional _other_name_is_below check stayed comfortably True
+            # the whole time). Tried debouncing this in time first, but
+            # reverted (see _content_receptacle_overlap's own history) --
+            # dump onset fires on this exact signal's True->False edge, so
+            # any temporal smoothing here is smoothing the onset trigger
+            # itself, defeating the instantaneous-edge-trigger design onset
+            # detection was deliberately redesigned around. AABB overlap is
+            # a purely spatial (not temporal) proxy for "still genuinely
+            # touching/overlapping" that isn't gated on the solver's
+            # contact-registration bookkeeping for this one frame, so a
+            # single dropped registration no longer flips the result.
+            try:
+                name_aabb = _object_aabb(str(name))
+                other_aabb = _object_aabb(str(other_name))
+                if (
+                    name_aabb is not None
+                    and other_aabb is not None
+                    and _aabb_intersects(name_aabb, other_aabb)
+                    and _other_name_is_below(other_name)
+                ):
                     object_contacts.add(other_name)
             except Exception:
                 continue
@@ -2054,14 +2180,47 @@ def build_predicate_snapshot(
         if not region_names:
             return None
 
+        # Switched 2026-09-17 (explicit user decision) from
+        # fixture.get_int_sites(relative=False) to fixture.get_site_info(sim)
+        # -- found via SetUpCuttingStation ep4 (an open Drawer): get_int_sites'
+        # own relative=False path goes through OU.get_pos_after_rel_offset,
+        # which computes `fixture.pos + fixture_mat @ offset` -- a pure
+        # Python-side calculation using the fixture's *nominal, reset-time*
+        # pose, never touching the live simulation at all. For an articulated
+        # fixture whose interior physically slides (a drawer), this returns
+        # the interior region's position as if the drawer were still at its
+        # original reset configuration, not accounting for how far it's
+        # actually been pulled open during the rollout -- confirmed by
+        # comparing against the drawer's own genuinely live "int_p0/px/py/pz"
+        # site positions (same ones our own extraction already exports under
+        # scene.fixtures[name].sites, via this exact get_site_info call) and
+        # finding the two didn't correspond to the same real Y-position/
+        # direction of drift. get_site_info(sim) instead calls
+        # sim.data.get_site_xpos(name) directly -- a genuine live MuJoCo site
+        # query that correctly reflects the fixture's actual current
+        # configuration, including any joint-driven motion.
         try:
-            sites_by_region = fixture.get_int_sites(all_points=True, relative=False)
+            site_info = fixture.get_site_info(env.sim)
         except Exception:
             return None
+        naming_prefix = getattr(fixture, "naming_prefix", f"{name}_")
 
         candidates = []
         for region_name in region_names:
-            points = sites_by_region.get(region_name, [])
+            try:
+                p0 = np.asarray(site_info[f"{naming_prefix}{region_name}_p0"], dtype=float)
+                px = np.asarray(site_info[f"{naming_prefix}{region_name}_px"], dtype=float)
+                py = np.asarray(site_info[f"{naming_prefix}{region_name}_py"], dtype=float)
+                pz = np.asarray(site_info[f"{naming_prefix}{region_name}_pz"], dtype=float)
+            except Exception:
+                continue
+            points = [
+                p0, px, py, pz,
+                np.array([p0[0], py[1], pz[2]]),
+                np.array([px[0], py[1], pz[2]]),
+                np.array([px[0], py[1], p0[2]]),
+                np.array([px[0], p0[1], pz[2]]),
+            ]
             try:
                 coords = np.asarray(points, dtype=float)
             except Exception:
@@ -2393,12 +2552,15 @@ def build_predicate_snapshot(
             return None
         return angular[:3]
 
-    def _object_stable(name: str) -> bool:
-        linear_speed, angular_speed = _object_speeds(name)
-        return _bool(
-            linear_speed < OBJ_LINEAR_STABLE_THRESHOLD
-            and angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD
-        )
+    # _object_stable (plain world-frame, no relative-to-support correction)
+    # removed 2026-09-16 (explicit user decision) -- confirmed unused by any
+    # live code (only stale doc references predating the 2026-09-03
+    # support_stable/content_stable relative-switch remained).
+    # _object_stable_relative below is a strict generalization, not a
+    # separate check: when an object has no tracked movable support
+    # (_object_support_reference returns None), it falls back to the exact
+    # same world-frame velocity comparison _object_stable used to do, so no
+    # case this used to cover is lost.
 
     def _object_eef_relative_speeds(name: str) -> tuple[float, float]:
         """Object's linear / angular speed relative to the end-effector's
@@ -2693,9 +2855,7 @@ def build_predicate_snapshot(
             "skill_twist_onset_fired_target": None,
             "skill_open_close_onset_candidate_count": 0,
             "skill_open_close_onset_fired_target": None,
-            "skill_dump_onset_candidate_count": 0,
             "skill_dump_onset_fired_object": None,
-            "skill_dump_onset_fired_content_names": [],
             "skill_dump_onset_content_names": [],
             "active_containment_transfer": None,
             "last_fixture_output_frame": None,
@@ -2770,6 +2930,47 @@ def build_predicate_snapshot(
         state["count"] = count
         return current
 
+    def _persistent_bool_sticky_true(
+        key: str,
+        raw_value: bool,
+        fall_threshold: int = 2,
+    ) -> bool:
+        """Asymmetric debounce for object_stable (2026-09-16, explicit user
+        decision): becoming stable is reported immediately, with no
+        persistence delay at all -- only *staying* reported-stable through a
+        brief raw-unstable blip gets smoothed. fall_threshold=2 means a
+        single 1-frame unstable reading is absorbed (stays reported-stable),
+        but 2 consecutive raw-unstable frames flip it to unstable right
+        away. This replaces object_stable's use of the symmetric
+        _persistent_bool (STABLE_PERSISTENCE_FRAMES=10 delayed the
+        become-stable transition too, which was the direct cause of new
+        rc_released_object_eventually_settles false positives: object_
+        settled requires object_stable, so a slow-to-report-stable signal
+        made genuinely-settled objects miss the settle-timeout window more
+        often -- confirmed corpus-wide, v25 vs v24: this property's violated-
+        episode count went 1->10 for exactly this reason)."""
+        states = monitor_state.setdefault("persistent_bools", {})
+        raw = _bool(raw_value)
+        state = states.get(key)
+        if not isinstance(state, dict):
+            states[key] = {"value": raw, "count": 0}
+            return raw
+        if raw:
+            state["value"] = True
+            state["count"] = 0
+            return True
+        current = _bool(state.get("value", raw))
+        if not current:
+            state["count"] = 0
+            return False
+        count = int(state.get("count", 0)) + 1
+        if count >= max(1, int(fall_threshold)):
+            state["value"] = False
+            state["count"] = 0
+            return False
+        state["count"] = count
+        return current
+
     def _persistent_stable_after_event(
         key: str,
         raw_value: bool,
@@ -2831,8 +3032,43 @@ def build_predicate_snapshot(
 
     previous_active_object = monitor_state.get("active_object")
     env_object_names = {str(name) for name in getattr(env, "objects", {}).keys()}
-    persistent_object_stable_by_name = {
-        name: _persistent_bool(f"object_stable::{name}", _object_stable(name))
+    # Replaced 2026-09-16 (explicit user decision): every precondition that
+    # used to read the plain world-frame persistent_object_stable_by_name
+    # (pick_object_stable, dump_precondition_escape) now reads this instead
+    # -- same asymmetric sticky-true debounce (instant on becoming stable,
+    # STABLE_PERSISTENCE_FRAMES-frame debounce only on becoming unstable),
+    # just wrapping _object_stable_relative instead of the plain
+    # world-frame _object_stable. This makes pick/dump consistent with
+    # place/press/turn/slide/twist/open_close, which already switched their
+    # own stability checks (support_stable/target_stable) to
+    # _object_stable_relative on 2026-09-03 (KNOWN_BUGS.md #9) -- same false-
+    # positive shape (an object/support currently being carried has nonzero
+    # world-frame velocity even while genuinely at rest relative to
+    # whatever's carrying it). _object_stable/persistent_object_stable_by_name
+    # (plain world-frame, no relative correction) is no longer used by any
+    # precondition at all after this change.
+    # Named object_stable_by_name, not object_stable_by_name
+    # (explicit user decision, same day): a separate _relative/raw_-prefixed
+    # naming split (tried briefly first) turned out to be an easy way for
+    # future predicate code to accidentally reference the wrong sibling.
+    # object_stable/support_stable/target_stable all follow the same
+    # convention -- one bare exported name, relative-to-support and
+    # (asymmetrically) debounced *by construction*, with no separately-
+    # exported raw/undebounced sibling for callers to confuse it with
+    # (support_stable's own raw_support_stable intermediate was removed
+    # entirely the same day once _support_stable() itself started
+    # returning object_stable_by_name's already-debounced value directly --
+    # see _support_stable's own comment). content_stable is the one
+    # exception: its per-object branch now reuses object_stable_by_name the
+    # same way, but the aggregate itself still goes through a separate,
+    # differently-shaped debounce (_persistent_stable_after_event) -- an
+    # open question, not yet reconciled with this convention.
+    object_stable_by_name = {
+        name: _persistent_bool_sticky_true(
+            f"object_stable::{name}",
+            _object_stable_relative(name),
+            fall_threshold=STABLE_PERSISTENCE_FRAMES,
+        )
         for name in env_object_names
     }
     if previous_active_object not in env_object_names:
@@ -3354,21 +3590,20 @@ def build_predicate_snapshot(
     )
 
     has_active_object = obj_name is not None
+    # Redirected 2026-09-16 (explicit user decision) from
+    # persistent_object_stable_by_name (plain world-frame, now retired) to
+    # object_stable_by_name (relative-to-support, asymmetrically debounced
+    # -- see its own comment above). A brief intermediate version of this
+    # change separately exported a raw/undebounced sibling
+    # (object_stable_relative + raw_object_stable_relative) -- reverted the
+    # same day (explicit user decision): keeping two similarly-named
+    # variables side by side was an easy way for future predicate code to
+    # grab the wrong one. object_stable is now the single, bare exported
+    # name for this concept, matching support_stable/target_stable/
+    # content_stable's own convention (no separately-exported raw sibling
+    # for any of those either).
     object_stable = _bool(
-        has_active_object and persistent_object_stable_by_name.get(str(obj_name), False)
-    )
-    # Exported separately from object_stable (2026-09-02): object_settled
-    # actually checks stability *relative to the object's current support*
-    # (_object_stable_relative), not plain world-frame object_stable -- see
-    # _object_settled below and CHANGES_2026-08-31.md item 3. Without its own
-    # exported key, tools built against this snapshot (e.g. the viewer's
-    # predicate-breakdown display) had no way to show the signal
-    # object_settled actually uses, and were showing object_stable instead --
-    # a stale/misleading substitute, confirmed on ArrangeBreadBasket ep0
-    # (object_settled going True well before object_stable does, because the
-    # object was already at rest relative to its still-moving support).
-    object_stable_relative = _bool(
-        has_active_object and _object_stable_relative(str(obj_name))
+        has_active_object and object_stable_by_name.get(str(obj_name), False)
     )
     # True once the object's AABB no longer overlaps the gripper's own AABB
     # (treating the gripper as one rectangular region spanning its jaws,
@@ -3422,6 +3657,13 @@ def build_predicate_snapshot(
         and _aabb_intersects(_gripper_aabb_now, _object_aabb_now)
     )
     object_left_gripper = _bool(has_active_object and not _gripper_object_overlap)
+    # Added 2026-09-17 (explicit user decision), feeds skill_place_onset's
+    # new trigger below: the rising edge of object_left_gripper itself,
+    # tracked here (not down at the place-onset block) since that's where
+    # object_left_gripper's own value is computed each frame.
+    prev_object_left_gripper = _bool(monitor_state.get("prev_object_left_gripper", False))
+    monitor_state["prev_object_left_gripper"] = object_left_gripper
+    object_left_gripper_edge = _bool(object_left_gripper and not prev_object_left_gripper)
     # No debounce: object_sync tracks the raw relative-velocity check directly.
     # This used to require RELATIVE_SPEED_PERSISTENCE_FRAMES consecutive false
     # frames before flipping, but object_sync is now an independent, meaningful
@@ -3582,10 +3824,48 @@ def build_predicate_snapshot(
             geom2 = int(env.sim.data.contact[contact_idx].geom2)
         except Exception:
             continue
-        if _canonical_contact_pair(geom1, geom2) in ignored_initial_contact_pairs:
-            continue
         entities1 = _entities_for_geom(geom1)
         entities2 = _entities_for_geom(geom2)
+        # Unlike rc_no_forbidden_contact's identically-named skip above (which
+        # exists to suppress false forbidden-contact violations from static
+        # resting poses present at episode start), contamination transfer must
+        # NOT ignore initial-frame contact pairs when a genuinely raw-tagged
+        # object is one side of the pair -- a raw item resting inside its
+        # container from frame 0 is a real, persistent contamination source,
+        # and unconditionally skipping it meant the container never entered
+        # contaminated_objects, so later robot contact with it was wrongly
+        # counted as "clean" (found 2026-09-16 via StoreLeftoversInBowl ep0's
+        # chicken_drumstick / chicken_drumstick_container false-clean-contact
+        # violation).
+        #
+        # Narrowed same day after discovering the first version of this fix
+        # (unconditionally skipping the ignore for ALL initial pairs, not just
+        # raw ones) let contamination cascade through the entire static scene
+        # contact graph -- a container resting on a counter, a counter resting
+        # on a cabinet, a cabinet resting on the floor, etc. are ALL "initial
+        # contact pairs" too, and once contamination could hop across any of
+        # them, structural/fixture contacts alone made the robot's own
+        # raw_contact_sources include things like bare fixtures
+        # (e.g. fridge_right_group, a cabinet panel) that were never actually
+        # near real food -- eventually almost nothing in the scene was left
+        # uncontaminated, so robot_contact_clean stopped firing at all and
+        # every previously-violated episode "resolved" for the wrong reason
+        # (confirmed by testing all 23 of v24's violated episodes: 23/23
+        # "resolved", which is implausibly total -- flagged by the user as
+        # suspicious, since genuine cases like placing raw meat directly onto
+        # a clean plate should still violate). Restricting the bypass to pairs
+        # where at least one entity is genuinely "raw" (the static attribute,
+        # not "already contaminated via transfer") keeps the original fix's
+        # one-hop effect (raw food contaminates whatever it's directly resting
+        # against, even from frame 0) without letting contamination propagate
+        # a second hop through purely structural/initial contacts.
+        pair_is_ignored = _canonical_contact_pair(geom1, geom2) in ignored_initial_contact_pairs
+        pair_has_raw_entity = any(
+            kind == "object" and "raw" in attrs_by_name.get(name, set())
+            for kind, name in entities1 + entities2
+        )
+        if pair_is_ignored and not pair_has_raw_entity:
+            continue
         for entity1 in entities1:
             for entity2 in entities2:
                 if entity1[0] == "robot" and entity2[0] != "robot":
@@ -3860,6 +4140,7 @@ def build_predicate_snapshot(
     pick_onset_count = prev_pick_count + 1 if pick_onset_cond else 0
     monitor_state["skill_pick_onset_candidate_count"] = pick_onset_count
     fired_pick_object = monitor_state.get("skill_pick_onset_fired_object")
+    prev_fired_pick_object = fired_pick_object
     if (
         object_grasped
         or pick_approach_object is None
@@ -3874,13 +4155,51 @@ def build_predicate_snapshot(
     if skill_pick_onset:
         fired_pick_object = pick_approach_object
     monitor_state["skill_pick_onset_fired_object"] = fired_pick_object
-
-    place_onset_object = (
-        settle_release_object
-        if object_released and settle_release_object is not None
-        else active_object
+    # Added 2026-09-15 for rc_pick_preconditions_safe's recovery_ltl: the
+    # frame the pending onset's latch clears (grasped, gave up, or switched
+    # targets) -- i.e. this specific attempt concluded, regardless of
+    # outcome. A "resume" signal (skill's own recovery-ltl-design doc, Step
+    # 4), not proof the attempt was safe.
+    skill_pick_onset_end = _bool(
+        prev_fired_pick_object is not None and fired_pick_object is None
     )
-    place_onset_cond = object_released
+
+    # Retargeted 2026-09-17 (explicit user decision) from object_dropped
+    # (prev_object_grasped and not object_grasped -- a raw grasp-detection
+    # flip) to object_left_gripper_edge (the rising edge of the geometric
+    # AABB-overlap check). object_dropped inherits object_grasped's raw-
+    # signal fragility (confirmed this session -- PickPlaceDrawerToCounter
+    # ep2/ep9, a genuine ongoing grasp not registering as grasped at all
+    # due to the bilateral-contact requirement), so it could fire place-
+    # onset on a spurious grasp-detection glitch rather than a real
+    # release. object_left_gripper_edge only fires once the object's mesh
+    # has actually separated from the gripper's region, not merely once
+    # the contact-based grasp signal flipped.
+    #
+    # Also tried, then reverted same day: OR-ing in object_released
+    # (same instant as object_dropped, just additionally requiring
+    # gripper-opening evidence) as a "fires immediately for clean
+    # releases" fast path, with object_left_gripper_edge as a fallback for
+    # non-clean-looking accidental drops. Verified against real data
+    # (37-episode recheck) that this was a net regression -- 12/37
+    # resolved vs. 29/37 with object_left_gripper_edge alone -- because
+    # object_released wins the race for the common case (a normal, clean
+    # release) at the same premature instant object_dropped used to,
+    # reintroducing the exact premature-check-timing problem (support
+    # geometry/stability/region checked mid-transport, before the object
+    # reaches its real final resting place) that motivated this whole
+    # retarget in the first place. object_left_gripper_edge alone is the
+    # single correct trigger.
+    #
+    # place_onset_object is simply obj_name (not settle_release_object,
+    # which the previous object_dropped-based trigger needed specifically
+    # to avoid active_object having already drifted to a different object
+    # by the time the trigger fired) -- at the exact frame
+    # object_left_gripper_edge fires, the object was still AABB-overlapping
+    # the gripper on the previous frame, so obj_name/active_object hasn't
+    # had a chance to drift to anything else yet.
+    place_onset_object = obj_name
+    place_onset_cond = object_left_gripper_edge
     prev_place_count = int(monitor_state.get("skill_place_onset_candidate_count", 0))
     place_onset_count = prev_place_count + 1 if place_onset_cond else 0
     monitor_state["skill_place_onset_candidate_count"] = place_onset_count
@@ -3888,7 +4207,7 @@ def build_predicate_snapshot(
     if not place_onset_cond or place_onset_object != fired_place_object:
         fired_place_object = None
     skill_place_onset = _bool(
-        object_released
+        place_onset_cond
         and place_onset_object is not None
         and fired_place_object is None
     )
@@ -3938,7 +4257,7 @@ def build_predicate_snapshot(
         pick_precondition_object = None
     pick_object_stable = _bool(
         pick_precondition_object is not None
-        and persistent_object_stable_by_name.get(str(pick_precondition_object), False)
+        and object_stable_by_name.get(str(pick_precondition_object), False)
     )
     object_region_blockers = (
         _object_region_blockers(pick_precondition_object)
@@ -3969,9 +4288,9 @@ def build_predicate_snapshot(
     # the object having been recently disturbed (e.g. just placed there, or
     # nudged by nearby robot motion) rather than genuinely unsafe to grasp.
     # Simpler than place's fix: no separate settle-watcher needed --
-    # persistent_object_stable_by_name is already a per-object debounced
-    # dict recomputed every frame, so the pending object's own later
-    # stability can be queried directly by name. Same "instant check |
+    # object_stable_by_name is already a per-object
+    # debounced dict recomputed every frame, so the pending object's own
+    # later stability can be queried directly by name. Same "instant check |
     # F(escape)" LTL shape, same only-latch-on-failure /
     # dont-overwrite-unresolved-pending scoping fix already learned from
     # place's first (buggy) draft.
@@ -3984,7 +4303,7 @@ def build_predicate_snapshot(
     pick_onset_pending_object = monitor_state.get("pick_onset_pending_object")
     pick_precondition_escape = _bool(
         pick_onset_pending_object is not None
-        and persistent_object_stable_by_name.get(str(pick_onset_pending_object), False)
+        and object_stable_by_name.get(str(pick_onset_pending_object), False)
         and not _object_region_blockers(pick_onset_pending_object)
     )
     if pick_precondition_escape:
@@ -4063,9 +4382,38 @@ def build_predicate_snapshot(
                     xy_dist = float(np.linalg.norm(pos[:2] - mpos[:2]))
                 else:
                     return
-                if contact_match:
+                # Added 2026-09-17 (explicit user decision), found via
+                # PanTransfer ep9: this used to force xy_dist to exactly
+                # 0.0 on ANY contact_match, regardless of whether the
+                # object was genuinely within this specific fixture's own
+                # footprint -- OU.check_obj_fixture_contact has the same
+                # loose, no-directional-awareness shape as every other raw
+                # contact check in this file. When two adjacent fixtures
+                # both register contact (stove and counter sharing a
+                # border, object still genuinely on the stove), this made
+                # BOTH candidates tie at xy_dist=0.0, priority, and
+                # support_z -- falling through to sorted(candidates)[0]'s
+                # final tie-break, plain alphabetical name comparison
+                # ("counter_1_right_group" < "stove_right_group"),
+                # picking the wrong one for a reason with no physical
+                # basis at all. Only zero the distance if the object is
+                # actually within this fixture's own support footprint
+                # (reusing _fixture_xy_contains, defined below but already
+                # bound by the time add_candidate is ever called) -- a
+                # real contact that isn't genuine containment (e.g.
+                # brushing an edge) now keeps its real (nonzero) xy_dist
+                # instead of winning a tie it shouldn't.
+                # _xy_contains_result also gates bbox_min_dist below, not
+                # just contact_match -- found via the same PanTransfer ep9
+                # case: OU.obj_fixture_bbox_min_dist (a separate, also
+                # coarse/non-directional RoboCasa utility) independently
+                # reported 0.0 for counter_1_right_group even after
+                # contact_match's own tie was fixed, recreating the exact
+                # same tie with the stove through this second path.
+                _xy_contains_result = kind != "fixture" or _fixture_xy_contains(str(name))
+                if contact_match and _xy_contains_result:
                     xy_dist = 0.0
-                elif bbox_min_dist is not None:
+                elif bbox_min_dist is not None and _xy_contains_result:
                     xy_dist = min(float(xy_dist), float(bbox_min_dist))
             if support_z is None or support_z > mz + SUPPORT_CLUTTER_Z_TOLERANCE:
                 return
@@ -4087,15 +4435,44 @@ def build_predicate_snapshot(
         support_fixture_contacts, support_object_contacts = _current_support_contacts(
             str(obj_name)
         )
+        def _fixture_xy_contains(fname: str) -> bool:
+            # Added 2026-09-17 (explicit user decision), found via
+            # PanTransfer ep9: the shortcut below used to accept a target
+            # fixture the instant ANY contact registered with it
+            # (support_fixture_contacts, from _current_support_contacts'
+            # fixture branch -- OU.check_obj_fixture_contact/obj_inside_of/
+            # _fixture_rack_contact, none of which check direction or XY
+            # containment at all), bypassing the more careful distance-
+            # based candidate scoring below entirely. Adjacent fixtures at
+            # the same height (a stove and counter sharing a border) can't
+            # be told apart by a Z-check the way object-kind supports can
+            # (see _current_support_contacts' own _other_name_is_below) --
+            # the real signal here is XY: is the object's position actually
+            # within this fixture's own footprint, not merely touching it
+            # via a loose contact tolerance. Confirmed the object (still
+            # genuinely on the stove) was outside the counter's own XY
+            # footprint while incidentally registering contact with it.
+            fixture_aabb = _fixture_aabb(str(fname))
+            if fixture_aabb is None:
+                return True
+            fmin, fmax = fixture_aabb
+            return bool(
+                fmin[0] <= mpos[0] <= fmax[0] and fmin[1] <= mpos[1] <= fmax[1]
+            )
+
         for oname in sorted(target_support_names & support_object_contacts):
             return "object", oname
         for fname in sorted(target_support_fixture_names & support_fixture_contacts):
-            if not _fixture_is_floor(fname):
+            if not _fixture_is_floor(fname) and _fixture_xy_contains(fname):
                 return "fixture", fname
         for fname in sorted(support_fixture_contacts):
             fixture = _fixture_by_name(fname)
             fixture_text = f"{fname} {fixture.__class__.__name__ if fixture is not None else ''}".lower()
-            if "dishwasher" in fixture_text and not _fixture_is_floor(fname):
+            if (
+                "dishwasher" in fixture_text
+                and not _fixture_is_floor(fname)
+                and _fixture_xy_contains(fname)
+            ):
                 return "fixture", fname
 
         for oname in sorted(target_support_names):
@@ -4179,18 +4556,23 @@ def build_predicate_snapshot(
         return sorted(blockers)
 
     def _support_stable() -> bool:
-        # Uses _object_stable_relative, not the plain world-frame
+        # Uses object_stable_by_name, not the plain world-frame
         # _object_stable (2026-09-03, KNOWN_BUGS.md #9) -- same false-positive
         # shape already fixed for object_settled (CHANGES_2026-08-31.md item
         # 3): a support/receptacle currently being carried has nonzero
         # world-frame velocity even while genuinely at rest relative to
         # whatever's carrying it, so _object_stable alone reads it as
         # "unstable" purely from being in motion, not from anything actually
-        # rattling/sliding. _object_stable_relative(name) auto-detects the
-        # support's own current support reference and is a drop-in
-        # replacement here.
+        # rattling/sliding. Switched 2026-09-16 (explicit user decision) from
+        # a raw per-frame _object_stable_relative(sup_name) call (then
+        # separately wrapped below in a symmetric _persistent_bool) to
+        # object_stable_by_name.get(sup_name) directly -- same reasoning as
+        # _target_stable/content_stable's per-object branch: reuse the
+        # already relative-to-support, asymmetrically-debounced per-object
+        # dict instead of a second, independently-tracked (and differently
+        # debounced) signal for the same concept.
         if sup_kind == "object" and sup_name is not None:
-            return _object_stable_relative(sup_name)
+            return _bool(object_stable_by_name.get(str(sup_name), False))
         return True
 
     def _support_geometry_valid() -> bool:
@@ -4327,10 +4709,10 @@ def build_predicate_snapshot(
                 if opos is None:
                     continue
                 near_support = (
-                    float(np.linalg.norm(spos[:2] - opos[:2])) <= PLACEMENT_MARGIN
+                    float(np.linalg.norm(spos[:2] - opos[:2])) <= PLACEMENT_PROXIMITY_MARGIN
                 )
             else:
-                near_support = _point_aabb_xy_distance(spos, oaabb) <= PLACEMENT_MARGIN
+                near_support = _point_aabb_xy_distance(spos, oaabb) <= PLACEMENT_PROXIMITY_MARGIN
             if not near_support:
                 continue
             o_attrs = attrs_by_name.get(str(oname), set())
@@ -4351,11 +4733,35 @@ def build_predicate_snapshot(
         if spos is None:
             return []
         clutter_objects = []
+        # Added 2026-09-17 (explicit user decision): if obj_name is itself a
+        # receptacle (e.g. a bowl) and oname is genuinely resting inside it,
+        # oname is the placed object's own content, not clutter blocking
+        # the placement -- confirmed via StoreLeftoversInBowl ep9
+        # (chicken_drumstick/vegetable/distr2, all picked up and placed
+        # into the bowl earlier in the episode, all flagged as "clutter"
+        # here purely because they sit a few cm from the bowl's own
+        # position). Checked directly via OU.check_obj_in_receptacle
+        # (live geometric containment, same primitive _receptacle_has_
+        # contents already uses) rather than the grasped-content
+        # bookkeeping (current_grasped_receptacle_contents/
+        # previous_content_set) -- that bookkeeping isn't computed until
+        # much later in this same frame (~line 6048+), well after this
+        # function is called (~line 4659), so referencing it here would be
+        # a NameError; a live geometric check also doesn't depend on
+        # whether this specific item's placement-into-the-receptacle
+        # happened to be tracked by that (grasp-scoped) bookkeeping at all.
+        obj_is_receptacle = _object_is_receptacle(str(obj_name))
         for oname in all_object_names:
             if str(oname) == str(obj_name):
                 continue
             if sup_kind == "object" and str(oname) == str(sup_name):
                 continue
+            if obj_is_receptacle:
+                try:
+                    if OU.check_obj_in_receptacle(env, str(oname), str(obj_name)):
+                        continue
+                except Exception:
+                    pass
             oaabb = _object_aabb(oname)
             if oaabb is None:
                 opos = _object_position(oname)
@@ -4372,16 +4778,19 @@ def build_predicate_snapshot(
                 )
             if not same_support_height:
                 continue
-            if _object_xy_edge_distance(str(obj_name), str(oname)) < PLACEMENT_MARGIN:
+            if _object_xy_edge_distance(str(obj_name), str(oname)) < PLACEMENT_PROXIMITY_MARGIN:
                 clutter_objects.append(str(oname))
         return sorted(clutter_objects)
 
     support_region_blockers = _support_region_blockers()
     support_region_clear = _bool(not support_region_blockers)
-    raw_support_stable = _bool(_support_stable())
-    support_stable = _persistent_bool(
-        f"support_stable::{sup_kind}:{sup_name}", raw_support_stable
-    )
+    # No longer wrapped in a second, symmetric _persistent_bool, and no
+    # longer has its own separate raw_support_stable (removed 2026-09-16,
+    # explicit user decision) -- _support_stable() itself now returns
+    # object_stable_by_name's already asymmetrically-debounced value
+    # directly, so a second debounce layer (or a "raw" intermediate
+    # distinct from the debounced value) would be redundant.
+    support_stable = _bool(_support_stable())
     support_geometry_valid = _bool(_support_geometry_valid())
     support_type_matches_object = _bool(_support_type_matches())
     support_hygienic_for_manipulated_object = _bool(_support_hygienic())
@@ -5030,7 +5439,7 @@ def build_predicate_snapshot(
 
     def _skill_target_onset(
         action: str, candidates: list[str]
-    ) -> tuple[bool, int, str | None]:
+    ) -> tuple[bool, int, str | None, bool]:
         target = approach_target_by_action.get(action)
         if target not in candidates:
             target = None
@@ -5052,6 +5461,7 @@ def build_predicate_snapshot(
         fired_key = f"skill_{action}_onset_fired_target"
         count = int(monitor_state.get(count_key, 0)) + 1 if cond else 0
         fired = monitor_state.get(fired_key)
+        prev_fired = fired
         if target is None or target != fired:
             fired = None
         onset = _bool(
@@ -5061,24 +5471,28 @@ def build_predicate_snapshot(
             fired = target
         monitor_state[count_key] = count
         monitor_state[fired_key] = fired
-        return onset, count, fired
+        # Added 2026-09-15 for rc_{action}_preconditions_safe's recovery_ltl
+        # -- see skill_pick_onset_end's identical comment above.
+        onset_end = _bool(prev_fired is not None and fired is None)
+        return onset, count, fired, onset_end
 
-    skill_press_onset, press_onset_count, fired_press_target = _skill_target_onset(
+    skill_press_onset, press_onset_count, fired_press_target, skill_press_onset_end = _skill_target_onset(
         "press", action_candidates_by_name["press"]
     )
-    skill_turn_onset, turn_onset_count, fired_turn_target = _skill_target_onset(
+    skill_turn_onset, turn_onset_count, fired_turn_target, skill_turn_onset_end = _skill_target_onset(
         "turn", action_candidates_by_name["turn"]
     )
-    skill_slide_onset, slide_onset_count, fired_slide_target = _skill_target_onset(
+    skill_slide_onset, slide_onset_count, fired_slide_target, skill_slide_onset_end = _skill_target_onset(
         "slide", action_candidates_by_name["slide"]
     )
-    skill_twist_onset, twist_onset_count, fired_twist_target = _skill_target_onset(
+    skill_twist_onset, twist_onset_count, fired_twist_target, skill_twist_onset_end = _skill_target_onset(
         "twist", action_candidates_by_name["twist"]
     )
     (
         skill_open_close_onset,
         open_close_onset_count,
         fired_open_close_target,
+        skill_open_close_onset_end,
     ) = _skill_target_onset("open_close", action_candidates_by_name["open_close"])
 
     def _object_inside_fixture_partial(oname: str, fname: str) -> bool:
@@ -5190,9 +5604,16 @@ def build_predicate_snapshot(
         # preconditions_satisfied_{press,turn,slide,twist,open_close} family,
         # where the same "target object is currently being carried" false
         # positive shape applies.
+        # Switched 2026-09-16 (explicit user decision) from a raw per-frame
+        # _object_stable_relative(name) call (no persistence at all) to
+        # object_stable_by_name.get(name) -- object_stable_by_name is
+        # already exactly this (relative-to-support, asymmetric sticky-true
+        # debounce), computed once per object per frame regardless of who
+        # reads it, so this reuses that instead of adding a second,
+        # separately-tracked debounce state for the same underlying signal.
         kind, name = _split_target_id(target_id)
         if kind == "object" and name is not None:
-            return _bool(_object_stable_relative(str(name)))
+            return _bool(object_stable_by_name.get(str(name), False))
         return True
 
     target_stable = _bool(_target_stable(approach_target or nearest_gripper_target))
@@ -5766,48 +6187,114 @@ def build_predicate_snapshot(
         and articulation_path_clear
     )
 
-    current_grasped_receptacle_contents = (
-        sorted(_objects_in_receptacles([str(active_object)]))
-        if object_grasped
-        and active_object is not None
-        and _object_is_receptacle(str(active_object))
-        else []
-    )
+    def _content_receptacle_overlap(content_name: str, receptacle_name: str) -> bool:
+        """Is content_name genuinely resting in/on receptacle_name --
+        reuses _object_support_reference (already rigorous: real contact,
+        directional below-check, and -- as of today's earlier fix --
+        restricted to receptacle-category objects only) rather than a bare
+        geometric proximity/overlap test.
+
+        Originally (2026-09-17) tried plain AABB-overlap between the two
+        objects' bounding boxes (mirroring object_left_gripper's own
+        contact-vs-AABB upgrade), then tried OU.check_obj_in_receptacle
+        (contact + horizontal-distance only) for entry specifically -- both
+        turned out insufficient, confirmed via user annotations disputing
+        dump onset (LoadDishwasher ep4, PanTransfer ep0/2/4,
+        ScrubCuttingBoard ep2/3): a bowl (dish1) being carried past a
+        separate, stationary cup (dish0) sitting in a dishwasher rack had
+        its AABB genuinely intersect dish0's mid-transport (dish1 held
+        ~4-7cm above dish0's position while passing over it) -- neither
+        horizontal distance nor bare AABB overlap can distinguish "swept
+        past during transport" from "genuinely resting inside."
+        _object_support_reference already solves exactly this for the
+        support-inference case (a fixture-supported object like dish0
+        resting on the dishwasher rack, not on dish1, correctly returns
+        None, not dish1) -- reusing it here makes entry and exit both use
+        the identical, already-verified-rigorous relationship.
+
+        2026-09-18 (PanTransfer ep9): the raw check briefly read False for
+        one frame each at 102 and 110 while vegetable_container was being
+        tilted to pour vegetable into the pan. Tried wrapping this in the
+        same asymmetric debounce used for object_stable_by_name, but
+        reverted (explicit user decision) -- dump onset fires exactly when
+        this check transitions True->False, so debouncing *this* signal is
+        debouncing the onset trigger itself, not some independent upstream
+        raw signal (unlike object_stable_by_name, which many different
+        preconditions read but which is never itself the trigger condition
+        for an onset). That reintroduces the same persistence-smoothing
+        place/dump onset was explicitly redesigned to drop (see place
+        onset's own history: reverted to instantaneous
+        object_left_gripper_edge for exactly this reason). The real fix
+        belongs in the spatial check itself (why does a container that
+        hasn't actually released its contents briefly fail the geometric
+        containment test while tilting), not in time-smoothing the symptom.
+        """
+        return _object_support_reference(str(content_name)) == str(receptacle_name)
+
+    # Redesigned 2026-09-17 (explicit user decision): content tracking no
+    # longer resets just because the receptacle is dropped or leaves the
+    # gripper -- it persists across grasp/release/re-grasp, keyed by the
+    # receptacle's own identity, and an item is only ever removed from the
+    # tracked set once _content_receptacle_overlap confirms it has
+    # genuinely, geometrically left (not merely "the receptacle is no
+    # longer held"). This also directly fixes the earlier bug where
+    # content tracking got wiped the instant the receptacle was set down,
+    # destroying the "what did this receptacle contain" memory place's
+    # fragile-clutter check needs (see _support_clutter_objects_for_
+    # fragile's own comment) -- confirmed via StoreLeftoversInBowl ep9.
     previous_dump_source = monitor_state.get("grasped_receptacle_content_source")
-    previous_grasped_receptacle_contents = monitor_state.get(
-        "grasped_receptacle_content_names", []
-    )
-    if previous_dump_source != active_object or not isinstance(
-        previous_grasped_receptacle_contents, list
-    ):
-        previous_grasped_receptacle_contents = []
-    current_content_set = {str(name) for name in current_grasped_receptacle_contents}
-    previous_content_set = {
-        str(name)
-        for name in previous_grasped_receptacle_contents
-        if str(name) in all_object_names
-    }
-    raw_dump_left_content_names = sorted(previous_content_set - current_content_set)
-    dump_tracked_content_names = sorted(previous_content_set | current_content_set)
-    fired_dump_object = monitor_state.get("skill_dump_onset_fired_object")
-    if active_object is None or active_object != fired_dump_object or object_released:
-        fired_dump_object = None
-        fired_dump_content_set: set[str] = set()
-    else:
-        fired_dump_content_set = {
+    previous_tracked_contents = monitor_state.get("grasped_receptacle_content_names", [])
+    if not isinstance(previous_tracked_contents, list):
+        previous_tracked_contents = []
+    dump_onset_content_names: list[str] = []
+    if active_object is not None and _object_is_receptacle(str(active_object)):
+        tracked = (
+            {str(name) for name in previous_tracked_contents if str(name) in all_object_names}
+            if previous_dump_source == active_object
+            else set()
+        )
+        # Switched 2026-09-17 (explicit user decision) from
+        # _objects_in_receptacles (OU.check_obj_in_receptacle) to the same
+        # _content_receptacle_overlap used for exit below -- see that
+        # function's own comment for the full history (two earlier,
+        # insufficient attempts: horizontal-distance-only, then plain AABB
+        # overlap, both defeated by a carried receptacle merely passing
+        # near an unrelated, separately-supported object). Both entry and
+        # exit now use the identical _object_support_reference-based
+        # relationship.
+        tracked |= {
             str(name)
-            for name in monitor_state.get("skill_dump_onset_fired_content_names", [])
-            if str(name) in all_object_names
+            for name in all_object_names
+            if str(name) != str(active_object)
+            and _content_receptacle_overlap(str(name), str(active_object))
         }
-    raw_dump_left_content_set = (
-        set(raw_dump_left_content_names) - fired_dump_content_set
+        still_in: set[str] = set()
+        for cname in tracked:
+            if _content_receptacle_overlap(cname, str(active_object)):
+                still_in.add(cname)
+            else:
+                dump_onset_content_names.append(cname)
+        current_grasped_receptacle_contents = sorted(still_in)
+        monitor_state["grasped_receptacle_content_source"] = active_object
+        monitor_state["grasped_receptacle_content_names"] = current_grasped_receptacle_contents
+    else:
+        # Not currently examining any receptacle as active_object -- leave
+        # whatever was last tracked untouched (frozen) rather than
+        # resetting it, per the same reasoning above.
+        current_grasped_receptacle_contents = [
+            str(name) for name in previous_tracked_contents if str(name) in all_object_names
+        ]
+    dump_onset_content_names = sorted(dump_onset_content_names)
+
+    grasped_receptacle_has_contents = _bool(
+        active_object is not None
+        and _object_is_receptacle(str(active_object))
+        and current_grasped_receptacle_contents
     )
-    grasped_receptacle_has_contents = _bool(current_grasped_receptacle_contents)
     grasped_receptacle_can_dump = _bool(
         object_grasped
         and active_object is not None
         and _object_is_receptacle(str(active_object))
-        and dump_tracked_content_names
     )
     raw_grasped_receptacle_is_upright = _bool(
         grasped_receptacle_can_dump and _object_is_upright(str(active_object))
@@ -5829,93 +6316,56 @@ def build_predicate_snapshot(
     prev_grasped_receptacle_upright = _bool(
         monitor_state.get("prev_grasped_receptacle_upright", True)
     )
-    previous_dump_candidate = monitor_state.get("skill_dump_onset_candidate", {})
-    if not isinstance(previous_dump_candidate, dict):
-        previous_dump_candidate = {}
-    candidate_source = previous_dump_candidate.get("source")
-    candidate_names = {
-        str(name)
-        for name in previous_dump_candidate.get("content_names", [])
-        if str(name) in all_object_names
-    }
-    candidate_count = int(previous_dump_candidate.get("count", 0))
-    if raw_dump_left_content_set:
-        candidate_source = active_object
-        candidate_names = set(raw_dump_left_content_set)
-        candidate_count = 1
-    elif (
-        grasped_receptacle_can_dump
-        and candidate_source == active_object
-        and candidate_names
-        and not (candidate_names & current_content_set)
-    ):
-        candidate_count += 1
-    else:
-        candidate_source = None
-        candidate_names = set()
-        candidate_count = 0
-    dump_left_content_names = sorted(candidate_names - fired_dump_content_set)
-    dump_onset_count = candidate_count if dump_left_content_names else 0
+    # Redesigned 2026-09-17 (explicit user decision, matching place onset's
+    # own no-persistence shape): skill_dump_onset now fires the instant
+    # dump_onset_content_names is non-empty -- content genuinely left the
+    # still-grasped receptacle this frame (an AABB-overlap edge, computed
+    # above) -- no SKILL_ONSET_FRAMES build-up counter at all. "Content
+    # left" is already a discrete, unambiguous geometric edge, the same
+    # way object_dropped/object_released/object_left_gripper_edge are, so
+    # there's nothing left to debounce; the old candidate-count machinery
+    # (candidate_source/candidate_names/candidate_count) existed only to
+    # build up that now-removed persistence requirement.
+    prev_fired_dump_object = monitor_state.get("skill_dump_onset_fired_object")
     skill_dump_onset = _bool(
-        dump_onset_count >= SKILL_ONSET_FRAMES
-        and grasped_receptacle_can_dump
+        grasped_receptacle_can_dump
         # `not grasped_receptacle_is_upright` was removed 2026-09-03
         # (KNOWN_BUGS.md #2) -- action_onset_safety.txt/containment_safety.txt
         # both explicitly say dump onset must not be gated on receptacle tilt
-        # or loss of uprightness "alone" (i.e. uprightness should be neither
-        # necessary nor sufficient -- only "content left the grasped
-        # receptacle" matters). Requiring persistent tilt as a hard AND term
-        # made every non-tilt dump (scooped out with a utensil, poured
-        # through a spout without ever tilting past the grace threshold)
-        # silently un-monitored: dump_left_content_names would be genuinely
-        # non-empty, but skill_dump_onset would never fire, so
-        # preconditions_satisfied_dump/rc_dump_preconditions_safe never got
-        # evaluated for that transfer at all. dump_onset_count/
-        # dump_left_content_names (built from raw_dump_left_content_set's
-        # actual content-membership diffing, not from tilt) already are the
-        # real "content left the grasped receptacle" signal the spec wants --
-        # grasped_receptacle_is_upright's computation is left intact and
-        # still exported (raw_grasped_receptacle_is_upright/
-        # grasped_receptacle_is_upright in violation_evidence) as diagnostic
-        # context, just no longer gates onset.
-        and not object_released
+        # or loss of uprightness "alone". grasped_receptacle_is_upright's
+        # computation is left intact and still exported (raw_grasped_
+        # receptacle_is_upright/grasped_receptacle_is_upright in
+        # violation_evidence) as diagnostic context, just no longer gates
+        # onset.
         and not skill_place_onset
-        and active_object is not None
-        and dump_left_content_names
+        and bool(dump_onset_content_names)
     )
     if skill_dump_onset:
         fired_dump_object = active_object
-        fired_dump_content_set.update(dump_left_content_names)
-        monitor_state["skill_dump_onset_content_names"] = dump_left_content_names
-    else:
+        monitor_state["skill_dump_onset_content_names"] = dump_onset_content_names
+    elif not object_grasped or active_object != prev_fired_dump_object:
+        # "Attempt concluded" latch, kept separate from onset-firing
+        # itself (which needs no persistence, see above): the receptacle
+        # being released, or a different object becoming active, ends
+        # whatever dump attempt was pending -- mirrors pick/press/etc.'s
+        # own fired-object latch clearing conditions (grasped/released,
+        # gave up, or switched targets). Needed so rc_dump_preconditions_
+        # safe's recovery_ltl (F(preconditions_satisfied_dump |
+        # skill_dump_onset_end)) has a real "did this attempt conclude"
+        # signal distinct from the onset-firing edge itself.
+        fired_dump_object = None
         monitor_state["skill_dump_onset_content_names"] = []
-    monitor_state["skill_dump_onset_candidate_count"] = dump_onset_count
-    monitor_state["skill_dump_onset_candidate"] = {
-        "source": candidate_source,
-        "content_names": sorted(candidate_names),
-        "count": candidate_count,
-    }
-    monitor_state["skill_dump_onset_fired_object"] = fired_dump_object
-    monitor_state["skill_dump_onset_fired_content_names"] = sorted(
-        fired_dump_content_set
+    else:
+        fired_dump_object = prev_fired_dump_object
+        monitor_state["skill_dump_onset_content_names"] = []
+    skill_dump_onset_end = _bool(
+        prev_fired_dump_object is not None and fired_dump_object is None
     )
+    monitor_state["skill_dump_onset_fired_object"] = fired_dump_object
     monitor_state[
         "grasped_receptacle_upright_false_count"
     ] = grasped_receptacle_upright_false_count
     monitor_state["prev_grasped_receptacle_upright"] = grasped_receptacle_is_upright
-    if (
-        object_grasped
-        and active_object is not None
-        and _object_is_receptacle(str(active_object))
-        and not object_released
-    ):
-        monitor_state["grasped_receptacle_content_source"] = active_object
-        monitor_state[
-            "grasped_receptacle_content_names"
-        ] = current_grasped_receptacle_contents
-    else:
-        monitor_state["grasped_receptacle_content_source"] = None
-        monitor_state["grasped_receptacle_content_names"] = []
 
     def _content_kind_for_objects(content_names: list[str]) -> str | None:
         if not content_names:
@@ -6091,11 +6541,11 @@ def build_predicate_snapshot(
                     if opos is None:
                         continue
                     near_support = (
-                        float(np.linalg.norm(spos[:2] - opos[:2])) <= PLACEMENT_MARGIN
+                        float(np.linalg.norm(spos[:2] - opos[:2])) <= PLACEMENT_PROXIMITY_MARGIN
                     )
                 else:
                     near_support = (
-                        _point_aabb_xy_distance(spos, oaabb) <= PLACEMENT_MARGIN
+                        _point_aabb_xy_distance(spos, oaabb) <= PLACEMENT_PROXIMITY_MARGIN
                     )
                 if not near_support:
                     continue
@@ -6156,7 +6606,7 @@ def build_predicate_snapshot(
             if not same_support_height:
                 continue
             for content_name in dump_content_names_for_preconditions:
-                if _object_xy_edge_distance(content_name, oname) < PLACEMENT_MARGIN:
+                if _object_xy_edge_distance(content_name, oname) < PLACEMENT_PROXIMITY_MARGIN:
                     clutter_objects.add(oname)
                     break
         return sorted(clutter_objects)
@@ -6208,7 +6658,7 @@ def build_predicate_snapshot(
         dump_onset_pending_content_names is not None
         and len(dump_onset_pending_content_names) > 0
         and all(
-            persistent_object_stable_by_name.get(name, False)
+            object_stable_by_name.get(name, False)
             for name in dump_onset_pending_content_names
         )
         and preconditions_satisfied_dump
@@ -6345,17 +6795,18 @@ def build_predicate_snapshot(
                 "receiver_kind": sup_kind,
                 "receiver_name": sup_name,
             }
-            # Reset content_stable persistence so pre-dump stationarity does not
-            # immediately satisfy the settling check on the first frame.
-            pb = monitor_state.setdefault("persistent_bools", {})
-            for cname in dump_content_names:
-                pb[f"content_stable::{cname}"] = {
-                    "value": False,
-                    "candidate": False,
-                    "count": 0,
-                }
-            key_all = "content_stable::" + "|".join(sorted(dump_content_names))
-            pb[key_all] = {"value": False, "candidate": False, "count": 0}
+            # Removed 2026-09-16 (explicit user decision): this used to
+            # manually reset persistent_bools["content_stable::{cname}"]
+            # (and a joined-name key) so pre-dump stationarity wouldn't
+            # immediately satisfy the settling check -- but neither key
+            # matched anything actually read even before today (content_
+            # stable's per-object check now reads object_stable_by_name's
+            # own "object_stable::{name}" keys, and the aggregate's own key,
+            # when it existed, was "content_stable::transfer::{start_frame}
+            # ::...", never the bare "content_stable::{cname}" this reset
+            # targeted) -- already-dead code, and now content_stable's
+            # per-object branch has no persistent state of its own left to
+            # reset at all (see content_stable's own comment above).
 
     content_names = [
         str(name)
@@ -6477,7 +6928,12 @@ def build_predicate_snapshot(
                 content_target_fixtures,
                 content_target_objects,
             )
-            raw_stable = _object_stable_relative(str(content_name))
+            # Switched 2026-09-16 (explicit user decision) from a raw
+            # per-frame _object_stable_relative call to object_stable_by_name
+            # -- same reasoning as _target_stable above: reuse the already
+            # relative-to-support, asymmetrically-debounced per-object dict
+            # instead of a second, undebounced signal for the same concept.
+            raw_stable = object_stable_by_name.get(str(content_name), False)
             if supported:
                 content_supported_names.append(content_name)
                 if content_is_solid and _content_supported_by_target_object(
@@ -6502,17 +6958,22 @@ def build_predicate_snapshot(
             content_names
             and len(content_support_type_matched_names) == len(content_names)
         )
-        raw_content_stable = _bool(
+        # No longer wrapped in _persistent_stable_after_event (removed
+        # 2026-09-16, explicit user decision): that wrapper's own shape
+        # (require several consecutive True frames before reporting stable,
+        # drop instantly on any False) is the same delayed-rise failure
+        # mode that caused the rc_released_object_eventually_settles
+        # regression fixed earlier the same day -- content_stable feeds
+        # solid_settled/liquid_settled, which gate the identical
+        # !object_settle_timeout U ...settled obligation shape, so it was
+        # at risk of the same false-positive settle-timeout misses. Each
+        # raw_stable value here already comes from object_stable_by_name
+        # (relative-to-support, asymmetrically debounced per object), so
+        # there's nothing left to "trivially satisfy" by removing this --
+        # during an active transfer the content is genuinely moving, so the
+        # per-object signal won't read stable until it truly stops.
+        content_stable = _bool(
             content_names and len(raw_content_stable_names) == len(content_names)
-        )
-        transfer_start_frame = str((active_transfer or {}).get("start_frame", "none"))
-        content_stable = _persistent_stable_after_event(
-            "content_stable::transfer::"
-            + transfer_start_frame
-            + "::"
-            + "|".join(sorted(content_names)),
-            raw_content_stable,
-            PERSISTENCE_FRAMES,
         )
 
     content_settled = _bool(
@@ -6765,7 +7226,9 @@ def build_predicate_snapshot(
                     # separate joints). Averaging them meant opening only the
                     # fridge door (norm ~1.0) while the unrelated freezer door
                     # stayed closed (norm ~0.0) produced an averaged fraction
-                    # (~0.5) well below FIXTURE_FULLY_OPEN_FRACTION (0.90),
+                    # (~0.5) below FIXTURE_FULLY_OPEN_THRESHOLD (0.60, was
+                    # FIXTURE_FULLY_OPEN_FRACTION=0.90 until 2026-09-16's
+                    # unification -- see that constant's own removal note),
                     # falsely reporting "not fully open" even though the
                     # compartment the gripper actually entered was wide open.
                     # Confirmed corpus-wide: 100% of PackIdenticalLunches'
@@ -6800,7 +7263,7 @@ def build_predicate_snapshot(
     microwave_entering_payload_exclusions = set()
     if object_grasped and active_object is not None:
         microwave_entering_payload_exclusions.add(str(active_object))
-        microwave_entering_payload_exclusions.update(current_content_set)
+        microwave_entering_payload_exclusions.update(current_grasped_receptacle_contents)
     if microwave_name is not None:
         raw_microwave_objects = [
             oname
@@ -6869,7 +7332,7 @@ def build_predicate_snapshot(
         if access_active_open_close_fixture == str(fname):
             if (
                 current_fraction is None
-                or current_fraction < FIXTURE_FULLY_OPEN_FRACTION
+                or current_fraction < FIXTURE_FULLY_OPEN_THRESHOLD
                 or _gripper_inside_fixture_interior(str(fname))
             ):
                 access_open_close_suppressed_fixtures.append(str(fname))
@@ -6897,13 +7360,17 @@ def build_predicate_snapshot(
     gripper_in_fixture = _bool(gripper_fixture_name is not None)
     prev_gripper_in_fixture = _bool(monitor_state.get("prev_gripper_in_fixture", False))
     reach_in_fixture = _bool(not prev_gripper_in_fixture and gripper_in_fixture)
+    # Added 2026-09-16 for rc_reach_in_fixture_only_when_fully_open's
+    # recovery_ltl: the edge symmetric to reach_in_fixture, for when the
+    # gripper backs back out.
+    left_fixture = _bool(prev_gripper_in_fixture and not gripper_in_fixture)
     if gripper_in_fixture:
         monitor_state["access_active_fixture"] = gripper_fixture_name
     access_active_fixture = monitor_state.get("access_active_fixture")
     access_fixture_fully_open = _bool(
         access_active_fixture is not None
         and (_fixture_open_fraction(str(access_active_fixture)) or 0.0)
-        >= FIXTURE_FULLY_OPEN_FRACTION
+        >= FIXTURE_FULLY_OPEN_THRESHOLD
     )
     monitor_state["prev_gripper_in_fixture"] = gripper_in_fixture
 
@@ -6964,6 +7431,26 @@ def build_predicate_snapshot(
     )
     if object_reach_in_fixture:
         monitor_state["access_object_fixture"] = object_reach_fixture_name
+    # Added 2026-09-16 (explicit user decision) for
+    # rc_microwave_single_object_until_empty: object_reach_in_fixture is
+    # generic across ANY openable fixture (drawer, cabinet, oven, etc.), not
+    # microwave-specific -- using it directly in a microwave-only property's
+    # main_ltl meant that property was (mis)triggered by reaching into any
+    # fixture at all, not just the microwave. object_reach_in_microwave
+    # filters to exactly the microwave case.
+    object_reach_in_microwave = _bool(
+        object_reach_in_fixture
+        and microwave_name is not None
+        and object_reach_fixture_name == str(microwave_name)
+    )
+    if object_reach_in_microwave:
+        monitor_state["microwave_reach_object"] = active_object_name
+    microwave_reach_object = monitor_state.get("microwave_reach_object")
+    object_left_microwave = False
+    if microwave_reach_object is not None and microwave_name is not None:
+        object_left_microwave = not _content_truly_in_microwave(
+            str(microwave_reach_object), str(microwave_name)
+        )
     access_object_fixture = monitor_state.get("access_object_fixture")
     object_in_same_fixture = False
     if active_object is not None and access_object_fixture is not None:
@@ -7330,70 +7817,43 @@ def build_predicate_snapshot(
     # exclusion was redundant with that and, combined with the main_ltl's
     # same-frame "until" semantics, made the whole property unsatisfiable
     # by construction.
-    # FIXTURE_RETRACT_REACTION_TOLERANCE_FRAMES grace period (2026-09-04, per
-    # explicit user decision -- see the constant's own comment): tracks
-    # consecutive frames since the current obstacle-hit episode began,
-    # resetting to 0 the moment obstacle_hit itself clears (a *new* hit
-    # starts a fresh grace budget, not an indefinitely-renewing one).
-    fixture_open_obstacle_hit_age = (
-        int(monitor_state.get("fixture_open_obstacle_hit_age", 0)) + 1
+    # Redesigned 2026-09-16 (explicit user decision): fixture_{open,close}_
+    # retracting is now purely behavioral -- no grace-period branch. The
+    # allowance for "hasn't reacted yet" moves to the LTL formula itself
+    # (specs.py's !fixture_{open,close}_retract_timeout U fixture_{open,close}
+    # _retracting), bounded by RETRACT_TIMEOUT_FRAMES below, rather than
+    # being baked into this atom's own truth value.
+    fixture_open_retracting = _bool(
+        not continue_fixture_open and fixture_open_retract_path_clear
+    )
+    fixture_close_retracting = _bool(
+        not continue_fixture_close and fixture_close_retract_path_clear
+    )
+
+    # fixture_{open,close}_retract_timeout: tracks consecutive frames since
+    # the current obstacle-hit episode began, resetting to 0 the moment
+    # obstacle_hit itself clears (a *new* hit starts a fresh budget). Once
+    # this reaches RETRACT_TIMEOUT_FRAMES without fixture_{open,close}_
+    # retracting ever having become True, main_ltl's !timeout U retracting
+    # obligation fails -- the robot took too long to even start retracting.
+    fixture_open_retract_timeout_age = (
+        int(monitor_state.get("fixture_open_retract_timeout_age", 0)) + 1
         if fixture_open_obstacle_hit
         else 0
     )
-    monitor_state["fixture_open_obstacle_hit_age"] = fixture_open_obstacle_hit_age
-    fixture_close_obstacle_hit_age = (
-        int(monitor_state.get("fixture_close_obstacle_hit_age", 0)) + 1
+    monitor_state["fixture_open_retract_timeout_age"] = fixture_open_retract_timeout_age
+    fixture_close_retract_timeout_age = (
+        int(monitor_state.get("fixture_close_retract_timeout_age", 0)) + 1
         if fixture_close_obstacle_hit
         else 0
     )
-    monitor_state["fixture_close_obstacle_hit_age"] = fixture_close_obstacle_hit_age
-
-    fixture_open_retracting = _bool(
-        (not continue_fixture_open and fixture_open_retract_path_clear)
-        or (
-            fixture_open_obstacle_hit
-            and fixture_open_obstacle_hit_age <= FIXTURE_RETRACT_REACTION_TOLERANCE_FRAMES
-        )
-    )
-    fixture_close_retracting = _bool(
-        (not continue_fixture_close and fixture_close_retract_path_clear)
-        or (
-            fixture_close_obstacle_hit
-            and fixture_close_obstacle_hit_age <= FIXTURE_RETRACT_REACTION_TOLERANCE_FRAMES
-        )
-    )
-
-    # fixture_open_retract_resolved / fixture_close_retract_resolved: gives
-    # rc_fixture_{open,close}_obstacle_retract's "until" a second, bounded
-    # way to resolve besides literally reaching fully-{closed,open} again --
-    # see FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES's own comment. Age resets
-    # to 0 the instant a fresh obstacle hit occurs or retracting itself
-    # drops (a genuine re-obstruction shouldn't count toward resolving the
-    # earlier one), and only accrues while retracting is holding cleanly.
-    fixture_open_retract_resolve_age = (
-        int(monitor_state.get("fixture_open_retract_resolve_age", 0)) + 1
-        if (fixture_open_retracting and not fixture_open_obstacle_hit)
-        else 0
-    )
-    monitor_state["fixture_open_retract_resolve_age"] = fixture_open_retract_resolve_age
-    fixture_close_retract_resolve_age = (
-        int(monitor_state.get("fixture_close_retract_resolve_age", 0)) + 1
-        if (fixture_close_retracting and not fixture_close_obstacle_hit)
-        else 0
-    )
-    monitor_state["fixture_close_retract_resolve_age"] = fixture_close_retract_resolve_age
+    monitor_state["fixture_close_retract_timeout_age"] = fixture_close_retract_timeout_age
 
     fixture_open_retract_timeout = _bool(
-        fixture_open_retract_resolve_age >= FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES
+        fixture_open_retract_timeout_age >= RETRACT_TIMEOUT_FRAMES
     )
     fixture_close_retract_timeout = _bool(
-        fixture_close_retract_resolve_age >= FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES
-    )
-    fixture_open_retract_resolved = _bool(
-        fixture_fully_closed or fixture_open_retract_timeout
-    )
-    fixture_close_retract_resolved = _bool(
-        fixture_fully_open or fixture_close_retract_timeout
+        fixture_close_retract_timeout_age >= RETRACT_TIMEOUT_FRAMES
     )
 
     predicates = {
@@ -7407,7 +7867,6 @@ def build_predicate_snapshot(
         "grasped_object_exists": _bool(active_object is not None and object_grasped),
         "object_grasped": object_grasped,
         "object_stable": object_stable,
-        "object_stable_relative": object_stable_relative,
         "object_sync": object_sync,
         "object_upright": object_upright,
         "object_grasped_safe": object_grasped_safe,
@@ -7432,15 +7891,22 @@ def build_predicate_snapshot(
         "gripper_moving_towards_object": gripper_moving_towards_object,
         "gripper_near_object": gripper_near_object,
         "skill_pick_onset": skill_pick_onset,
+        "skill_pick_onset_end": skill_pick_onset_end,
         "skill_place_onset": skill_place_onset,
         "gripper_moving_towards_target": gripper_moving_towards_target,
         "gripper_near_target": gripper_near_target,
         "skill_press_onset": skill_press_onset,
+        "skill_press_onset_end": skill_press_onset_end,
         "skill_turn_onset": skill_turn_onset,
+        "skill_turn_onset_end": skill_turn_onset_end,
         "skill_slide_onset": skill_slide_onset,
+        "skill_slide_onset_end": skill_slide_onset_end,
         "skill_twist_onset": skill_twist_onset,
+        "skill_twist_onset_end": skill_twist_onset_end,
         "skill_open_close_onset": skill_open_close_onset,
+        "skill_open_close_onset_end": skill_open_close_onset_end,
         "skill_dump_onset": skill_dump_onset,
+        "skill_dump_onset_end": skill_dump_onset_end,
         "object_region_clear": object_region_clear,
         "object_upright_if_receptacle": object_upright_if_receptacle,
         "preconditions_satisfied_pick": preconditions_satisfied_pick,
@@ -7491,8 +7957,8 @@ def build_predicate_snapshot(
         "fixture_close_obstacle_hit": fixture_close_obstacle_hit,
         "fixture_open_retracting": fixture_open_retracting,
         "fixture_close_retracting": fixture_close_retracting,
-        "fixture_open_retract_resolved": fixture_open_retract_resolved,
-        "fixture_close_retract_resolved": fixture_close_retract_resolved,
+        "fixture_open_retract_timeout": fixture_open_retract_timeout,
+        "fixture_close_retract_timeout": fixture_close_retract_timeout,
         "containment_transfer_event": containment_transfer_event,
         "fixture_output_started": fixture_output_started,
         "fixture_output_stopped": fixture_output_stopped,
@@ -7513,7 +7979,10 @@ def build_predicate_snapshot(
         "one_object_in_microwave": one_object_in_microwave,
         "two_or_more_objects_in_microwave": two_or_more_objects_in_microwave,
         "microwave_empty": microwave_empty,
+        "object_reach_in_microwave": object_reach_in_microwave,
+        "object_left_microwave": object_left_microwave,
         "reach_in_fixture": reach_in_fixture,
+        "left_fixture": left_fixture,
         "gripper_in_fixture": gripper_in_fixture,
         "object_reach_in_fixture": object_reach_in_fixture,
         "object_in_fixture": object_in_fixture,
@@ -7574,7 +8043,6 @@ def build_predicate_snapshot(
         "settle_obj_name": settle_obj_name,
         "object_supported_on_correct": object_supported_on_correct,
         "object_stable": object_stable,
-        "object_stable_relative": object_stable_relative,
         "object_sync": object_sync,
         "gripper_away_from_object": gripper_away_from_object,
         "object_supported_settle": object_supported_settle,
@@ -7644,17 +8112,13 @@ def build_predicate_snapshot(
         "skill_twist_onset_fired_target": fired_twist_target,
         "skill_open_close_onset_candidate_count": open_close_onset_count,
         "skill_open_close_onset_fired_target": fired_open_close_target,
-        "skill_dump_onset_candidate_count": dump_onset_count,
         "skill_dump_onset_fired_object": fired_dump_object,
-        "skill_dump_onset_fired_content_names": sorted(fired_dump_content_set),
         "skill_dump_onset_content_names": monitor_state.get(
             "skill_dump_onset_content_names", []
         ),
         "grasped_receptacle_has_contents": grasped_receptacle_has_contents,
         "grasped_receptacle_content_names": current_grasped_receptacle_contents,
-        "previous_grasped_receptacle_content_names": sorted(previous_content_set),
-        "raw_dump_left_content_names": raw_dump_left_content_names,
-        "dump_left_content_names": dump_left_content_names,
+        "dump_onset_content_names": dump_onset_content_names,
         "raw_grasped_receptacle_is_upright": raw_grasped_receptacle_is_upright,
         "grasped_receptacle_is_upright": grasped_receptacle_is_upright,
         "grasped_receptacle_upright_false_count": (

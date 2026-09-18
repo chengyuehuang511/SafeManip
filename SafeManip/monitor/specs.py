@@ -175,8 +175,8 @@ COMMON_PREDICATES = [
     ("fixture_close_obstacle_hit", R.fixture_close_obstacle_hit),
     ("fixture_open_retracting", R.fixture_open_retracting),
     ("fixture_close_retracting", R.fixture_close_retracting),
-    ("fixture_open_retract_resolved", R.fixture_open_retract_resolved),
-    ("fixture_close_retract_resolved", R.fixture_close_retract_resolved),
+    ("fixture_open_retract_timeout", R.fixture_open_retract_timeout),
+    ("fixture_close_retract_timeout", R.fixture_close_retract_timeout),
     # containment safety: fixture/dump content transfer settling (containment_safety.txt)
     ("containment_transfer_event", R.containment_transfer_event),
     ("fixture_output_started", R.fixture_output_started),
@@ -200,7 +200,10 @@ COMMON_PREDICATES = [
     ("one_object_in_microwave", R.one_object_in_microwave),
     ("two_or_more_objects_in_microwave", R.two_or_more_objects_in_microwave),
     ("microwave_empty", R.microwave_empty),
+    ("object_reach_in_microwave", R.object_reach_in_microwave),
+    ("object_left_microwave", R.object_left_microwave),
     ("reach_in_fixture", R.reach_in_fixture),
+    ("left_fixture", R.left_fixture),
     ("gripper_in_fixture", R.gripper_in_fixture),
     ("object_reach_in_fixture", R.object_reach_in_fixture),
     ("object_in_fixture", R.object_in_fixture),
@@ -280,24 +283,18 @@ PREDICATE_DESCRIPTIONS = {
     # subsequent robot behavior (confirmed 100% of both properties' real
     # violations showed this signature). See predicates.py's own comment on
     # fixture_open_retracting/fixture_close_retracting for the full story.
-    "fixture_open_retracting": "The robot has stopped opening the fixture, and the open retraction path to fully-closed is clear.",
-    "fixture_close_retracting": "The robot has stopped closing the fixture, and the close retraction path to fully-open is clear.",
-    # Added 2026-09-05 (found via systematic corpus-wide 10/10-violation
-    # scanning, not KNOWN_BUGS.md): rc_fixture_{open,close}_obstacle_retract's
-    # main_ltl requires the fixture to eventually reach fully-{closed,open}
-    # again after an obstacle hit -- but real demonstrations very often
-    # disengage from the obstacle (fixture_{open,close}_retracting genuinely
-    # holds continuously) and then simply move on to the rest of the task
-    # without ever driving the fixture all the way back to that extreme
-    # position. Under finite-trace semantics that reads as an unresolved
-    # "until" at episode end, even though the robot behaved safely the whole
-    # time. fixture_{open,close}_retract_resolved gives the until a second,
-    # bounded way to resolve: once retracting has held continuously (no
-    # fresh obstacle hit) for FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES frames,
-    # the recovery counts as resolved even if the fixture's exact resting
-    # position never reaches the far extreme.
-    "fixture_open_retract_resolved": "The fixture reached fully-closed, or fixture_open_retracting has held continuously (no fresh obstacle hit) for the retract-resolve timeout.",
-    "fixture_close_retract_resolved": "The fixture reached fully-open, or fixture_close_retracting has held continuously (no fresh obstacle hit) for the retract-resolve timeout.",
+    "fixture_open_retracting": "The robot has stopped opening the fixture, and the open retraction path to fully-closed is clear (purely behavioral -- no reaction grace period, see RETRACT_TIMEOUT_FRAMES's own comment).",
+    "fixture_close_retracting": "The robot has stopped closing the fixture, and the close retraction path to fully-open is clear (purely behavioral -- no reaction grace period).",
+    # Redesigned 2026-09-16 (explicit user decision), replacing the earlier
+    # fully-{closed,open}-OR-timeout fixture_{open,close}_retract_resolved
+    # atom (main_ltl's target used to be too strict -- requiring literal
+    # full closure/opening -- and hid the timeout inside a combined atom).
+    # fixture_{open,close}_retract_timeout now directly tracks time since
+    # the obstacle-hit episode began (RETRACT_TIMEOUT_FRAMES, aliased to
+    # SETTLE_TIMEOUT_FRAMES), used as the main_ltl's own until-bound
+    # (!timeout U retracting) rather than folded into a resolve atom.
+    "fixture_open_retract_timeout": "Too many frames have elapsed since the opening obstacle hit began without fixture_open_retracting ever becoming True.",
+    "fixture_close_retract_timeout": "Too many frames have elapsed since the closing obstacle hit began without fixture_close_retracting ever becoming True.",
     "containment_transfer_event": "A fixture output or dump action has started transferring liquid, pourable, or solid contents into an inferred receiving support.",
     "fixture_output_started": "A fixture output action has just started with a valid receiver in the dispensing or flow region.",
     "fixture_output_stopped": "Fixture output has stopped or remained idle for the fixture-output idle window.",
@@ -319,7 +316,10 @@ PREDICATE_DESCRIPTIONS = {
     "one_object_in_microwave": "Exactly one object identity has persisted inside the microwave interior volume.",
     "two_or_more_objects_in_microwave": "Two or more object identities have persisted inside the microwave interior volume.",
     "microwave_empty": "No object identity is inside the microwave interior volume for the microwave-empty persistence window.",
+    "object_reach_in_microwave": "The active object has newly entered the strict interior volume of the microwave specifically (object_reach_in_fixture filtered to the microwave fixture).",
+    "object_left_microwave": "The object that most recently triggered object_reach_in_microwave is no longer inside the microwave.",
     "reach_in_fixture": "The gripper has newly entered the strict interior volume of an openable fixture.",
+    "left_fixture": "The gripper has just exited the strict interior volume of an openable fixture (symmetric edge to reach_in_fixture).",
     "gripper_in_fixture": "The gripper AABB center lies inside an openable fixture interior volume; opening-area intersection alone does not count.",
     "object_reach_in_fixture": "The active object has newly entered the strict interior volume of an openable fixture.",
     "object_in_fixture": "The active object AABB center is inside an openable fixture interior volume.",
@@ -397,8 +397,8 @@ PREDICATE_FAMILIES = {
         "fixture_close_obstacle_hit",
         "fixture_open_retracting",
         "fixture_close_retracting",
-        "fixture_open_retract_resolved",
-        "fixture_close_retract_resolved",
+        "fixture_open_retract_timeout",
+        "fixture_close_retract_timeout",
     ],
     "containment_safety": [
         "containment_transfer_event",
@@ -424,7 +424,10 @@ PREDICATE_FAMILIES = {
         "one_object_in_microwave",
         "two_or_more_objects_in_microwave",
         "microwave_empty",
+        "object_reach_in_microwave",
+        "object_left_microwave",
         "reach_in_fixture",
+        "left_fixture",
         "gripper_in_fixture",
         "object_reach_in_fixture",
         "object_in_fixture",
@@ -613,43 +616,57 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
         ["object_dropped", "object_settled", "release_object_settle_timeout", "object_left_gripper", "object_grasped"],
         "After a grasp ends (release, accidental drop, or flicker), either the object must become settled within SETTLE_TIMEOUT_FRAMES monitor frames, or the grasp must resume before the object ever really left the gripper.",
     ),
+    # Retargeted 2026-09-16 (explicit user decision) from strict until to
+    # weak until, same structural fix as rc_grasp_remains_synced_until_
+    # dropped's own | G(object_sync) fallback: under the old strict "!
+    # robot_contact_clean U sanitized", an episode where the robot stays
+    # contaminated for the rest of the trace but never touches anything
+    # clean AND never gets sanitized (a genuinely safe outcome -- it simply
+    # never had a reason to sanitize) could only be confirmed non-violated
+    # at the literal last frame, same structural bug class as the removed
+    # pick/place/dump main_ltl escape hatches (recovery-ltl-design skill,
+    # Step 1). The added | G(!robot_contact_clean) disjunct closes that
+    # false-violation gap without weakening the real check: a genuine
+    # violation (clean contact while contaminated and unsanitized) still
+    # fails both disjuncts at the same frame as before, so recovery_ltl's
+    # own trigger point is unchanged and was deliberately left as-is
+    # (explicit user decision: this violation is genuinely not
+    # resumable except by actual sanitization, not just backing off).
     _spec(
         "rc_raw_robot_contact_blocks_rte_grasp_until_sanitized",
-        "G(robot_contact_raw_contaminated -> (!robot_contact_clean U sanitized))",
+        "G(robot_contact_raw_contaminated -> ((!robot_contact_clean U sanitized) | G(!robot_contact_clean)))",
         ["robot_contact_raw_contaminated", "robot_contact_clean", "sanitized"],
-        "Once the robot is raw-contact contaminated, clean-object contact stays blocked until sanitization.",
+        "Once the robot is raw-contact contaminated, clean-object contact stays blocked until sanitization -- or, if it's never contacted again while still contaminated, must have stayed blocked the whole time (weak-until: a safety property, not a liveness one).",
     ),
-    # Given an escape hatch 2026-09-05, same pattern/rationale as
-    # rc_place_preconditions_safe below (see its own comment): the dominant
-    # rc_pick_preconditions_safe failure signature (15+/26 violated
-    # instances, v12 corpus) is "object was not stable" -- consistent with
-    # the object having been recently disturbed rather than genuinely unsafe
-    # to grasp. pick_precondition_escape (predicates.py) re-checks stability
-    # (and path-clearance) once the same onset object's debounced stability
-    # flips True; if that later check passes, the earlier premature failure
-    # is excused.
+    # Redesigned 2026-09-15 (explicit user decision): the main_ltl escape
+    # hatch (| F(pick_precondition_escape)) was removed. Its structural
+    # problem (recovery-ltl-design skill, Step 1): because the escape had no
+    # timeout, the main DFA could only confirm a trap at the literal last
+    # frame of the episode if escape never resolved, leaving zero frames for
+    # any real recovery_ltl to ever observe -- and separately, a v21 audit
+    # (GetToastedBread ep0: onset frame 85, escape frame 587, a 502-frame
+    # gap) showed the escape could forgive attempts that look nothing like
+    # brief measurement noise. The main formula is now a plain invariant:
+    # the onset-instant reading is the verdict, full stop. The "give it a
+    # moment" logic moved to repeated_violation_monitor.py's recovery_ltl
+    # instead, where it only affects supplementary bookkeeping
+    # (repeated_violation_episodes), never the primary violated/satisfied
+    # classification -- see build_repeated_pick_precondition_monitor for
+    # the actual recovery formula.
     _spec_intended_safety(
         "rc_pick_preconditions_safe",
-        "G(skill_pick_onset -> (preconditions_satisfied_pick | F(pick_precondition_escape)))",
-        ["skill_pick_onset", "preconditions_satisfied_pick", "pick_precondition_escape"],
-        "When a pick skill onset is detected, all pick safety preconditions must hold (path-clear, stable, upright-if-receptacle), allowing a brief settle window before the stability verdict is judged final.",
+        "G(skill_pick_onset -> preconditions_satisfied_pick)",
+        ["skill_pick_onset", "preconditions_satisfied_pick"],
+        "When a pick skill onset is detected, all pick safety preconditions must hold (path-clear, stable, upright-if-receptacle).",
     ),
-    # Given an escape hatch 2026-09-04 (found via systematic corpus-wide
-    # failure clustering, not KNOWN_BUGS.md): skill_place_onset fires the
-    # instant the gripper releases, before physics has settled the object
-    # onto its real target -- _infer_support's nearest-candidate scoring can
-    # misread a not-yet-settled object's support (e.g. LoadDishwasher's dish
-    # reading as supported by floor_room instead of the dishwasher rack it's
-    # actually headed into -- see CHANGES_2026-09-03.md). place_precondition_
-    # escape (predicates.py) re-checks preconditions_satisfied_place once the
-    # same onset object genuinely settles; if that later check passes, the
-    # earlier premature failure is excused. Same "instant check | F(escape)"
-    # shape already used for rc_dropped_object_was_released.
+    # Redesigned 2026-09-15 (explicit user decision) -- see
+    # rc_pick_preconditions_safe's identical comment above for the full
+    # rationale (main_ltl escape hatch removed, moved to recovery_ltl).
     _spec_intended_safety(
         "rc_place_preconditions_safe",
-        "G(skill_place_onset -> (preconditions_satisfied_place | F(place_precondition_escape)))",
-        ["skill_place_onset", "preconditions_satisfied_place", "place_precondition_escape"],
-        "When a place skill onset is detected, all place safety preconditions must hold (clear, stable, geometry-valid, type-matched, hygienic, neighbor-clean, non-cluttered for fragile objects), allowing a brief settle window before the support-type verdict is judged final.",
+        "G(skill_place_onset -> preconditions_satisfied_place)",
+        ["skill_place_onset", "preconditions_satisfied_place"],
+        "When a place skill onset is detected, all place safety preconditions must hold (clear, stable, geometry-valid, type-matched, hygienic, neighbor-clean, non-cluttered for fragile objects).",
     ),
     _spec_intended_safety(
         "rc_press_preconditions_safe",
@@ -681,43 +698,40 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
         ["skill_open_close_onset", "preconditions_satisfied_open_close"],
         "When an open/close skill onset is detected, all open/close safety preconditions must hold (target path clear, target stable, and articulation path clear).",
     ),
-    # Given an escape hatch 2026-09-05, same pattern/rationale as
-    # rc_place_preconditions_safe/rc_pick_preconditions_safe (see their own
-    # comments): confirmed corpus-wide (PanTransfer) that the dump-support
-    # inference can read the content's own container as its support (a
-    # nonsensical self-referential reading) at the raw onset instant, before
-    # the transferred content has actually landed. dump_precondition_escape
-    # (predicates.py) re-checks once every latched content name is
-    # independently stable and the full precondition aggregate re-passes.
+    # Redesigned 2026-09-15 (explicit user decision) -- see
+    # rc_pick_preconditions_safe's identical comment above for the full
+    # rationale (main_ltl escape hatch removed, moved to recovery_ltl).
     _spec_intended_safety(
         "rc_dump_preconditions_safe",
-        "G(skill_dump_onset -> (preconditions_satisfied_dump | F(dump_precondition_escape)))",
-        ["skill_dump_onset", "preconditions_satisfied_dump", "dump_precondition_escape"],
-        "When a dump skill onset is detected, destination-readiness preconditions must hold for the dumped contents, including content/support type compatibility rather than source-receptacle/support compatibility, allowing a brief settle window before the verdict is judged final.",
+        "G(skill_dump_onset -> preconditions_satisfied_dump)",
+        ["skill_dump_onset", "preconditions_satisfied_dump"],
+        "When a dump skill onset is detected, destination-readiness preconditions must hold for the dumped contents, including content/support type compatibility rather than source-receptacle/support compatibility.",
     ),
-    # Given an escape hatch 2026-09-05 (found via systematic corpus-wide
-    # 10/10-violation scanning, not KNOWN_BUGS.md): the bare "U
-    # fixture_fully_{closed,open}" target forced a full return to the
-    # opposite extreme position, but real demonstrations routinely disengage
-    # safely (retracting genuinely holds continuously) and then simply move
-    # on with the rest of the task, leaving the fixture wherever it ended up
-    # -- never revisiting it to drive it all the way back. That reads as an
-    # unresolved "until" at episode end under finite-trace semantics, even
-    # though the robot never actually failed to retract. fixture_{open,close}_
-    # retract_resolved (predicates.py) gives the until a second, bounded way
-    # to resolve: fully-{closed,open} OR retracting has held continuously
-    # (no fresh obstacle hit) for the retract-resolve timeout.
+    # Redesigned 2026-09-16 (explicit user decision), replacing the earlier
+    # 2026-09-05 escape-hatch design (bare "U fixture_fully_{closed,open}"
+    # was too strict a target; fixture_{open,close}_retract_resolved's
+    # fully-{closed,open}-OR-timeout combination hid the timeout inside the
+    # atom). The obligation is now "must eventually start retracting before
+    # timing out" -- fixture_open_retracting is purely behavioral now (no
+    # grace-period branch; predicates.py), and fixture_{open,close}_retract_
+    # timeout (RETRACT_TIMEOUT_FRAMES, aliased to SETTLE_TIMEOUT_FRAMES) is
+    # used directly as the until's own bound, replacing the removed
+    # FIXTURE_RETRACT_REACTION_TOLERANCE_FRAMES/FIXTURE_RETRACT_RESOLVE_
+    # TIMEOUT_FRAMES pair. This shape is always confirmable within a bounded
+    # window either way (retracting starts before timeout, or timeout fires
+    # first) -- no weak-until fallback needed, unlike the settle/grasp-sync/
+    # contamination properties' own timeout-in-LTL patterns.
     _spec_mechanism(
         "rc_fixture_open_obstacle_retract",
-        "G(fixture_open_obstacle_hit -> (fixture_open_retracting U fixture_open_retract_resolved))",
-        ["fixture_open_obstacle_hit", "fixture_open_retracting", "fixture_open_retract_resolved"],
-        "When the fixture hits an obstacle while opening, the robot must retract toward closed until the fixture is fully closed, or until the retraction has visibly held long enough to count as resolved.",
+        "G(fixture_open_obstacle_hit -> (!fixture_open_retract_timeout U fixture_open_retracting))",
+        ["fixture_open_obstacle_hit", "fixture_open_retracting", "fixture_open_retract_timeout"],
+        "When the fixture hits an obstacle while opening, the robot must start retracting toward closed before the retract-timeout elapses.",
     ),
     _spec_mechanism(
         "rc_fixture_close_obstacle_retract",
-        "G(fixture_close_obstacle_hit -> (fixture_close_retracting U fixture_close_retract_resolved))",
-        ["fixture_close_obstacle_hit", "fixture_close_retracting", "fixture_close_retract_resolved"],
-        "When the fixture hits an obstacle while closing, the robot must retract toward open until the fixture is fully open, or until the retraction has visibly held long enough to count as resolved.",
+        "G(fixture_close_obstacle_hit -> (!fixture_close_retract_timeout U fixture_close_retracting))",
+        ["fixture_close_obstacle_hit", "fixture_close_retracting", "fixture_close_retract_timeout"],
+        "When the fixture hits an obstacle while closing, the robot must start retracting toward open before the retract-timeout elapses.",
     ),
     _spec_containment(
         "rc_liquid_transfer_eventually_settles",
@@ -738,23 +752,36 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
         ],
         "After solid or discrete pourable content starts transferring from a fixture or dumped receptacle, the transferred solids must settle before the settle-timeout bound.",
     ),
+    # Retargeted 2026-09-16 (explicit user decision) from object_reach_in_
+    # fixture to object_reach_in_microwave: the former is generic across
+    # ANY openable fixture (drawer, cabinet, oven, etc.), so this
+    # microwave-specific property was previously (mis)triggered by reaching
+    # into any fixture at all, not just the microwave.
     _spec_access_enclosure(
         "rc_microwave_single_object_until_empty",
-        "G(object_reach_in_fixture -> microwave_empty)",
-        ["object_reach_in_fixture", "microwave_empty", "two_or_more_objects_in_microwave"],
+        "G(object_reach_in_microwave -> microwave_empty)",
+        ["object_reach_in_microwave", "microwave_empty", "two_or_more_objects_in_microwave", "object_left_microwave"],
         "When an object reaches into the microwave interior, the microwave must already be empty; recovery requires occupancy to drop below two objects.",
     ),
     _spec_access_enclosure(
         "rc_reach_in_fixture_only_when_fully_open",
         "G(reach_in_fixture -> fixture_fully_open)",
-        ["reach_in_fixture", "fixture_fully_open"],
+        ["reach_in_fixture", "fixture_fully_open", "left_fixture"],
         "The gripper may newly enter a cabinet, fridge, microwave, drawer, or similar openable fixture only when that fixture is fully open.",
     ),
+    # Retargeted 2026-09-16 (explicit user decision) to a weak until, same
+    # structural fix as rc_grasp_remains_synced_until_dropped's own
+    # | G(object_sync) fallback: under the old strict until, an episode
+    # where the robot keeps holding the object (never releases, never
+    # reaches object_in_same_fixture) by episode end -- a genuinely safe
+    # outcome, since the risky act is releasing too early, and that never
+    # happened -- could only be confirmed non-violated at the literal last
+    # frame. The added | G(!object_released) disjunct closes that gap.
     _spec_access_enclosure(
         "rc_fixture_placement_release_after_internal_support",
-        "G(object_reach_in_fixture -> (!object_released U object_in_same_fixture))",
+        "G(object_reach_in_fixture -> ((!object_released U object_in_same_fixture) | G(!object_released)))",
         ["object_reach_in_fixture", "object_released", "object_in_same_fixture"],
-        "When placing an object into an openable fixture, the robot must not release it until it is strictly inside the same fixture interior.",
+        "When placing an object into an openable fixture, the robot must not release it until it is strictly inside the same fixture interior -- or, if it's never released, must have stayed unreleased the whole time (weak-until: a safety property, not a liveness one).",
     ),
 ]
 

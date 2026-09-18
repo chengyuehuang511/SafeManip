@@ -5,7 +5,36 @@ from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional
 
 from monitor.LTLfDFA import LTLfDFA
-from monitor.specs import SETTLE_TIMEOUT_FRAMES
+from monitor.specs import (
+    SETTLE_TIMEOUT_FRAMES,
+    TASK_AGNOSTIC_PROPERTY_SPECS,
+    VARIANT_PROPERTY_SPECS,
+)
+
+# Single source of truth for every property's main_ltl, shared with the
+# primary verdict DFA (run_monitor_on_privileged.py). Every build_repeated_*
+# function below must look its main_ltl up here rather than hand-typing a
+# second copy of the formula -- a hand-typed copy can silently drift from
+# the real spec (found 2026-09-15: pick/place/dump precondition escapes and
+# rc_grasp_remains_synced_until_dropped's weak-until fallback were all
+# missing from hand-typed copies here, corrupting recovery_accepting_by_property
+# and viewer display for otherwise-satisfied episodes without affecting the
+# real violated/satisfied verdict, which is computed independently from this
+# spec table and was never wrong).
+_PROPERTY_MAIN_LTL = {
+    spec["name"]: spec["ltl"]
+    for spec in (TASK_AGNOSTIC_PROPERTY_SPECS + VARIANT_PROPERTY_SPECS)
+}
+
+
+def _spec_main_ltl(property_name: str) -> str:
+    if property_name not in _PROPERTY_MAIN_LTL:
+        raise KeyError(
+            f"No specs.py TASK_AGNOSTIC_PROPERTY_SPECS/VARIANT_PROPERTY_SPECS "
+            f"entry found for {property_name!r} -- every RepeatedViolationMonitor "
+            f"must be built from a real spec, not a hand-typed formula."
+        )
+    return _PROPERTY_MAIN_LTL[property_name]
 
 
 def _copy_dict(value) -> Dict:
@@ -50,6 +79,27 @@ class RepeatedViolationMonitorConfig:
     reason_builder: Optional[Callable[[List[Dict], bool], str]] = None
     recovery_window_frames: Optional[int] = None
     count_overlapping_rejections: bool = False
+    # Added 2026-09-17 (explicit user decision): for any property whose
+    # main_ltl is a timeout-bounded obligation (G(trigger -> (!timeout U
+    # resolved)), e.g. rc_released_object_eventually_settles), the DFA can
+    # get force-closed as "still in violation" by finalize() simply because
+    # the recorded trace ended before the timeout window had a chance to
+    # play out -- not because a genuine violation was ever observed. Found
+    # via WashLettuce (9/10 episodes in a v25/v26 corpus scan): the
+    # object's release happened on the *literal last recorded frame* of
+    # the episode (duration_frames == 1 every time, confirmed via real
+    # data), so there were zero frames left to ever observe settling --
+    # the demonstration's own recording simply stops the instant task
+    # success (the release) is detected. Set this to the property's own
+    # timeout constant (e.g. SETTLE_TIMEOUT_FRAMES) to suppress exactly
+    # this artifact: an episode force-closed at finalize() with fewer than
+    # this many frames between its start and the true end of the trace is
+    # dropped entirely (not counted as violated) rather than treated as a
+    # genuine failure, since there was never enough trace left to know one
+    # way or the other. Only applies to the finalize()-time force-close
+    # path -- a violation closed normally mid-trace (genuine timeout
+    # observed with frames to spare, or a real recovery) is untouched.
+    min_resolve_frames: Optional[int] = None
 
 
 class RepeatedViolationMonitor:
@@ -209,6 +259,7 @@ class RepeatedViolationMonitor:
                 end_main_state=self.main_state,
                 end_recovery_state=self.recovery_state,
             )
+            self._drop_if_unresolvable_truncation()
             for active_episode in self._additional_active_episodes:
                 self._active_episode = active_episode
                 self._close_episode(
@@ -220,6 +271,7 @@ class RepeatedViolationMonitor:
                     end_main_state=self.main_state,
                     end_recovery_state=self.recovery_state,
                 )
+                self._drop_if_unresolvable_truncation()
             self._additional_active_episodes = []
             self.in_violation = False
 
@@ -265,6 +317,21 @@ class RepeatedViolationMonitor:
                 self.config.recovery_window_frames
             )
         return deepcopy(self._finalized_result)
+
+    def _drop_if_unresolvable_truncation(self) -> None:
+        """Undo the just-appended finalize()-time force-close if it doesn't
+        actually carry enough trace to mean anything -- see
+        RepeatedViolationMonitorConfig.min_resolve_frames's own comment for
+        the full reasoning. Only ever called right after a force-close in
+        finalize() (always recovered=False there), so it's safe to just
+        check the most recent episode."""
+        if self.config.min_resolve_frames is None or not self.episodes:
+            return
+        episode = self.episodes[-1]
+        if episode["recovered"]:
+            return
+        if episode["duration_frames"] < int(self.config.min_resolve_frames):
+            self.episodes.pop()
 
     def _new_active_episode(
         self,
@@ -1351,7 +1418,7 @@ def build_repeated_forbidden_contact_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_no_forbidden_contact",
-            main_ltl="G(!forbidden_contact_sustained)",
+            main_ltl=_spec_main_ltl("rc_no_forbidden_contact"),
             recovery_ltl="G(forbidden_contact_sustained -> F(!forbidden_contact_sustained))",
             property_description=property_description,
             binding={},
@@ -1382,7 +1449,7 @@ def build_repeated_grasp_sync_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_grasp_remains_synced_until_dropped",
-            main_ltl="G(object_grasped -> (object_sync U object_dropped))",
+            main_ltl=_spec_main_ltl("rc_grasp_remains_synced_until_dropped"),
             recovery_ltl="G(object_grasped & !object_sync -> F(object_sync | object_dropped))",
             property_description=property_description,
             binding={},
@@ -1472,7 +1539,7 @@ def build_repeated_object_drop_release_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_dropped_object_was_released",
-            main_ltl="G(object_dropped -> (object_released | (!object_left_gripper U object_grasped)))",
+            main_ltl=_spec_main_ltl("rc_dropped_object_was_released"),
             recovery_ltl="F(object_grasped | object_left_gripper)",
             property_description=property_description,
             binding={},
@@ -1556,15 +1623,21 @@ def build_repeated_released_settle_monitor(
             # rationale (closes a coverage gap: uncontrolled drops that never
             # qualified as a deliberate object_released previously skipped this
             # settle-check entirely).
-            main_ltl=(
-                "G(object_dropped -> (!release_object_settle_timeout U object_settled) "
-                "| (!object_left_gripper U object_grasped))"
-            ),
+            main_ltl=_spec_main_ltl("rc_released_object_eventually_settles"),
             recovery_ltl="F(object_settled | release_object_settle_timeout | object_grasped)",
             property_description=property_description,
             binding={},
             explanation_builder=_released_settle_explanation,
             reason_builder=_released_settle_reason,
+            # Added 2026-09-17 -- see RepeatedViolationMonitorConfig.
+            # min_resolve_frames's own comment. Found via WashLettuce
+            # (9/10 episodes in a v25/v26 corpus scan): the release
+            # happened on the literal last recorded frame every time
+            # (duration_frames == 1), giving the monitor zero real frames
+            # to ever observe settling -- not a genuine safety failure,
+            # just the demonstration recording stopping the instant task
+            # success (the release) was detected.
+            min_resolve_frames=SETTLE_TIMEOUT_FRAMES,
         )
     )
 
@@ -1575,11 +1648,20 @@ def build_repeated_contamination_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_raw_robot_contact_blocks_rte_grasp_until_sanitized",
-            main_ltl="G(robot_contact_raw_contaminated -> (!robot_contact_clean U sanitized))",
-            recovery_ltl=(
-                "G((robot_contact_raw_contaminated & robot_contact_clean & !sanitized) "
-                "-> F(sanitized))"
-            ),
+            main_ltl=_spec_main_ltl("rc_raw_robot_contact_blocks_rte_grasp_until_sanitized"),
+            # Changed 2026-09-16 (explicit user decision) from the G(antecedent
+            # -> F(sanitized))-wrapped, sanitized-only form to a bare "resume"
+            # signal (recovery-ltl-design skill, Step 4), matching e.g.
+            # rc_dropped_object_was_released's F(object_grasped |
+            # object_left_gripper) shape: either it got properly sanitized, or
+            # it at least stopped touching the clean thing (!robot_contact_clean).
+            # The latter doesn't prove the contamination risk was cleared --
+            # recovered/duration_frames here mean "how long until we stopped
+            # watching," not "was this instance saved." Not a tautology (Bug
+            # B): robot_contact_clean is True at the exact trap-confirmation
+            # frame (that's what triggered the violation), so !robot_contact_
+            # clean is guaranteed False there, not trivially True.
+            recovery_ltl="F(sanitized | !robot_contact_clean)",
             property_description=property_description,
             binding={},
             explanation_builder=_contamination_explanation,
@@ -1594,8 +1676,17 @@ def build_repeated_pick_precondition_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_pick_preconditions_safe",
-            main_ltl="G(skill_pick_onset -> preconditions_satisfied_pick)",
-            recovery_ltl="none",
+            main_ltl=_spec_main_ltl("rc_pick_preconditions_safe"),
+            # Added 2026-09-15 (explicit user decision), replacing the old
+            # main_ltl escape hatch: "resume" signal (recovery-ltl-design
+            # skill, Step 4), not proof the attempt was safe -- either the
+            # world naturally became fine (preconditions_satisfied_pick), or
+            # this specific attempt concluded regardless of outcome
+            # (skill_pick_onset_end, the pending-object latch clearing on
+            # grasp/give-up/target-switch). recovered/duration_frames here
+            # measure "how long until we stopped watching," not "was this
+            # instance saved."
+            recovery_ltl="F(preconditions_satisfied_pick | skill_pick_onset_end)",
             property_description=property_description,
             binding={},
             explanation_builder=_pick_precondition_explanation,
@@ -1611,8 +1702,26 @@ def build_repeated_place_precondition_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_place_preconditions_safe",
-            main_ltl="G(skill_place_onset -> preconditions_satisfied_place)",
-            recovery_ltl="none",
+            main_ltl=_spec_main_ltl("rc_place_preconditions_safe"),
+            # Added 2026-09-15 (explicit user decision), replacing the old
+            # main_ltl escape hatch. Place's own onset latch
+            # (skill_place_onset_fired_object) clears unconditionally ~1
+            # frame after every onset, since object_dropped (its trigger) is
+            # itself a one-frame edge -- unlike pick/dump's persistent
+            # approach-based latch, it carries no real "did this attempt
+            # conclude" information, so it is deliberately NOT used here (it
+            # would make this recovery resolve near-instantly on almost
+            # every episode, masking real multi-hundred-frame place-settle
+            # gaps found in the v21 audit, e.g. DeliverStraw ep2 delta 514).
+            # Instead reuses rc_released_object_eventually_settles' own
+            # already-bounded settle machinery (SETTLE_TIMEOUT_FRAMES) as
+            # the "resume" signal (recovery-ltl-design skill, Step 4): the
+            # dropped object either settles, times out waiting to settle, or
+            # gets re-grasped.
+            recovery_ltl=(
+                "F(preconditions_satisfied_place | object_settled "
+                "| release_object_settle_timeout | object_grasped)"
+            ),
             property_description=property_description,
             binding={},
             explanation_builder=_place_precondition_explanation,
@@ -1629,13 +1738,19 @@ def build_repeated_intended_safety_precondition_monitor(
     if action not in INTENDED_SAFETY_PRECONDITION_SPECS:
         raise ValueError(f"Unsupported intended-safety action: {action}")
     property_name = f"rc_{action}_preconditions_safe"
-    onset_name = f"skill_{action}_onset"
-    preconditions_name = f"preconditions_satisfied_{action}"
+    # Added 2026-09-15 (explicit user decision), replacing the old main_ltl
+    # escape hatch (dump only had one; press/turn/slide/twist/open_close
+    # never did) -- see build_repeated_pick_precondition_monitor's identical
+    # comment for the "resume, not recovery" framing. skill_{action}_onset_
+    # end is the shared _skill_target_onset()/dump latch clearing (grasped/
+    # released, gave up, or switched targets) -- persistent, can take many
+    # frames, unlike place's edge-triggered latch (see place's own comment).
+    recovery_ltl = f"F(preconditions_satisfied_{action} | skill_{action}_onset_end)"
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name=property_name,
-            main_ltl=f"G({onset_name} -> {preconditions_name})",
-            recovery_ltl="none",
+            main_ltl=_spec_main_ltl(property_name),
+            recovery_ltl=recovery_ltl,
             property_description=property_description,
             binding={},
             explanation_builder=lambda episodes: _generic_precondition_explanation(episodes, action),
@@ -1655,33 +1770,35 @@ def build_repeated_fixture_open_obstacle_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_fixture_open_obstacle_retract",
-            main_ltl="G(fixture_open_obstacle_hit -> (fixture_open_retracting U fixture_open_retract_resolved))",
-            # Fixed 2026-09-03 (KNOWN_BUGS.md #10): was the bare atom
-            # "fixture_fully_closed", which under LTLf finite-trace semantics
-            # means "holds at the *current* (first) position recovery
-            # evaluates" -- not "eventually holds". Since recovery starts
-            # evaluating at the exact frame the trap is confirmed (an
-            # until-obligation failure, meaning fixture_fully_closed is
-            # necessarily still False there -- if it were already True the
-            # until would have resolved, not trapped), the bare atom read
-            # False on its very first observation, every time, permanently
-            # trapping recovery with 0% ever recovering corpus-wide. Wrapped
-            # in F(...) instead. Verified (isolated LTLfDFA test, see
-            # CHANGES_2026-09-03.md): fixture_fully_closed is never
-            # tautologically True at the trap-confirmation frame (it's the
-            # main formula's own genuine resolve atom, not a decoy escape
-            # term), so no Bug B risk here -- unlike
-            # rc_dropped_object_was_released/rc_released_object_eventually_settles,
-            # this one didn't need a "resume, not recovery" redesign, a plain
-            # F(...) wrap is correct as-is.
-            # main_ltl's resolve target updated 2026-09-05 to
-            # fixture_open_retract_resolved (predicates.py) -- see specs.py's
-            # own comment on rc_fixture_open_obstacle_retract for why.
-            recovery_ltl="F(fixture_open_retract_resolved)",
+            main_ltl=_spec_main_ltl("rc_fixture_open_obstacle_retract"),
+            # Redesigned 2026-09-16 (explicit user decision). main_ltl has
+            # only one trap path ("timed out before ever starting to
+            # retract"), so fixture_open_retract_timeout is *guaranteed*
+            # True at every trap-confirmation frame -- including it here is
+            # a deliberate Bug B (tautological escape), not an oversight:
+            # per recovery-ltl-design's Step 4, explicit user decision to
+            # keep it anyway. Verified (isolated RepeatedViolationMonitor
+            # test): with this term present, every single violation of this
+            # property reports recovered=True, duration_frames=2,
+            # unconditionally -- the 2 comes from the class's own one-frame
+            # processing lag (_recovery_accepts is only checked starting the
+            # frame *after* the one that opens the episode, never the same
+            # frame) plus inclusive frame counting, not from any real
+            # waiting. recovered/duration_frames here carry zero
+            # discriminating information about what actually happened after
+            # the trap -- this is intentionally a no-op resume signal.
+            recovery_ltl="F(fixture_open_retracting | fixture_open_retract_timeout)",
             property_description=property_description,
             binding={},
             explanation_builder=_fixture_open_obstacle_explanation,
             reason_builder=_fixture_open_obstacle_reason,
+            # See RepeatedViolationMonitorConfig.min_resolve_frames's own
+            # comment (added 2026-09-17, same timeout-bounded-obligation
+            # truncation-artifact fix as rc_released_object_eventually_
+            # settles). fixture_open_retract_timeout is aliased to
+            # SETTLE_TIMEOUT_FRAMES (predicates.py's RETRACT_TIMEOUT_FRAMES
+            # = SETTLE_TIMEOUT_FRAMES), not separately exported from specs.py.
+            min_resolve_frames=SETTLE_TIMEOUT_FRAMES,
         )
     )
 
@@ -1692,19 +1809,20 @@ def build_repeated_fixture_close_obstacle_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_fixture_close_obstacle_retract",
-            main_ltl="G(fixture_close_obstacle_hit -> (fixture_close_retracting U fixture_close_retract_resolved))",
-            # Fixed 2026-09-03 (KNOWN_BUGS.md #10) -- symmetric to
-            # rc_fixture_open_obstacle_retract above; same bare-atom bug, same
-            # verification (fixture_fully_open is never already True at the
-            # trap-confirmation frame), same fix.
-            # main_ltl's resolve target updated 2026-09-05 to
-            # fixture_close_retract_resolved (predicates.py) -- see specs.py's
-            # own comment on rc_fixture_close_obstacle_retract for why.
-            recovery_ltl="F(fixture_close_retract_resolved)",
+            main_ltl=_spec_main_ltl("rc_fixture_close_obstacle_retract"),
+            # Redesigned 2026-09-16 (explicit user decision) -- symmetric to
+            # rc_fixture_open_obstacle_retract above; see its identical
+            # comment (deliberate Bug B: recovered=True, duration_frames=2,
+            # unconditionally, on every violation -- a no-op resume signal,
+            # not a real one).
+            recovery_ltl="F(fixture_close_retracting | fixture_close_retract_timeout)",
             property_description=property_description,
             binding={},
             explanation_builder=_fixture_close_obstacle_explanation,
             reason_builder=_fixture_close_obstacle_reason,
+            # See RepeatedViolationMonitorConfig.min_resolve_frames's own
+            # comment (added 2026-09-17).
+            min_resolve_frames=SETTLE_TIMEOUT_FRAMES,
         )
     )
 
@@ -1715,8 +1833,18 @@ def build_repeated_liquid_transfer_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_liquid_transfer_eventually_settles",
-            main_ltl="G(liquid_transfer_event -> (!object_settle_timeout U liquid_settled))",
-            recovery_ltl="none",
+            main_ltl=_spec_main_ltl("rc_liquid_transfer_eventually_settles"),
+            # Added 2026-09-16 (explicit user decision), matching
+            # rc_released_object_eventually_settles's recovery shape in
+            # spirit, minus its object_grasped disjunct: liquid content has
+            # no "re-grasp" analog (it's poured, not held), so there's no
+            # non-tautological alternative term here at all. main_ltl has
+            # only one trap path (object_settle_timeout fires before
+            # liquid_settled), so object_settle_timeout is *guaranteed* True
+            # at every trap frame -- a deliberate Bug B (tautological
+            # escape), same tradeoff accepted for
+            # rc_fixture_{open,close}_obstacle_retract's recovery.
+            recovery_ltl="F(liquid_settled | object_settle_timeout)",
             property_description=property_description,
             binding={},
             explanation_builder=lambda episodes: _containment_explanation("liquid", episodes),
@@ -1726,6 +1854,9 @@ def build_repeated_liquid_transfer_monitor(
                 in_violation_at_end,
             ),
             count_overlapping_rejections=True,
+            # See RepeatedViolationMonitorConfig.min_resolve_frames's own
+            # comment (added 2026-09-17).
+            min_resolve_frames=SETTLE_TIMEOUT_FRAMES,
         )
     )
 
@@ -1736,11 +1867,16 @@ def build_repeated_solid_transfer_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_solid_transfer_eventually_settles",
-            main_ltl="G(solid_transfer_event -> (!object_settle_timeout U solid_settled))",
-            recovery_ltl=(
-                "G(solid_misplacement -> "
-                "F(misplaced_solid_removed | misplaced_solid_recollected))"
-            ),
+            main_ltl=_spec_main_ltl("rc_solid_transfer_eventually_settles"),
+            # Replaced 2026-09-16 (explicit user decision) -- the previous
+            # formula tracked solid_misplacement/removed/recollected, atoms
+            # not referenced by this property's own main_ltl at all. Now
+            # matches rc_liquid_transfer_eventually_settles's identical
+            # comment above -- no object_grasped disjunct (no "re-grasp"
+            # analog for transferred content), same deliberate Bug B
+            # tradeoff (object_settle_timeout guaranteed True at every trap
+            # frame).
+            recovery_ltl="F(solid_settled | object_settle_timeout)",
             property_description=property_description,
             binding={},
             explanation_builder=lambda episodes: _containment_explanation("solid", episodes),
@@ -1749,6 +1885,9 @@ def build_repeated_solid_transfer_monitor(
                 episodes,
                 in_violation_at_end,
             ),
+            # See RepeatedViolationMonitorConfig.min_resolve_frames's own
+            # comment (added 2026-09-17).
+            min_resolve_frames=SETTLE_TIMEOUT_FRAMES,
         )
     )
 
@@ -1759,7 +1898,7 @@ def build_repeated_microwave_single_object_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_microwave_single_object_until_empty",
-            main_ltl="G(object_reach_in_fixture -> microwave_empty)",
+            main_ltl=_spec_main_ltl("rc_microwave_single_object_until_empty"),
             # Fixed 2026-09-03 (KNOWN_BUGS.md #10). Two separate bugs, not
             # just the bare-atom one: (1) same bare-atom-under-LTLf-finite-
             # trace-semantics issue as the fixture properties above -- fixed
@@ -1777,7 +1916,15 @@ def build_repeated_microwave_single_object_monitor(
             # condition. Verified (isolated LTLfDFA test): F(microwave_empty)
             # is never tautologically True at the trap frame in either
             # violation shape (1 object or 2+ objects present).
-            recovery_ltl="F(microwave_empty)",
+            # Changed 2026-09-16 (explicit user decision): added
+            # object_left_microwave as an alternate resume term -- the
+            # specific object that triggered the violation leaving the
+            # microwave, even if other objects remain and the microwave
+            # isn't fully empty yet. Not tautological: at the trap frame,
+            # microwave_empty is False (that's the violation) and
+            # object_left_microwave is also False there (the object just
+            # reached in), so neither disjunct is guaranteed true at frame 1.
+            recovery_ltl="F(microwave_empty | object_left_microwave)",
             property_description=property_description,
             binding={},
             explanation_builder=lambda episodes: _access_explanation("microwave", episodes),
@@ -1796,8 +1943,15 @@ def build_repeated_reach_in_fixture_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_reach_in_fixture_only_when_fully_open",
-            main_ltl="G(reach_in_fixture -> fixture_fully_open)",
-            recovery_ltl="none",
+            main_ltl=_spec_main_ltl("rc_reach_in_fixture_only_when_fully_open"),
+            # Added 2026-09-16 (explicit user decision), matching
+            # rc_microwave_single_object_until_empty's own pattern above:
+            # either the fixture eventually becomes fully open, or the
+            # gripper backs back out of it. Not tautological: at the trap
+            # frame, fixture_fully_open is False (that's the violation) and
+            # left_fixture is also False there (the gripper just reached
+            # in), so neither disjunct is guaranteed true at frame 1.
+            recovery_ltl="F(fixture_fully_open | left_fixture)",
             property_description=property_description,
             binding={},
             explanation_builder=lambda episodes: _access_explanation("reach", episodes),
@@ -1817,8 +1971,17 @@ def build_repeated_fixture_placement_support_monitor(
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_fixture_placement_release_after_internal_support",
-            main_ltl="G(object_reach_in_fixture -> (!object_released U object_in_same_fixture))",
-            recovery_ltl="none",
+            main_ltl=_spec_main_ltl("rc_fixture_placement_release_after_internal_support"),
+            # Added 2026-09-16 (explicit user decision). main_ltl now has
+            # only one trap path (object_released becomes True before
+            # object_in_same_fixture does), so object_released is
+            # *guaranteed* True at every trap-confirmation frame --
+            # including it here is a deliberate Bug B (tautological
+            # escape), the same tradeoff accepted for
+            # rc_fixture_{open,close}_obstacle_retract's recovery.
+            # object_in_same_fixture is the only genuinely non-tautological
+            # disjunct (guaranteed False at the trap frame).
+            recovery_ltl="F(object_released | object_in_same_fixture)",
             property_description=property_description,
             binding={},
             explanation_builder=lambda episodes: _access_explanation("placement", episodes),

@@ -47,6 +47,29 @@ PROPERTY_SPECS = {
     spec["name"]: spec for spec in (TASK_AGNOSTIC_PROPERTY_SPECS + VARIANT_PROPERTY_SPECS)
 }
 
+# Added 2026-09-17 (explicit user decision): every property here has the
+# same main_ltl shape, G(trigger -> (!timeout U resolved)) -- the DFA can
+# only genuinely trap (permanently fail) if `timeout` itself actually
+# became True at some point in the trace; if it never did, the only way
+# the property ends non-accepting is the recorded trace simply running out
+# mid-obligation (a truncated-trace artifact, not a real failure -- the
+# monitor was never given enough frames to know the answer). Found via
+# WashLettuce (rc_released_object_eventually_settles, 9/10 episodes in a
+# v25/v26 corpus scan: the demonstration's own recording stops the instant
+# task success, i.e. the release, is detected, so release_object_settle_
+# timeout could structurally never become True). Applies identically to
+# LIBERO's own predicates.py, which aliases the same constant names/atom
+# shapes (SETTLE_TIMEOUT_FRAMES, RETRACT_TIMEOUT_FRAMES) -- this check
+# only depends on the atom *name* appearing in a violated property's
+# per-frame predicate_values, not which sim engine produced it.
+TIMEOUT_BOUNDED_PROPERTY_ATOMS = {
+    "rc_released_object_eventually_settles": "release_object_settle_timeout",
+    "rc_fixture_open_obstacle_retract": "fixture_open_retract_timeout",
+    "rc_fixture_close_obstacle_retract": "fixture_close_retract_timeout",
+    "rc_liquid_transfer_eventually_settles": "object_settle_timeout",
+    "rc_solid_transfer_eventually_settles": "object_settle_timeout",
+}
+
 PICK_PRECONDITION_PREDICATES = (
     "object_region_clear",
     "object_stable",
@@ -133,6 +156,31 @@ def _set_frame_predicate_value(dynamic_info: Dict, name: str, value: bool) -> No
     }
 
 
+# Added 2026-09-15: recovery_ltl-only atoms for the 8 intended-safety
+# precondition properties (see each build_repeated_*_monitor's recovery_ltl
+# comment in repeated_violation_monitor.py). Deliberately NOT folded into
+# PICK_PRECONDITION_PREDICATES/PLACE_PRECONDITION_PREDICATES/
+# INTENDED_SAFETY_PRECONDITION_SPECS -- those lists double as the
+# failure-reason component lists (_generic_precondition_failure_messages
+# etc.), and none of these atoms are a real precondition sub-check --
+# folding them in would misreport "skill press onset end" as a failed
+# precondition in human-readable explanation text.
+_PRECONDITION_RECOVERY_ONLY_ATOMS: Dict[str, Tuple[str, ...]] = {
+    "rc_pick_preconditions_safe": ("skill_pick_onset_end",),
+    "rc_place_preconditions_safe": (
+        "object_settled",
+        "release_object_settle_timeout",
+        "object_grasped",
+    ),
+    "rc_press_preconditions_safe": ("skill_press_onset_end",),
+    "rc_turn_preconditions_safe": ("skill_turn_onset_end",),
+    "rc_slide_preconditions_safe": ("skill_slide_onset_end",),
+    "rc_twist_preconditions_safe": ("skill_twist_onset_end",),
+    "rc_open_close_preconditions_safe": ("skill_open_close_onset_end",),
+    "rc_dump_preconditions_safe": ("skill_dump_onset_end",),
+}
+
+
 def _augment_precondition_predicate_values(
     property_name: str,
     predicate_values: Dict[str, bool],
@@ -148,9 +196,9 @@ def _augment_precondition_predicate_values(
             INTENDED_SAFETY_PROPERTY_ACTIONS[property_name]
         ]
     else:
-        return augmented
+        component_names = ()
 
-    for name in component_names:
+    for name in (*component_names, *_PRECONDITION_RECOVERY_ONLY_ATOMS.get(property_name, ())):
         if name not in augmented and _has_frame_predicate_value(dynamic_info, name):
             augmented[name] = _get_frame_predicate_value(dynamic_info, name)
     if property_name == "rc_pick_preconditions_safe":
@@ -1347,6 +1395,17 @@ def monitor_rollout(
             "num_frames": len(events),
             "ever_non_accepting": any(not event["accepting"] for event in events),
         }
+        timeout_atom = TIMEOUT_BOUNDED_PROPERTY_ATOMS.get(property_name)
+        if (
+            not final_event["accepting"]
+            and timeout_atom is not None
+            and not any(event["predicate_values"].get(timeout_atom) for event in events)
+        ):
+            # See TIMEOUT_BOUNDED_PROPERTY_ATOMS's own comment -- the timeout
+            # atom never actually fired, so this can only be a truncated-
+            # trace artifact, not a genuine violation.
+            satisfied.append(entry)
+            continue
         if final_event["accepting"]:
             satisfied.append(entry)
         else:
@@ -1442,6 +1501,14 @@ def monitor_rollout(
                     "final_frame": final_event["frame_index"],
                 }
                 entry["temporal_evidence"] = temporal_evidence
+                # Truncated-trace reclassification for this property is now
+                # handled generically above (TIMEOUT_BOUNDED_PROPERTY_ATOMS,
+                # checked before this whole property-specific block even
+                # runs) -- release_object_settle_timeout never firing in
+                # `events` is exactly the WashLettuce case this used to
+                # special-case here by comparing final_frame/timeout_frame
+                # directly; both checks agree, so only the generic one is
+                # kept.
             entry["explanation"] = _describe_violation(
                 property_name=property_name,
                 binding=entry["binding"],

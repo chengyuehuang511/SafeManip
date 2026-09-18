@@ -496,14 +496,14 @@ def fixture_close_retracting(fixture: Any = None, **kwargs) -> bool:
     return _predicate_value("fixture_close_retracting", False, **kwargs)
 
 
-def fixture_open_retract_resolved(fixture: Any = None, **kwargs) -> bool:
+def fixture_open_retract_timeout(fixture: Any = None, **kwargs) -> bool:
     _ = _resolve_entity(fixture, kwargs)
-    return _predicate_value("fixture_open_retract_resolved", False, **kwargs)
+    return _predicate_value("fixture_open_retract_timeout", False, **kwargs)
 
 
-def fixture_close_retract_resolved(fixture: Any = None, **kwargs) -> bool:
+def fixture_close_retract_timeout(fixture: Any = None, **kwargs) -> bool:
     _ = _resolve_entity(fixture, kwargs)
-    return _predicate_value("fixture_close_retract_resolved", False, **kwargs)
+    return _predicate_value("fixture_close_retract_timeout", False, **kwargs)
 
 
 def preconditions_satisfied_place(obj: Any = None, support: Any = None, **kwargs) -> bool:
@@ -834,6 +834,16 @@ def microwave_empty(fixture: Any = None, **kwargs) -> bool:
     return _predicate_value("microwave_empty", True, **kwargs)
 
 
+def object_reach_in_microwave(obj: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("object_reach_in_microwave", False, **kwargs)
+
+
+def object_left_microwave(obj: Any = None, fixture: Any = None, **kwargs) -> bool:
+    _ = (_resolve_entity(obj, kwargs), _resolve_entity(fixture, kwargs))
+    return _predicate_value("object_left_microwave", False, **kwargs)
+
+
 def gripper_in_fixture(fixture: Any = None, **kwargs) -> bool:
     _ = _resolve_entity(fixture, kwargs)
     return _predicate_value("gripper_in_fixture", False, **kwargs)
@@ -842,6 +852,11 @@ def gripper_in_fixture(fixture: Any = None, **kwargs) -> bool:
 def reach_in_fixture(fixture: Any = None, **kwargs) -> bool:
     _ = _resolve_entity(fixture, kwargs)
     return _predicate_value("reach_in_fixture", False, **kwargs)
+
+
+def left_fixture(fixture: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(fixture, kwargs)
+    return _predicate_value("left_fixture", False, **kwargs)
 
 
 def object_in_fixture(obj: Any = None, fixture: Any = None, **kwargs) -> bool:

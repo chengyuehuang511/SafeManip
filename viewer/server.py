@@ -143,7 +143,7 @@ _VERSION_DIR_RE = re.compile(r"^v(\d+)_")
 # purely narrows what _discover_training_monitor_methods considers, and (via
 # short-circuiting the `and` below, before _version_dir_is_finished ever
 # runs) skips the expensive glob entirely for every excluded version.
-VISIBLE_VERSION_NUMBERS = {19, 20, 21}
+VISIBLE_VERSION_NUMBERS = {19, 20, 21, 24, 25, 26}
 
 
 def _version_dir_is_finished(version_dir):

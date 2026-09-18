@@ -43,6 +43,29 @@ RECEPTACLE_NAME_SUBSTRINGS = (
     "caddy",
     "bin",
     "container",
+    # "bottle" and "can" added 2026-09-16 (explicit user decision), verified
+    # against RoboCasa's own RECEPTACLE_CATEGORIES (attributes.py:219-235,
+    # eval/simulators/robocasa/robocasa/models/objects/kitchen_objects.py):
+    # that set lists "bottle" and "can" literally, independent of their
+    # "types" metadata (wine's types are only ("drink", "alcohol"), no
+    # "receptacle"/"liquid") -- so RoboCasa itself treats a bottle/can as a
+    # receptacle shape regardless of contents. Without these, LIBERO's real
+    # wine_bottle object was never recognized as receptacle-shaped even
+    # though its real RoboCasa analog (category "bottle") is.
+    "bottle",
+    "can",
+    # "ramekin" added 2026-09-16 (explicit user decision): no RoboCasa
+    # category named "ramekin" exists at all (confirmed by grepping
+    # kitchen_objects.py), same situation as "plate"/"basket"/"caddy"/"bin"
+    # above (this file's own docstring already calls those out as LIBERO
+    # categories with no direct RoboCasa-taxonomy equivalent, judged by real
+    # shape instead) -- a ramekin is a small bowl-shaped dish, receptacle by
+    # the same shape reasoning, and was already treated as such by
+    # FRAGILE_NAME_SUBSTRINGS/MICROWAVABLE_NAME_SUBSTRINGS/WASHABLE_NAME_
+    # SUBSTRINGS elsewhere in this file -- omitting it here (the actual
+    # receptacle-shape check) while including it there was an inconsistency,
+    # not a deliberate distinction.
+    "ramekin",
     "box",  # cream_cheese_box etc. are NOT receptacles by shape, but this
     # substring also catches "moka_pot" incorrectly only if "pot" weren't
     # already listed first -- kept last/lowest-priority on purpose so more
@@ -142,3 +165,247 @@ RAW_NAME_SUBSTRINGS = ("raw", "meat", "fish", "seafood", "chicken", "beef", "unc
 # "ready_to_eat" fallback set ({"ready_to_eat", "cooked_food", "fruit",
 # "vegetable", "dairy", "bread_food", "pastry"}).
 RTE_NAME_SUBSTRINGS = ("cooked", "fruit", "vegetable", "dairy", "bread", "pastry", "pudding", "cheese", "butter")
+
+# Added 2026-09-16 (explicit user decision): mirrors RoboCasa's own
+# attributes.py taxonomy for LIBERO's simpler flat object set, so
+# rc_place_preconditions_safe's support_objects_clean_for_manipulated_object/
+# support_not_cluttered_for_fragile_manipulated_object sub-checks (previously
+# entirely absent from LIBERO's preconditions_satisfied_place composition,
+# not just stubbed) can be implemented for real instead of omitted. Per
+# explicit user direction, implemented unconditionally -- whether any actual
+# LIBERO object matches a given set is left to the attribute check itself to
+# determine, not pre-judged by corpus inspection the way RAW_NAME_SUBSTRINGS/
+# RTE_NAME_SUBSTRINGS's own verified-zero-occurrence claims were.
+
+# FRAGILE_CATEGORIES in RoboCasa's own attributes.py ({"mug", "coffee_cup",
+# "cup", "glass_cup", "wine_glass", "plate", "bowl", "egg"}) is itself
+# manually curated there (not derived from RoboCasa's external per-category
+# metadata) -- mirrored here against LIBERO's own category-name substrings.
+# "ramekin" added 2026-09-16 after verifying the actual 40-task object
+# corpus (glazed_rim_porcelain_ramekin, a real in-corpus distractor object,
+# not previously matched by anything -- see the corpus-verification note
+# further down this file).
+FRAGILE_NAME_SUBSTRINGS = ("bowl", "mug", "cup", "glass", "plate", "egg", "ramekin")
+
+# RoboCasa's OBJECT_METADATA_BOOLEAN_ATTRIBUTES (washable, microwavable,
+# cookable, toastable, fridgable, freezable, dishwashable) are read directly
+# off RoboCasa's own external per-category metadata (kitchen_objects.py),
+# which has no LIBERO equivalent -- approximated here as name-substring
+# sets. Not yet consumed by any LIBERO precondition check (RoboCasa's own
+# consumers of these -- preconditions_satisfied_open_close's fixture/content
+# type-matching for microwave/dishwasher contents -- haven't been ported to
+# LIBERO); provided so that porting work doesn't also require inventing the
+# attribute data from scratch. (WASHABLE_NAME_SUBSTRINGS/DISHWASHABLE_NAME_
+# SUBSTRINGS/FRIDGABLE_NAME_SUBSTRINGS/FREEZABLE_NAME_SUBSTRINGS live further
+# down this file, next to COOKABLE_NAME_SUBSTRINGS, since they need to reuse
+# MEAT_NAME_SUBSTRINGS/DAIRY_NAME_SUBSTRINGS/LIQUID_NAME_SUBSTRINGS and must
+# be defined after those to avoid a forward-reference NameError -- the same
+# ordering hazard the "Fixed 2026-09-16" COOKABLE/FRIDGABLE note above
+# describes.) MICROWAVABLE and TOASTABLE have no such dependency, so they
+# stay here, confirmed True only for bowl/mug/cup/plate/ramekin-shaped dishes
+# (RoboCasa: pot/pan/tray/basket and every bottled liquid are confirmed
+# microwavable=False) and toastable only for bread-shaped items, respectively.
+MICROWAVABLE_NAME_SUBSTRINGS = ("bowl", "mug", "cup", "plate", "ramekin")
+TOASTABLE_NAME_SUBSTRINGS = ("bread",)
+
+# TOOL_CATEGORIES mirror (RoboCasa: knife/fork/spoon/spatula/ladle/whisk/
+# tongs/peeler/reamer/rolling_pin/pizza_cutter/measuring_cup/can_opener/
+# bottle_opener/cheese_grater/scissors/digital_scale/strainer/cutting_board).
+TOOL_NAME_SUBSTRINGS = (
+    "knife", "fork", "spoon", "spatula", "ladle", "whisk", "tongs",
+    "peeler", "opener", "grater", "scissors", "scale", "strainer",
+    "cutting_board", "rolling_pin",
+)
+
+# POURABLE_CATEGORIES mirror (RoboCasa: jug/pitcher/teapot/thermos/mug/
+# coffee_cup/cup/glass_cup/wine_glass, plus its own LIQUID_CATEGORIES).
+POURABLE_NAME_SUBSTRINGS = (
+    "jug", "pitcher", "teapot", "thermos", "mug", "cup", "glass",
+    *LIQUID_NAME_SUBSTRINGS,
+)
+
+# Added 2026-09-16 (explicit user decision): the rest of RoboCasa's
+# ROLE_ATTRIBUTE_AXES["object"]-derived, actually-populated attributes (not
+# just declared in the axis list -- verified against
+# object_category_attribute_defaults() itself, not the schema). Deliberately
+# NOT mirrored: "hot"/"cold"/"cleaner"/"stackable"/"lid"/"cuttable"/
+# "packaged_food" -- RoboCasa's own attribute-assignment function never
+# actually assigns these to any object (PLACEHOLDER_TRUE_ATTRIBUTES, which
+# includes hot/cold, is dead code -- not consumed anywhere in that
+# codebase), so mirroring them would just copy inert schema names, not real
+# behavior. Also NOT mirrored: TWISTABLE_CATEGORIES-for-movable-objects --
+# already correctly excluded elsewhere in this file (LIBERO movable objects
+# have no articulated cap/lid sub-mechanism to twist, confirmed against the
+# actual object model).
+FRUIT_NAME_SUBSTRINGS = ("apple", "banana", "orange", "grape", "berry", "lemon", "lime", "peach", "pear")
+VEGETABLE_NAME_SUBSTRINGS = ("carrot", "potato", "onion", "lettuce", "tomato", "pepper", "corn", "broccoli", "cucumber")
+MEAT_NAME_SUBSTRINGS = ("meat", "chicken", "beef", "pork", "fish", "bacon", "sausage")
+DAIRY_NAME_SUBSTRINGS = ("milk", "cheese", "butter", "cream", "yogurt")
+BREAD_FOOD_NAME_SUBSTRINGS = ("bread", "toast", "bagel", "bun", "roll")
+COOKED_FOOD_NAME_SUBSTRINGS = ("cooked", "pudding")
+CONDIMENT_NAME_SUBSTRINGS = ("ketchup", "mustard", "mayo", "dressing", "sauce", "jam", "jelly")
+SPICE_NAME_SUBSTRINGS = ("salt", "spice", "seasoning", "pepper")
+PASTRY_NAME_SUBSTRINGS = ("pastry", "cake", "cookie", "donut", "pie", "croissant")
+SWEET_NAME_SUBSTRINGS = ("sweet", "candy", "chocolate", "sugar")
+DRINK_NAME_SUBSTRINGS = ("juice", "milk", "wine", "coffee", "soda", "water", "beer")
+ALCOHOL_NAME_SUBSTRINGS = ("wine", "beer", "liquor")
+COOKWARE_NAME_SUBSTRINGS = ("pot", "pan", "frypan", "skillet", "kettle", "wok")
+
+# FOOD_TYPE_NAMES mirror -- union of the food-ish sub-categories above
+# (RoboCasa: fruit, vegetable, meat, dairy, bread_food, cooked_food, pastry,
+# sweets, condiment, spice, drink).
+FOOD_NAME_SUBSTRINGS = (
+    *FRUIT_NAME_SUBSTRINGS, *VEGETABLE_NAME_SUBSTRINGS, *MEAT_NAME_SUBSTRINGS,
+    *DAIRY_NAME_SUBSTRINGS, *BREAD_FOOD_NAME_SUBSTRINGS, *COOKED_FOOD_NAME_SUBSTRINGS,
+    *PASTRY_NAME_SUBSTRINGS, *SWEET_NAME_SUBSTRINGS, *CONDIMENT_NAME_SUBSTRINGS,
+    *SPICE_NAME_SUBSTRINGS, *DRINK_NAME_SUBSTRINGS,
+)
+
+# Fixed 2026-09-16: COOKABLE_NAME_SUBSTRINGS/FRIDGABLE_NAME_SUBSTRINGS were
+# originally defined (above, near WASHABLE/MICROWAVABLE) using abstract type
+# labels ("fruit", "vegetable", "dairy", "bread", "meat") instead of actual
+# object-name substrings -- those labels can never match a real category
+# string like "cream_cheese" or "chocolate_pudding". Redefined here by
+# reusing the real substring sets instead (same pattern as
+# UTENSIL_NAME_SUBSTRINGS = TOOL_NAME_SUBSTRINGS above), now that those real
+# sets exist. Verified against the actual 40-task object corpus: FRIDGABLE
+# genuinely matches milk/butter/cream_cheese; COOKABLE has no real match in
+# this corpus (no raw ingredients needing cooking), a legitimate
+# zero-occurrence result, same class as RAW_NAME_SUBSTRINGS's own.
+COOKABLE_NAME_SUBSTRINGS = (
+    *FRUIT_NAME_SUBSTRINGS, *VEGETABLE_NAME_SUBSTRINGS, *MEAT_NAME_SUBSTRINGS,
+    *DAIRY_NAME_SUBSTRINGS, *BREAD_FOOD_NAME_SUBSTRINGS, "egg",
+)
+
+# Corrected 2026-09-16 (explicit user decision), verified directly against
+# RoboCasa's real per-category dicts in kitchen_objects.py (not just its
+# "types" tuples): fridgable=True is assigned far more broadly than just
+# meat/dairy -- confirmed True for bowl, mug, cup, plate, pan, pot (all
+# receptacle/cookware shapes), and for milk, ketchup, juice, can (all bottled
+# food/drink items; e.g. kitchen_objects.py's `ketchup=dict(... fridgable=True
+# ...)`, `bowl=dict(... fridgable=True ...)`). Confirmed fridgable=False for
+# `wine=dict(...)` and `basket=dict(...)` specifically -- those two are
+# deliberately excluded below rather than folded in via a broader shape
+# substring, so LIBERO's wine_bottle/basket don't get a false "fridgable".
+# The old FRIDGABLE_NAME_SUBSTRINGS = MEAT+DAIRY only (this file's own prior
+# "Fixed 2026-09-16" comment above claimed FRIDGABLE "genuinely matches
+# milk/butter/cream_cheese" as if that were the full real set -- it understated
+# it; bowl/mug/plate/pan/pot/ketchup/juice/alphabet_soup ("soup", via
+# LIQUID_NAME_SUBSTRINGS) are real matches too).
+FRIDGABLE_NAME_SUBSTRINGS = (
+    "bowl", "mug", "cup", "plate", "pan", "pot",
+    *MEAT_NAME_SUBSTRINGS, *DAIRY_NAME_SUBSTRINGS, *LIQUID_NAME_SUBSTRINGS,
+)
+
+# freezable=True is, by contrast, genuinely narrow in RoboCasa's real data --
+# confirmed True only for dairy-ish items (`cream_cheese_stick`, `butter_stick`)
+# and for `can=dict(... freezable=True ...)`; confirmed False for every
+# receptacle/cookware shape (bowl/mug/cup/plate/pan/pot/tray) and for the
+# bottled liquids (milk/ketchup/wine/juice all freezable=False). So, unlike
+# the old code, FREEZABLE is deliberately NOT aliased to the (now broader)
+# FRIDGABLE_NAME_SUBSTRINGS above -- it keeps its own narrow set instead
+# (dairy/meat, plus "soup"/"can" for the real `can=dict(freezable=True)`
+# match, covering LIBERO's alphabet_soup).
+FREEZABLE_NAME_SUBSTRINGS = (*MEAT_NAME_SUBSTRINGS, *DAIRY_NAME_SUBSTRINGS, "soup", "can")
+
+# washable=True is assigned to nearly every RoboCasa category *except* dry/
+# baked/packaged solid foods (bread, cake, chocolate, cereal, chips, ... all
+# washable=False) and a few tools (digital_scale). Confirmed True for the
+# receptacle/cookware shapes (bowl/mug/cup/plate/pan/pot/tray/basket) *and*
+# for the bottled liquids (milk, ketchup, wine, juice/`juice=dict(...
+# washable=True ...)`) *and* for cream_cheese_stick (washable=True) -- but
+# confirmed False for butter_stick specifically (washable=False even though
+# it's dairy too, a genuine per-item inconsistency in RoboCasa's own data, not
+# a mirroring gap on this side). "basket"/"wine"/"cheese"/"cream" added
+# 2026-09-16 after this direct verification; previously this file aliased
+# DISHWASHABLE_NAME_SUBSTRINGS = WASHABLE_NAME_SUBSTRINGS, which was wrong in
+# both directions (see DISHWASHABLE_NAME_SUBSTRINGS below).
+WASHABLE_NAME_SUBSTRINGS = (
+    "bowl", "mug", "cup", "plate", "pot", "pan", "tray", "caddy", "ramekin",
+    "basket", "wine", "cheese", "cream", *LIQUID_NAME_SUBSTRINGS,
+)
+
+# dishwashable=True is, unlike washable, a *narrow* real RoboCasa attribute --
+# confirmed True only for bowl/mug/pan/plate/pot/knife/ladle/spoon/colander/
+# reamer/measuring_cup/strainer/tupperware/glass_cup/peeler/saucepan
+# (kitchen_objects.py) -- confirmed False (i.e. field simply absent, which
+# `info.get("dishwashable")` treats as falsy) for plain cup, coffee_cup,
+# tray, basket, and wine_glass, and for every bottled liquid (milk, ketchup,
+# wine, juice, can). So aliasing it to WASHABLE_NAME_SUBSTRINGS was a real
+# mirroring bug -- washable is much broader than dishwashable in RoboCasa's
+# own data. Corrected 2026-09-16 (explicit user decision) to its own narrow
+# set, restricted to the receptacle/cookware shapes that are actually
+# dishwasher-safe dishware, matching LIBERO's real akita_black_bowl/mugs/
+# plate/chefmate_8_frypan/moka_pot.
+DISHWASHABLE_NAME_SUBSTRINGS = ("bowl", "mug", "plate", "pan", "pot")
+
+# utensil is assigned to the exact same category set as "tool" in RoboCasa's
+# own object_category_attribute_defaults() (attrs.update({"tool", "utensil",
+# "graspable"})) -- not a separate taxonomy, so reuse TOOL_NAME_SUBSTRINGS
+# directly rather than re-declaring an identical list under a new name.
+UTENSIL_NAME_SUBSTRINGS = TOOL_NAME_SUBSTRINGS
+
+# graspable is assigned unconditionally to every object in RoboCasa
+# (attrs.add("graspable") with no category gate at all) -- not a
+# substring-matched attribute, just always True for any real object.
+
+# Added 2026-09-16 (explicit user decision): mirrors RoboCasa's
+# fixture_class_default_attributes() -- the "fixture" and "support" role
+# axes (ROLE_ATTRIBUTE_AXES["fixture"]/["support"]), keyed there by RoboCasa
+# fixture *class* names (e.g. "HingeCabinet", "Microwave", "Stove") which
+# have no LIBERO equivalent naming -- re-keyed here by LIBERO's own flat
+# fixture category name instead, for the fixture classes that actually have
+# a reasonable RoboCasa analog. "support:X" attributes (containment,
+# heated, cold_storage, wash_zone, prep_zone, serving_zone, storage_zone)
+# kept with their "support:" prefix intact, matching RoboCasa's own
+# encoding, since they describe the surface/interior the fixture provides,
+# not the fixture body itself.
+#
+# desk_caddy and wine_rack map to RoboCasa's DishRack class -- corrected
+# 2026-09-16 (explicit user decision): RoboCasa's DishRack attributes are
+# exactly ("support:containment", "support:storage_zone"), no openable/
+# closeable/body attributes at all, because a dish rack is an open storage
+# surface with no door or lid -- the same shape as a desk caddy or wine
+# rack (open organizers, nothing to open/close). This is a real, reasoned
+# analog, not a fabrication -- unlike the fixture-*body* attributes
+# (openable, heated, powered, etc.), which genuinely have no RoboCasa
+# equivalent for these two since neither is a sealed/powered fixture.
+# flat_stove maps to RoboCasa's Stove/Stovetop (a cooktop with no oven
+# cavity, matching LIBERO's own "flat_stove has no openable interior" note
+# elsewhere in this file) rather than Oven/ToasterOven.
+FIXTURE_CATEGORY_ATTRIBUTES: dict[str, tuple[str, ...]] = {
+    "microwave": ("openable", "closeable", "heated", "powered", "microwave", "pressable", "support:heated"),
+    "white_cabinet": ("openable", "closeable", "storage", "cabinet", "support:containment", "support:storage_zone"),
+    "wooden_cabinet": ("openable", "closeable", "storage", "cabinet", "support:containment", "support:storage_zone"),
+    "flat_stove": ("heated", "stove", "cooktop", "twistable", "support:heated"),
+    "desk_caddy": ("support:containment", "support:storage_zone"),
+    "wine_rack": ("support:containment", "support:storage_zone"),
+}
+
+
+def fixture_category_has_attribute(category: str, attribute: str) -> bool:
+    return attribute in FIXTURE_CATEGORY_ATTRIBUTES.get(str(category).lower(), ())
+
+
+# RoboCasa's remaining two ROLE_ATTRIBUTE_AXES -- "tool" (cleaning_tool/
+# cutting_tool/mixing_tool/serving_tool/measuring_tool) and "button"
+# (lever/toggle/power/mode_select/pressable) -- corrected 2026-09-16 after
+# checking their actual consumption in RoboCasa's own code, not just
+# declaring them inapplicable by assumption:
+# - Both TOOL_ATTRIBUTE_AXES and BUTTON_ATTRIBUTE_AXES (attributes.py:148-149)
+#   are themselves dead code in RoboCasa -- declared, never referenced
+#   again anywhere in that codebase, same class as PLACEHOLDER_TRUE_
+#   ATTRIBUTES (hot/cold). There is no real per-entity assignment logic to
+#   mirror for either sub-axis at all, in RoboCasa itself.
+# - The *functional* purpose each axis gestures at is handled by other,
+#   already-mirrored mechanisms instead: "tool"'s parent classification
+#   (RoboCasa's real, consumed TOOL_CATEGORIES, attributes.py:474 --
+#   assigns flat "tool"/"utensil"/"graspable" tags) is mirrored above via
+#   TOOL_NAME_SUBSTRINGS/UTENSIL_NAME_SUBSTRINGS, correctly showing zero
+#   real matches in the verified 22-object corpus (no tool objects exist,
+#   not a mirroring gap). "button"-style press-component targeting (e.g.
+#   RoboCasa predicates.py's own "button"/"power_button"/"lever" keyword
+#   matching for a fixture's press-affordance sub-geom) is already
+#   mirrored via this file's own ACTION_COMPONENT_KEYWORDS["press"]
+#   (imported from predicates.py verbatim, per its own docstring),
+#   independent of the (dead) formal ROLE_ATTRIBUTE_AXES["button"] system.

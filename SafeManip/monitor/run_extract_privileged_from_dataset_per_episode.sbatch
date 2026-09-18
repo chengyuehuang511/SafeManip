@@ -12,8 +12,16 @@
 #SBATCH --nodes=1
 # No GPU requested -- see run_extract_privileged_from_dataset.sbatch's own
 # comment for why (pure physics-state replay, no rendering, ever).
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
+# Right-sized 2026-09-16 (was cpus-per-task=8, mem=32G): confirmed via `top`
+# on a live compute node during a real 500+-task sweep that this pipeline is
+# single-threaded (one python3 process pinned at ~92-100% of exactly one
+# core, node otherwise ~88% idle) and uses ~3-4GB RSS -- the old request
+# reserved 8x the CPUs and ~8-10x the memory actually used, so SLURM could
+# only pack ~1/8th as many array tasks per node as the hardware could
+# actually run. 2 cpus / 8G leaves real headroom over the observed ~1
+# core / ~4GB without still wasting most of a node's capacity per task.
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
 #SBATCH --qos=debug
 #SBATCH --time=04:00:00
 #SBATCH --output=/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
