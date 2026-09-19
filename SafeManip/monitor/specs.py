@@ -771,14 +771,20 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
     _spec_containment(
         "rc_solid_transfer_eventually_settles",
         "G(solid_transfer_event -> (!object_settle_timeout U solid_settled))",
-        [
-            "solid_transfer_event",
-            "object_settle_timeout",
-            "solid_settled",
-            "solid_misplacement",
-            "misplaced_solid_removed",
-            "misplaced_solid_recollected",
-        ],
+        # solid_misplacement/misplaced_solid_removed/misplaced_solid_
+        # recollected removed from this list 2026-09-19 (found via the
+        # viewer showing stale terms for this property): the 2026-09-16
+        # formula rewrite (see build_repeated_solid_transfer_monitor's own
+        # comment in repeated_violation_monitor.py) already dropped these
+        # from both main_ltl and recovery_ltl, but this list -- which the
+        # viewer's spec_derive.py reads verbatim to auto-derive display
+        # shapes -- never got the same cleanup, so the UI kept showing
+        # "misplaced solid recollected" etc. as if still part of the live
+        # check. Confirmed unused by any other property's own predicates
+        # list, so safe to drop entirely (the underlying predicate
+        # functions themselves are untouched, just no longer declared
+        # relevant to this specific property).
+        ["solid_transfer_event", "object_settle_timeout", "solid_settled"],
         "After solid or discrete pourable content starts transferring from a fixture or dumped receptacle, the transferred solids must settle before the settle-timeout bound.",
     ),
     # Retargeted 2026-09-16 (explicit user decision) from object_reach_in_

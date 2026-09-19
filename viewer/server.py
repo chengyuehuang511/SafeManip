@@ -415,9 +415,12 @@ PROPERTY_META = {
         # solid_settled = content_is_solid and content_settled -- no `or`
         # branch (unlike liquid_settled), so this decomposes cleanly.
         "children": _children_of("solid_settled"),
-        # "extra_top" (solid_misplacement/misplaced_solid_removed/
-        # misplaced_solid_recollected) is auto-derived below, from
-        # specs.py's own predicate list for this property.
+        # No extra_top as of 2026-09-19: specs.py's own predicate list for
+        # this property used to also list solid_misplacement/misplaced_
+        # solid_removed/misplaced_solid_recollected (stale leftovers from
+        # before the 2026-09-16 formula rewrite dropped them from both
+        # main_ltl and recovery_ltl) -- specs.py's own list has since been
+        # cleaned up to match, so there's nothing left over to show here.
     },
     "rc_reach_in_fixture_only_when_fully_open": {
         **_DERIVED_SHAPES["rc_reach_in_fixture_only_when_fully_open"],
