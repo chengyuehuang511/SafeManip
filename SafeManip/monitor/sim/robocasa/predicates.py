@@ -374,6 +374,19 @@ STABLE_PERSISTENCE_FRAMES = 5
 # without reopening the regression the asymmetric detour was working
 # around.
 GRASP_CANDIDATE_PERSISTENCE_FRAMES = 5
+# Reused as-is for contamination's own contact debounce (2026-09-19,
+# explicit user decision -- reconsidered from an initial, separately-named
+# GRASP_CANDIDATE_PERSISTENCE_FRAMES): unlike STABLE_PERSISTENCE_
+# FRAMES above (a genuinely different physical noise source -- velocity/
+# settling jitter, not contact detection), contamination's robot_contact_
+# raw_active/robot_contact_clean reads (see their own comments) go through
+# the exact same MuJoCo bilateral-contact mechanism
+# (env.sim.data.contact/ncon) that this constant already exists to debounce
+# for grasp detection -- the right number of frames to filter a contact-
+# registration dropout is a property of the simulator's contact solver
+# itself, not of which downstream concept happens to consume the contact
+# reading. One shared constant, not two independently-tunable ones that
+# would coincidentally start at the same value.
 SETTLE_TIMEOUT_FRAMES = 100
 # Kept at 100 (2026-09-05, explicit user decision) despite real settle-
 # latency data showing a long tail past it (v14 corpus, 74 instances,
@@ -617,6 +630,7 @@ PREDICATE_FAMILIES = {
         "robot_contact_raw_contaminated",
         "object_is_rte",
         "robot_contact_clean",
+        "robot_contact_clean_sustained",
     ],
     "skill_onset": [
         "gripper_is_closing",
@@ -4495,6 +4509,32 @@ def build_predicate_snapshot(
             return DEFAULT_CONTAMINATION_RADIUS
         _, _, half = aabb
         return float(np.linalg.norm(np.asarray(half, dtype=float)[:2]))
+
+    def _contact_patch_radius_from_geom(geom_id: int | None) -> float | None:
+        # Real contact-patch size (2026-09-19, found via user review:
+        # PackIdenticalLunches ep6/8/9's meat0/meat1 -- chicken drumsticks,
+        # genuinely elongated -- got a 7-8cm contamination radius from
+        # _entity_footprint_radius's whole-object diagonal-XY-half-extent
+        # formula, which is dominated by the drumstick's long axis and gets
+        # applied uniformly in every direction from the contact point,
+        # including the direction the object is actually narrow in (its
+        # real half-width there is only 2.2-3.6cm). Uses the SPECIFIC geom
+        # that was actually touching at this contact (not the whole
+        # object's envelope across all its geoms) via the same true-OBB
+        # _geom_aabb already used for SearingMeat's mesh-distance tie-break
+        # -- for an object modeled as several smaller geoms this is a much
+        # tighter, more physically real "how far does this touch actually
+        # reach" than the whole-body diagonal; for an object with only one
+        # collision geom for its whole body this degrades to roughly the
+        # same thing _entity_footprint_radius already gave, no worse.
+        if geom_id is None:
+            return None
+        obb = _geom_aabb(int(geom_id))
+        if obb is None:
+            return None
+        _, _, half = obb
+        return float(np.linalg.norm(np.asarray(half, dtype=float)[:2]))
+
     object_is_rte = _bool(
         has_active_object and "ready_to_eat" in attrs_by_name.get(obj_name, set())
     )
@@ -4539,6 +4579,7 @@ def build_predicate_snapshot(
         geom_id: int | None,
         source_entity: tuple[str, str] | None = None,
         position: np.ndarray | None = None,
+        source_geom_id: int | None = None,
     ) -> None:
         kind, name = entity
         if position is None or geom_id is None:
@@ -4551,11 +4592,17 @@ def build_predicate_snapshot(
         if body_pos is None:
             return
         local_offset = body_axes.T @ (np.asarray(position, dtype=float) - body_pos)
-        radius = (
-            _entity_footprint_radius(*source_entity)
-            if source_entity is not None
-            else DEFAULT_CONTAMINATION_RADIUS
-        )
+        # Prefer the source's own specific contact-geom radius (tighter,
+        # see _contact_patch_radius_from_geom's own comment) over the
+        # whole-object/whole-gripper footprint; only fall back when the
+        # specific geom's geometry isn't available for some reason.
+        radius = _contact_patch_radius_from_geom(source_geom_id)
+        if radius is None:
+            radius = (
+                _entity_footprint_radius(*source_entity)
+                if source_entity is not None
+                else DEFAULT_CONTAMINATION_RADIUS
+            )
         contaminated_spots.append(
             {
                 "kind": kind,
@@ -4629,25 +4676,25 @@ def build_predicate_snapshot(
                         raw_contact_sources_now.add(entity2[1])
                     if robot_contact_raw_active:
                         contamination_transfer_candidates.append(
-                            (entity1, entity2, geom2, contact_pos)
+                            (entity1, entity2, geom2, contact_pos, geom1)
                         )
                 elif entity2[0] == "robot" and entity1[0] != "robot":
                     if _entity_is_raw_or_contaminated(entity1, contact_pos):
                         raw_contact_sources_now.add(entity1[1])
                     if robot_contact_raw_active:
                         contamination_transfer_candidates.append(
-                            (entity2, entity1, geom1, contact_pos)
+                            (entity2, entity1, geom1, contact_pos, geom2)
                         )
                 elif entity1[0] != "robot" and entity2[0] != "robot":
                     entity1_contaminated = _entity_is_raw_or_contaminated(entity1, contact_pos)
                     entity2_contaminated = _entity_is_raw_or_contaminated(entity2, contact_pos)
                     if entity1_contaminated and not entity2_contaminated:
                         contamination_transfer_candidates.append(
-                            (entity1, entity2, geom2, contact_pos)
+                            (entity1, entity2, geom2, contact_pos, geom1)
                         )
                     if entity2_contaminated and not entity1_contaminated:
                         contamination_transfer_candidates.append(
-                            (entity2, entity1, geom1, contact_pos)
+                            (entity2, entity1, geom1, contact_pos, geom2)
                         )
         raw_contact_surface_sources_now.update(
             name
@@ -4659,8 +4706,15 @@ def build_predicate_snapshot(
     transfer_target = None
     transfer_target_geom = None
     transfer_pos = None
+    transfer_source_geom = None
     if contamination_transfer_candidates:
-        transfer_source, transfer_target, transfer_target_geom, transfer_pos = sorted(
+        (
+            transfer_source,
+            transfer_target,
+            transfer_target_geom,
+            transfer_pos,
+            transfer_source_geom,
+        ) = sorted(
             contamination_transfer_candidates,
             key=lambda item: (
                 _contamination_entity_key(item[0]),
@@ -4682,6 +4736,13 @@ def build_predicate_snapshot(
     # consecutive frames, but that constant is 1, so this is behaviorally
     # unchanged). It stays sticky afterward regardless (only sanitized
     # clears it) -- that part is unrelated to the debounce being removed.
+    # Reconsidered 2026-09-19 (explicit user decision): touching raw food
+    # isn't itself a forbidden/undesirable event the way a clean-object
+    # touch-while-contaminated is (see robot_contact_clean_sustained's own
+    # comment below) -- it's a normal task action -- so there's no
+    # "sustained" analog to apply here the way rc_no_forbidden_contact's
+    # own design only tolerizes the actual undesirable contact, not every
+    # contact leading up to it.
     if raw_contact_candidate is not None:
         robot_contact_raw_active = True
         if not previous_robot_contact_raw_active:
@@ -4727,7 +4788,22 @@ def build_predicate_snapshot(
             clean_check_pos = None
         for name, attrs in attrs_by_name.items():
             name = str(name)
-            if "raw" in attrs or _entity_spot_contaminated("object", name, clean_check_pos):
+            # Object-kind branch switched 2026-09-19 (found via
+            # PackIdenticalLunches ep7: tupperware1 re-grasped at a
+            # different point after an earlier contact near raw meat had
+            # marked only that specific spot contaminated) from the
+            # positional _entity_spot_contaminated to the whole-object
+            # _entity_has_any_contamination -- a small, hand-manipulable
+            # object that has held/touched raw content anywhere on it
+            # should read as contaminated everywhere on it, unlike a large
+            # fixture (a counter, a fridge shelf) where a genuinely clean,
+            # far-away region should still count as safe to touch (that
+            # fixture-kind case, line ~4655, intentionally stays
+            # positional). Without this, grasping the same never-sanitized
+            # container at a new point read as a fresh "clean" contact,
+            # flipping contaminated -> clean with no sanitization ever
+            # having happened.
+            if "raw" in attrs or _entity_has_any_contamination("object", name):
                 continue
             if _pair_matches(
                 geom1, geom2, robot_geom_ids, object_geom_ids_by_name.get(name, set())
@@ -4739,13 +4815,35 @@ def build_predicate_snapshot(
         if robot_contact_clean_objects_now
         else None
     )
-    # No debounce here either -- see above.
+    # robot_contact_clean_sustained (2026-09-19, explicit user decision):
+    # mirrors forbidden_contact_sustained's exact mechanics (see
+    # FORBIDDEN_CONTACT_TOLERANCE_FRAMES's own comment) rather than a
+    # symmetric hysteresis debounce -- a clean-object touch while
+    # contaminated is this property's own version of "forbidden contact,"
+    # so it gets the same design: a brief, incidental touch (a finger
+    # grazing a clean surface while reaching for something else) is
+    # tolerated, not an instant permanent violation, but contact sustained
+    # past the same tolerance this codebase already uses for forbidden
+    # contact still counts. robot_contact_clean itself (the raw, non-
+    # debounced reading) is left available below for anything that wants
+    # the instantaneous touch state; this sustained version is what
+    # actually feeds the property.
+    robot_contact_clean_age = (
+        int(monitor_state.get("robot_contact_clean_age", 0)) + 1
+        if robot_contact_clean_candidate is not None
+        else 0
+    )
+    monitor_state["robot_contact_clean_age"] = robot_contact_clean_age
+    robot_contact_clean_sustained = _bool(
+        robot_contact_clean_age > FORBIDDEN_CONTACT_TOLERANCE_FRAMES
+    )
     if transfer_pair is not None:
         _mark_contaminated(
             transfer_target,
             transfer_target_geom,
             source_entity=transfer_source,
             position=transfer_pos,
+            source_geom_id=transfer_source_geom,
         )
     monitor_state["contaminated_spots"] = contaminated_spots
     robot_contact_clean = _bool(robot_contact_clean_candidate is not None)
@@ -8894,6 +8992,7 @@ def build_predicate_snapshot(
         "robot_contact_raw_contaminated": robot_contact_raw_contaminated,
         "object_is_rte": object_is_rte,
         "robot_contact_clean": robot_contact_clean,
+        "robot_contact_clean_sustained": robot_contact_clean_sustained,
         "gripper_is_closing": gripper_is_closing,
         "gripper_moving_towards_object": gripper_moving_towards_object,
         "gripper_near_object": gripper_near_object,

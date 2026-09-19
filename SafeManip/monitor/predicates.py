@@ -310,6 +310,11 @@ def robot_contact_clean(obj: Any = None, **kwargs) -> bool:
     return _predicate_value("robot_contact_clean", False, **kwargs)
 
 
+def robot_contact_clean_sustained(obj: Any = None, **kwargs) -> bool:
+    obj = _resolve_entity(obj, kwargs)
+    return _predicate_value("robot_contact_clean_sustained", False, **kwargs)
+
+
 # ---------------------------------------------------------------------------
 # Intended-safety onset and preconditions (intended_safety.txt)
 # ---------------------------------------------------------------------------

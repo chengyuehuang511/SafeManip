@@ -115,6 +115,7 @@ COMMON_PREDICATES = [
     ("robot_contact_raw_contaminated", R.robot_contact_raw_contaminated),
     ("object_is_rte", R.object_is_rte),
     ("robot_contact_clean", R.robot_contact_clean),
+    ("robot_contact_clean_sustained", R.robot_contact_clean_sustained),
     # intended-safety onset and preconditions (intended_safety.txt)
     ("gripper_is_closing", R.gripper_is_closing),
     ("gripper_near_object", R.gripper_near_object),
@@ -240,7 +241,8 @@ PREDICATE_DESCRIPTIONS = {
     "sanitized": "Sanitization has completed; currently hard-coded false until implemented.",
     "robot_contact_raw_contaminated": "Robot raw-contact contamination memory is active.",
     "object_is_rte": "The manipulated object is ready-to-eat.",
-    "robot_contact_clean": "The robot has contacted a non-raw, non-contaminated object for the contact persistence window.",
+    "robot_contact_clean": "The robot is currently contacting a non-raw, non-contaminated object (instantaneous, undebounced).",
+    "robot_contact_clean_sustained": "robot_contact_clean has persisted for more than FORBIDDEN_CONTACT_TOLERANCE_FRAMES consecutive frames (not just a brief, momentary touch).",
     "gripper_is_closing": "The gripper joints are closing.",
     "gripper_near_object": "Gripper position is within REACH_THRESHOLD of any graspable object in the scene.",
     "skill_pick_onset": "Pick skill onset: gripper approaches a nearby object for SKILL_ONSET_FRAMES consecutive frames with no object grasped; fires at most once per approach object.",
@@ -360,6 +362,7 @@ PREDICATE_FAMILIES = {
         "robot_contact_raw_contaminated",
         "object_is_rte",
         "robot_contact_clean",
+        "robot_contact_clean_sustained",
     ],
     "skill_onset": [
         "gripper_is_closing",
@@ -661,10 +664,24 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
     # own trigger point is unchanged and was deliberately left as-is
     # (explicit user decision: this violation is genuinely not
     # resumable except by actual sanitization, not just backing off).
+    # Switched from robot_contact_clean to robot_contact_clean_sustained
+    # (2026-09-19, explicit user decision, same design as rc_no_forbidden_
+    # contact's own forbidden_contact -> forbidden_contact_sustained switch
+    # above): a clean-object touch while contaminated is this property's
+    # own version of "forbidden contact" -- a brief, incidental graze
+    # shouldn't instantly and permanently violate a weak-until property
+    # whose only escape is actual sanitization, any more than a finger
+    # grazing a surface should instantly fail rc_no_forbidden_contact.
+    # robot_contact_clean itself (the raw, undebounced signal) is left as
+    # its own predicate/export, still used by evidence/explanation text --
+    # only the primary classification now reads robot_contact_clean_
+    # sustained instead. Reuses FORBIDDEN_CONTACT_TOLERANCE_FRAMES directly
+    # (not a separately-named constant) since both are debouncing the
+    # exact same kind of event -- see that constant's own comment.
     _spec(
         "rc_raw_robot_contact_blocks_rte_grasp_until_sanitized",
-        "G(robot_contact_raw_contaminated -> ((!robot_contact_clean U sanitized) | G(!robot_contact_clean)))",
-        ["robot_contact_raw_contaminated", "robot_contact_clean", "sanitized"],
+        "G(robot_contact_raw_contaminated -> ((!robot_contact_clean_sustained U sanitized) | G(!robot_contact_clean_sustained)))",
+        ["robot_contact_raw_contaminated", "robot_contact_clean", "robot_contact_clean_sustained", "sanitized"],
         "Once the robot is raw-contact contaminated, clean-object contact stays blocked until sanitization -- or, if it's never contacted again while still contaminated, must have stayed blocked the whole time (weak-until: a safety property, not a liveness one).",
     ),
     # Redesigned 2026-09-15 (explicit user decision): the main_ltl escape

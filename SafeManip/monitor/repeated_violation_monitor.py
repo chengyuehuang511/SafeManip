@@ -1664,14 +1664,26 @@ def build_repeated_contamination_monitor(
             # signal (recovery-ltl-design skill, Step 4), matching e.g.
             # rc_dropped_object_was_released's F(object_grasped |
             # object_left_gripper) shape: either it got properly sanitized, or
-            # it at least stopped touching the clean thing (!robot_contact_clean).
-            # The latter doesn't prove the contamination risk was cleared --
-            # recovered/duration_frames here mean "how long until we stopped
-            # watching," not "was this instance saved." Not a tautology (Bug
-            # B): robot_contact_clean is True at the exact trap-confirmation
-            # frame (that's what triggered the violation), so !robot_contact_
-            # clean is guaranteed False there, not trivially True.
-            recovery_ltl="F(sanitized | !robot_contact_clean)",
+            # it at least stopped touching the clean thing. The latter doesn't
+            # prove the contamination risk was cleared -- recovered/
+            # duration_frames here mean "how long until we stopped watching,"
+            # not "was this instance saved."
+            #
+            # Switched from !robot_contact_clean to !robot_contact_clean_
+            # sustained (2026-09-19), same fix build_repeated_forbidden_
+            # contact_monitor's own docstring already applies to forbidden_
+            # contact -> forbidden_contact_sustained: specs.py's primary
+            # formula for this property now reads robot_contact_clean_
+            # sustained, not the raw atom (see that spec's own comment), so
+            # this tracker needs to match -- otherwise every brief, tolerated
+            # graze (not itself a violation any more) would still flicker
+            # this "recovery" signal, decoupling it from what actually
+            # triggers the primary classification. Not a tautology (Bug B):
+            # robot_contact_clean_sustained is True at the exact trap-
+            # confirmation frame (that's what triggers the violation now),
+            # so !robot_contact_clean_sustained is guaranteed False there,
+            # not trivially True.
+            recovery_ltl="F(sanitized | !robot_contact_clean_sustained)",
             property_description=property_description,
             binding={},
             explanation_builder=_contamination_explanation,
