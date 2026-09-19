@@ -495,6 +495,27 @@ SUPPORT_CLUTTER_Z_TOLERANCE = 0.05
 # this grace exists at all), just without inflating the delay as much as
 # reusing the general-purpose 0.05 constant did.
 DUMP_EXIT_GRACE_MARGIN = 0.01
+# Content-tracking ENTRY persistence (2026-09-19, found via LoadDishwasher
+# ep4): unlike exit (which already tolerates a brief solver dropout via
+# DUMP_EXIT_GRACE_MARGIN), entry into `grasped_receptacle_content_names`
+# fired the instant _content_receptacle_overlap read True for even a
+# single frame -- and that raw signal can be genuinely, literally True
+# (real MuJoCo contact, not geometry slop) for an object that is merely
+# being carried *past* another, separately-supported object, not actually
+# resting inside it. Confirmed: `dish1` (a bowl being lowered into its own
+# dishwasher rack slot) physically grazes `dish0` (a cup already resting
+# in the adjacent slot) while descending -- real contact, not a bounding-
+# box-corner artifact (dish1's underside comes within 5.92cm of dish0's
+# rim height, well inside touching range given their actual bboxes). A
+# geometry margin can't fix this: the two situations look geometrically
+# identical at the instant of contact, so no distance threshold separates
+# them -- only whether the contact outlasts a momentary pass-by. Requiring
+# CONTENT_ENTRY_PERSISTENCE_FRAMES consecutive raw-True frames before
+# actually admitting a candidate distinguishes "still touching several
+# frames later" (genuine containment) from "touched once or twice while
+# sweeping past" (incidental). See CHANGES_2026-09-19.md for the
+# before/after on this exact episode.
+CONTENT_ENTRY_PERSISTENCE_FRAMES = 5
 # Fallback contamination-spot radius (2026-09-18) when the contaminating
 # entity's own footprint can't be measured (no AABB available) -- a small,
 # conservative default rather than treating the whole fixture as
@@ -4883,6 +4904,37 @@ def build_predicate_snapshot(
             pick_approach_candidate_object is None
             or _object_is_manipulable(pick_approach_candidate_object)
         )
+        # Added 2026-09-19 (found via LoadDishwasher ep0/2/3, KettleBoiling
+        # ep0/ep9): _gripper_object_distances()/gripper_near_object only
+        # ever consider *objects* as candidates -- a fixture (a door being
+        # closed, a rack being pushed, a stove knob being turned) is never
+        # itself a candidate, so pick onset can only ever misattribute a
+        # fixture-interaction action to whichever object happens to be
+        # nearby, even 20-30cm away, because that's still "the nearest
+        # object" by construction. Confirmed via real fixture joint qvel
+        # data: LoadDishwasher ep2 frame 686 (door_joint qvel -0.29 to
+        # -0.34, rack1_joint -0.08 to -0.13, both moving continuously
+        # through the flagged frame while the "picked" dish1 sat 25cm
+        # away), KettleBoiling ep0 frame 361 and ep9 frame 483 (stove knob
+        # qvel 0.48-0.95, actively being turned, while the "picked" kettle
+        # sat ~25-30cm away). This also overturns this session's earlier
+        # conclusion (docs/predicate_ltl_design/CHANGES_2026-09-19.md) that
+        # KettleBoiling ep9's violation was a genuine near-episode-end
+        # timing edge case -- it's this same misattribution, not a
+        # stability-signal mystery. Uses last frame's raw (non-sticky)
+        # robot-fixture-contact reading -- `robot_fixture_contact_raw` is
+        # computed much later in this same function (needs
+        # `_fixture_geom_map`, itself dependent on env geometry lookups not
+        # yet done at this point in the frame), so referencing this frame's
+        # own value here would be a NameError the same way other forward
+        # references in this file are avoided (see _current_support_
+        # contacts' own comment on _object_is_receptacle/attrs_by_name
+        # timing). A one-frame lag is negligible here: real fixture
+        # manipulation (door/rack/knob) holds nonzero joint velocity for
+        # many consecutive frames in every case above, not a single-frame
+        # blip, so the lagged signal still reliably reflects "was actively
+        # touching a fixture right before this instant."
+        and not _bool(monitor_state.get("robot_fixture_contact_raw", False))
     )
     prev_pick_count = int(monitor_state.get("skill_pick_onset_candidate_count", 0))
     pick_onset_count = prev_pick_count + 1 if pick_onset_cond else 0
@@ -7179,13 +7231,34 @@ def build_predicate_snapshot(
         # target is structurally what content will end up ON, never a
         # thing carried INSIDE the receptacle doing the pouring, so exclude
         # it from ever becoming a tracked content candidate at all.
-        tracked |= {
+        # Entry persistence (2026-09-19) -- see CONTENT_ENTRY_PERSISTENCE_
+        # FRAMES' own comment for the LoadDishwasher ep4 derivation. Keyed
+        # by (receptacle, candidate) pair so switching which object is
+        # `active_object` starts fresh counts, not stale ones from a
+        # different receptacle's pending candidates.
+        entry_pending = monitor_state.setdefault("content_entry_pending", {})
+        pending_for_receptacle = entry_pending.setdefault(str(active_object), {})
+        raw_entry_candidates = {
             str(name)
             for name in all_object_names
             if str(name) != str(active_object)
             and str(name) not in active_target_object_names
             and _content_receptacle_overlap(str(name), str(active_object))
         }
+        newly_qualified = set()
+        for cname in raw_entry_candidates:
+            count = int(pending_for_receptacle.get(cname, 0)) + 1
+            pending_for_receptacle[cname] = count
+            if count >= max(1, int(CONTENT_ENTRY_PERSISTENCE_FRAMES)):
+                newly_qualified.add(cname)
+        for cname in list(pending_for_receptacle.keys()):
+            if cname not in raw_entry_candidates:
+                del pending_for_receptacle[cname]
+        # Stale receptacle keys (no longer active_object anywhere) are
+        # harmless clutter, not a correctness issue -- one dict entry per
+        # object name ever seen as a receptacle, negligible memory, never
+        # read once that receptacle stops being active_object.
+        tracked |= newly_qualified
         still_in: set[str] = set()
         for cname in tracked:
             # allow_geometry_grace=True here only (never for the entry
@@ -8463,6 +8536,10 @@ def build_predicate_snapshot(
     # frames on/off, but that constant is 1, so this is behaviorally
     # unchanged).
     robot_fixture_contact = _bool(_robot_fixture_contact_raw)
+    # Stored for next frame's pick_onset_cond suppression check (2026-09-19)
+    # -- see that condition's own comment for why it must read *last*
+    # frame's value rather than this one.
+    monitor_state["robot_fixture_contact_raw"] = _robot_fixture_contact_raw
 
     # track active fixture across frames; retain last known name when not in contact
     _prev_active_fixture = monitor_state.get("active_fixture_contact_name")
