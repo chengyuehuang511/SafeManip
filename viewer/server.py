@@ -2,7 +2,10 @@
 """
 Standalone viewer server for SafeManip rollout eval results.
 
-No third-party dependencies (stdlib only). Serves:
+Stdlib only, with one deliberate exception: `ijson` (2026-09-18, explicit
+user decision) for streaming just the small fields actually needed out of
+otherwise huge monitor.json files -- see _iter_monitor_violation_property_
+names' own docstring for why. Serves:
   - a static single-page viewer (viewer/static/index.html, app.js, style.css)
   - a small JSON API for browsing tasks/episodes/monitor violations
   - the rollout .mp4 videos themselves, with HTTP Range support so the
@@ -37,6 +40,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, quote
 
+import ijson
 import predicate_derive
 import spec_derive
 
@@ -143,29 +147,25 @@ _VERSION_DIR_RE = re.compile(r"^v(\d+)_")
 # purely narrows what _discover_training_monitor_methods considers, and (via
 # short-circuiting the `and` below, before _version_dir_is_finished ever
 # runs) skips the expensive glob entirely for every excluded version.
-VISIBLE_VERSION_NUMBERS = {19, 20, 21, 24, 25, 26}
+VISIBLE_VERSION_NUMBERS = {19, 20, 21, 24, 25, 26, 27, 28}
 
 
 def _version_dir_is_finished(version_dir):
-    """A vN_.../ dir is only "finished" -- and therefore only shown as a
-    selectable method -- once every episode extract_privileged_from_dataset.py
-    wrote a raw privileged_information_<n>.json for also has its
-    ..._monitor.json sibling (i.e. the monitor pass has caught up with
-    extraction, not still running in the background), and at least one
-    episode exists at all. This is a live, per-call check (see
-    _discover_training_monitor_methods's docstring) specifically so an
-    in-progress run (like a corpus-wide re-extract via SLURM) doesn't show up
-    as a half-populated, confusing method choice while it's still writing --
-    it simply appears the moment the last _monitor.json lands, no server
-    restart needed."""
-    raw_count = 0
-    monitor_count = 0
-    for f in version_dir.glob("*/privileged_information_*.json"):
-        if f.name.endswith("_monitor.json"):
-            monitor_count += 1
-        else:
-            raw_count += 1
-    return raw_count > 0 and raw_count == monitor_count
+    """A vN_.../ dir is shown as a selectable method as soon as at least one
+    episode has a real ..._monitor.json (i.e. the monitor pass has produced
+    at least one real result) -- not gated on the whole corpus-wide sweep
+    completing (2026-09-18, explicit user decision: want to browse an
+    in-progress SLURM re-extract's already-finished episodes immediately,
+    not wait for the last one to land). Episodes whose monitor step hasn't
+    caught up with extraction yet just don't show data yet -- every call
+    site already checks monitor_path.is_file() per episode before reading,
+    so a partially-populated version degrades to "some episodes missing,"
+    not a crash. This is a live, per-call check (see
+    _discover_training_monitor_methods's docstring), so newly-finished
+    episodes appear immediately, no server restart needed."""
+    for f in version_dir.glob("*/privileged_information_*_monitor.json"):
+        return True
+    return False
 
 
 def _discover_training_monitor_methods():
@@ -592,7 +592,16 @@ except Exception:
 
 _raw_info_cache = {}
 _raw_info_lock = threading.Lock()
-_RAW_INFO_CACHE_MAX = 6
+# Was 6 (sized for files described as "run several MB" -- see
+# _load_raw_info_data's own docstring). 2026-09-19: this session's
+# extraction runs now use call_stride=1 across every frame, and raw
+# privileged_information_<N>.json files routinely run 100-500MB each --
+# confirmed the viewer's RSS climbing back toward the OOM range (1.85GB)
+# purely from this cache holding several such files at once during normal
+# browsing. Dropped to 2: still gets a cache hit for "flip back to the
+# episode you just left," without the multi-GB worst case 6 slots of
+# today's file sizes would allow.
+_RAW_INFO_CACHE_MAX = 2
 
 
 # --------------------------------------------------------------------------
@@ -800,6 +809,63 @@ def _property_status_for(mon, property_name):
     return None
 
 
+def _monitor_json_summary(monitor_path, property_filter=None):
+    """Stream just success / num_violated_instances / (optionally) one
+    named property's violated-or-satisfied status out of a monitor.json,
+    via ijson, in a single pass -- without ever materializing the
+    "violations"/"satisfied" arrays as Python objects (see
+    _iter_monitor_violation_property_names' own docstring for why those
+    can be 100+MB each; list_training_episodes calls this once per episode
+    per method, so a full json.loads() here was the other big contributor
+    to the OOM that killed this server once already). "success" and
+    "num_violated_instances" are plain top-level/shallow fields that come
+    *before* "violations"/"satisfied" in every monitor.json this codebase
+    writes (dict insertion order == field-assignment order in
+    run_monitor_on_privileged.py), so the common case (property_filter is
+    None) breaks out of the parse before ever reaching those big arrays at
+    all. Returns (success, num_violated_instances, property_status), where
+    property_status is True/False/None (violated/satisfied/not evaluated),
+    only meaningful when property_filter is given."""
+    success = None
+    num_violated = None
+    property_status = None
+    want_scalars = {"replay_summary.success", "num_violated_instances"}
+    found_scalars = set()
+    try:
+        with open(monitor_path, "rb") as f:
+            for prefix, event, value in ijson.parse(f):
+                if prefix in want_scalars and event in (
+                    "string",
+                    "number",
+                    "boolean",
+                    "null",
+                ):
+                    if prefix == "replay_summary.success":
+                        success = value
+                    elif prefix == "num_violated_instances":
+                        num_violated = value
+                    found_scalars.add(prefix)
+                elif property_filter is not None and event == "string":
+                    if (
+                        prefix == "violations.item.property_name"
+                        and value == property_filter
+                    ):
+                        property_status = True
+                    elif (
+                        prefix == "satisfied.item.property_name"
+                        and value == property_filter
+                    ):
+                        property_status = False
+                if len(found_scalars) == len(want_scalars) and (
+                    property_filter is None or property_status is not None
+                ):
+                    break
+    except Exception:
+        pass
+    return success, num_violated, property_status
+    return None
+
+
 def list_training_episodes(task, property_filter=None, annotator=None, verdict_filter=None):
     """`property_filter`: if given, every returned num_violations/success
     pair is scoped to that single named LTL property instead of the
@@ -857,20 +923,17 @@ def list_training_episodes(task, property_filter=None, annotator=None, verdict_f
             monitor_path = method_info["dir"] / task / f"privileged_information_{ep}_monitor.json"
             if not monitor_path.is_file():
                 continue
-            try:
-                mon = json.loads(monitor_path.read_text())
-                m_success = (mon.get("replay_summary") or {}).get("success")
-                if property_filter:
-                    status = _property_status_for(mon, property_filter)
-                    # 1/0/None (violated/satisfied/not-evaluated), not a
-                    # count, but kept as an int|None so the frontend's
-                    # existing "truthy -> viol badge" rendering still works
-                    # unchanged for the single-property case.
-                    m_num_violations = 1 if status is True else (0 if status is False else None)
-                else:
-                    m_num_violations = mon.get("num_violated_instances")
-            except Exception:
-                continue
+            m_success, m_total_violations, status = _monitor_json_summary(
+                monitor_path, property_filter=property_filter or None
+            )
+            if property_filter:
+                # 1/0/None (violated/satisfied/not-evaluated), not a
+                # count, but kept as an int|None so the frontend's
+                # existing "truthy -> viol badge" rendering still works
+                # unchanged for the single-property case.
+                m_num_violations = 1 if status is True else (0 if status is False else None)
+            else:
+                m_num_violations = m_total_violations
             entry["methods"][method_key] = {"success": m_success, "num_violations": m_num_violations}
             if method_key == _default_method:
                 entry["success"] = m_success
@@ -902,6 +965,38 @@ def list_training_episodes(task, property_filter=None, annotator=None, verdict_f
         episodes.append(entry)
     episodes.sort(key=lambda e: e["episode"])
     return episodes
+
+
+def _iter_monitor_violation_property_names(monitor_path):
+    """Stream just the (index, property_name) pairs out of a monitor.json's
+    top-level "violations" array, via ijson, instead of json.loads()'ing
+    the whole file.
+
+    Found 2026-09-18: a violated property's own entry embeds a full
+    "original"/"repeated" evaluation trace (repeated_violation_monitor.py's
+    own per-frame history/repeated_violation_episodes, deep-copied) --
+    confirmed on PackIdenticalLunches ep2, where "violations" alone was
+    161MB of a 349MB file (vs. 3.7MB for "satisfied", which carries no such
+    trace). training_violation_counts calls this once per episode across
+    an entire corpus (up to 500 files) purely to tally property_name
+    counts -- json.loads()'ing the full nested trace for every single
+    episode just to read one string field per violation is exactly what
+    OOM-killed this server once already. ijson streams through the file
+    without ever materializing those embedded traces as Python objects,
+    since the extraction path (violations.item.property_name) is a leaf,
+    not the surrounding violation object -- only the small string values it
+    actually points to get built. Order-preserving (ijson emits array
+    items in document order), so the yielded index still matches the
+    original violations list position for annotation lookups.
+    """
+    try:
+        with open(monitor_path, "rb") as f:
+            for idx, prop in enumerate(
+                ijson.items(f, "violations.item.property_name")
+            ):
+                yield idx, prop
+    except Exception:
+        return
 
 
 def training_violation_counts(method, annotator=None):
@@ -943,12 +1038,7 @@ def training_violation_counts(method, annotator=None):
             monitor_path = task_dir / f"privileged_information_{ep}_monitor.json"
             if not monitor_path.is_file():
                 continue
-            try:
-                mon = json.loads(monitor_path.read_text())
-            except Exception:
-                continue
-            for idx, v in enumerate(mon.get("violations") or []):
-                prop = v.get("property_name")
+            for idx, prop in _iter_monitor_violation_property_names(monitor_path):
                 if not prop:
                     continue
                 task_by_property[prop] = task_by_property.get(prop, 0) + 1
@@ -1284,7 +1374,19 @@ def compute_occurrences(meta, traces, active_object_by_frame, episode_last_frame
             first = _first_frame_with_value(trig, True)
             starts = [first] if first is not None else []
         obl_dict = dict(obl) if obl is not None else {}
-        res_dict = dict(res) if res is not None else {}
+        # resolve_kind (2026-09-19): "negated" means the ltl string's
+        # resolve atom is wrapped in "!" (e.g.
+        # rc_grasp_remains_synced_until_dropped's "!object_grasped_raw") --
+        # invert the trace's own values here so every downstream consumer
+        # can keep checking "is this frame's resolve value True" without
+        # needing to know about the negation itself. Absent for shapes
+        # whose regex has no resolve-negation group at all (_UNTIL_RE,
+        # _UNTIL_WITH_UNTIL_ESCAPE_RE) -- defaults to "as_is", unchanged
+        # values, same as before this field existed.
+        if res is not None and meta.get("resolve_kind") == "negated":
+            res_dict = {f: (not v) for f, v in dict(res).items()}
+        else:
+            res_dict = dict(res) if res is not None else {}
         # hold_true (e.g. object_grasped_safe) breaks on going False;
         # guard_false (e.g. a *_settle_timeout flag) breaks on going True.
         bad_value = meta["obligation_kind"] != "hold_true"
@@ -2858,12 +2960,7 @@ def libero_training_violation_counts(base_dir, annotator=None):
             monitor_path = task_dir / f"privileged_information_{ep}_monitor.json"
             if not monitor_path.is_file():
                 continue
-            try:
-                mon = json.loads(monitor_path.read_text())
-            except Exception:
-                continue
-            for idx, v in enumerate(mon.get("violations") or []):
-                prop = v.get("property_name")
+            for idx, prop in _iter_monitor_violation_property_names(monitor_path):
                 if not prop:
                     continue
                 task_by_property[prop] = task_by_property.get(prop, 0) + 1

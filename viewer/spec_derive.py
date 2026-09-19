@@ -38,8 +38,15 @@ _UNTIL_RE = re.compile(r"^G\(\s*(\w+)\s*->\s*\(\s*(!?)\s*(\w+)\s*U\s*(\w+)\s*\)\
 # downstream change is needed -- this regex just recognizes the shape.
 # Group 2/3 (the until's own negation+obligation) are backreferenced in the
 # trailing G(...) to require it wrap the *same* obligation atom.
+# 2026-09-19: resolve side (group 5) also allows an optional leading "!"
+# (group 4) -- e.g. rc_grasp_remains_synced_until_dropped's current main_ltl
+# "G(object_grasped -> ((object_sync U !object_grasped_raw) |
+# G(object_sync)))", where the resolve target is a LEVEL predicate negated
+# in place, not a bare edge atom (see specs.py's own comment above that
+# property for why). Previously only the obligation side (group 2) could be
+# negated.
 _WEAK_UNTIL_RE = re.compile(
-    r"^G\(\s*(\w+)\s*->\s*\(\s*\(\s*(!?)\s*(\w+)\s*U\s*(\w+)\s*\)\s*\|\s*G\(\s*\2\s*\3\s*\)\s*\)\s*\)$"
+    r"^G\(\s*(\w+)\s*->\s*\(\s*\(\s*(!?)\s*(\w+)\s*U\s*(!?)\s*(\w+)\s*\)\s*\|\s*G\(\s*\2\s*\3\s*\)\s*\)\s*\)$"
 )
 _INSTANT_RE = re.compile(r"^G\(\s*(\w+)\s*->\s*(\w+)\s*\)$")
 # "instant, but with an eventually-escape" -- e.g.
@@ -140,13 +147,14 @@ def parse_ltl_shape(ltl: str) -> dict | None:
         }
     m = _WEAK_UNTIL_RE.match(ltl)
     if m:
-        trigger, neg, obligation, resolve = m.groups()
+        trigger, neg, obligation, resolve_neg, resolve = m.groups()
         return {
             "pattern": "until",
             "trigger": trigger,
             "obligation": obligation,
             "obligation_kind": "guard_false" if neg == "!" else "hold_true",
             "resolve": resolve,
+            "resolve_kind": "negated" if resolve_neg == "!" else "as_is",
         }
     m = _UNTIL_RE.match(ltl)
     if m:
