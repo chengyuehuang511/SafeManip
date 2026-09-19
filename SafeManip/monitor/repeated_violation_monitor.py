@@ -1442,15 +1442,25 @@ def build_repeated_grasp_sync_monitor(
 
     recovery_ltl's escape covers *both* ways this specific desync episode
     can honestly end: resynced (object_sync) or the grasp itself ended
-    (object_dropped) -- covering only the former left desync-then-drop (no
-    resync first) with no path back to recovery at all, since object_sync
-    can't be guaranteed to ever read True again once the object is no
-    longer held."""
+    (!object_grasped_raw) -- covering only the former left desync-then-drop
+    (no resync first) with no path back to recovery at all, since
+    object_sync can't be guaranteed to ever read True again once the
+    object is no longer held. Uses !object_grasped_raw (a level), not the
+    shared debounced object_dropped (an edge) (2026-09-19, explicit user
+    decision, revised same day from an initial object_dropped_raw edge
+    attempt) -- same reasoning as main_ltl's own switch, see specs.py's
+    comment above rc_grasp_remains_synced_until_dropped: an edge-based raw
+    target can only satisfy F(...) using the single frame it fires, and if
+    a later frame's own re-evaluation needs a fresh resolution (as can
+    happen inside a recovery window spanning several frames) there's no
+    second pulse to find. A level predicate has no such limitation --
+    "raw grasp currently absent" stays true for as long as the object is
+    genuinely gone, resolvable from any frame in that span."""
     return RepeatedViolationMonitor(
         RepeatedViolationMonitorConfig(
             property_name="rc_grasp_remains_synced_until_dropped",
             main_ltl=_spec_main_ltl("rc_grasp_remains_synced_until_dropped"),
-            recovery_ltl="G(object_grasped & !object_sync -> F(object_sync | object_dropped))",
+            recovery_ltl="G(object_grasped & !object_sync -> F(object_sync | !object_grasped_raw))",
             property_description=property_description,
             binding={},
             explanation_builder=_grasp_sync_explanation,

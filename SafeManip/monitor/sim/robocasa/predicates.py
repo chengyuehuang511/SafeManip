@@ -244,18 +244,25 @@ def _obb_xy_distance(a, b) -> float:
 
 
 def _obb_point_xy_distance(point: np.ndarray, obb) -> float:
-    center, axes, half = obb
+    # 2026-09-18: was clamping the query point's LOCAL X/Y (the box's own
+    # axes) to the box's half-extents while leaving local Z entirely
+    # unclamped, then measuring only the WORLD X/Y of the resulting gap.
+    # That shortcut is only valid when the box's local Z roughly matches
+    # world Z (an upright object/fixture) -- "ignore local Z" then really
+    # does mean "ignore world height, compare horizontal position only."
+    # For a tipped-over object (a fallen distractor prop, confirmed via
+    # SteamInMicrowave ep3's "distr_counter_1" shrimp: its own local Z axis
+    # was nearly aligned with WORLD Y, not world Z), the unclamped local-Z
+    # component silently absorbs most of the real-world horizontal gap
+    # into the axis being ignored, so a genuinely ~27cm-away object
+    # measured as within a 1cm proximity margin. Use the box's true
+    # world-frame axis-aligned envelope instead -- correct regardless of
+    # rotation, since it's derived from the OBB's real corners, not from
+    # an assumption about which local axis is "up."
+    lower, upper = _obb_world_envelope(obb)
     point = np.asarray(point, dtype=float).reshape(3)
-    local = axes.T @ (point - center)
-    clamped_local = np.array(
-        [
-            float(np.clip(local[0], -half[0], half[0])),
-            float(np.clip(local[1], -half[1], half[1])),
-            local[2],
-        ]
-    )
-    closest = center + axes @ clamped_local
-    return float(np.linalg.norm(point[:2] - closest[:2]))
+    clamped_xy = np.clip(point[:2], lower[:2], upper[:2])
+    return float(np.linalg.norm(point[:2] - clamped_xy))
 
 
 def _obb_closest_point_on_top_face(point: np.ndarray, obb) -> np.ndarray:
@@ -327,6 +334,46 @@ PERSISTENCE_FRAMES = 5
 # to False, not re-introducing the rising-edge lag that caused the v25
 # regression.
 STABLE_PERSISTENCE_FRAMES = 5
+# Added 2026-09-19 (explicit user decision), found via PortionHotDogs ep6:
+# a real, if brief, bilateral-contact registration against an object the
+# hand isn't actually intentionally grasping (a stray brush against a
+# bowl's rim while transiting from one pick to the next) flipped
+# grasp_candidate to "bowl" for exactly 2 frames, sandwiched between an
+# approach to hotdog_bun2 and a genuine grasp of sausage1 -- with nothing
+# actually grasped either before or after. That spurious 2-frame
+# active_object="bowl" reading was enough to run the whole dump/content-
+# tracking pipeline against the bowl and spuriously fire a dump onset.
+# This disproves the 2026-09-08 removal comment's assumption that
+# _object_is_grasped's bilateral-contact requirement alone had already
+# eliminated this flicker at the raw-signal level. Raised from 3 to 5 same
+# day (explicit user decision): a candidate (including None) must hold
+# for 5 consecutive frames before being accepted -- comfortably past the
+# confirmed 2-frame blip, with extra margin, while still short relative
+# to how long a genuine, sustained grasp actually lasts.
+#
+# Symmetric (both directions), settled 2026-09-19 after two false starts
+# the same day: an asymmetric version (instant on the way to None) was
+# tried, since a symmetric one initially caused a false
+# rc_grasp_remains_synced_until_dropped violation (ArrangeBreadBasket ep0,
+# BreadSelection ep0 -- a genuinely slipping-then-dropped object stayed
+# "accepted" as grasped past the point object_sync correctly detected the
+# real slip). But the asymmetric version left the ORIGINAL problem this
+# debounce exists for unfixed in the release direction too: a spurious
+# one-frame drop while genuinely still held (WashLettuce ep1/4/8,
+# DeliverStraw ep2 -- object_dropped pulsing True for exactly one frame
+# with gripper-object distance staying at 0.0 throughout, a bare
+# contact-registration dropout, not a real release) was still accepted
+# instantly as a real drop. The actual fix for the ArrangeBreadBasket/
+# BreadSelection regression was narrower and didn't require relaxing this
+# debounce at all: rc_grasp_remains_synced_until_dropped now uses its own
+# undebounced object_grasped_raw LEVEL predicate (negated, "!object_grasped_
+# raw") as its "until" target (see specs.py's comment above that property
+# for why a level, not an edge) instead of the shared, debounced
+# object_dropped -- so this debounce can stay fully symmetric and protect
+# both the PortionHotDogs and WashLettuce/DeliverStraw directions at once,
+# without reopening the regression the asymmetric detour was working
+# around.
+GRASP_CANDIDATE_PERSISTENCE_FRAMES = 5
 SETTLE_TIMEOUT_FRAMES = 100
 # Kept at 100 (2026-09-05, explicit user decision) despite real settle-
 # latency data showing a long tail past it (v14 corpus, 74 instances,
@@ -381,7 +428,10 @@ SETTLE_TIMEOUT_FRAMES = 100
 # more conservative choice this time. Lowered same day (explicit user
 # decision) from 50 to 20 -- still well above the 2->8 raise's
 # evidence-grounded floor, but less conservative than the untested 50.
-SKILL_ONSET_FRAMES = 20
+# Lowered again 2026-09-19 (explicit user decision) from 20 to 10, as
+# part of the v28 iteration goal (verify pick/place/dump onsets against
+# the full corpus with a shorter approach-persistence window).
+SKILL_ONSET_FRAMES = 10
 # Tolerance for rc_no_forbidden_contact, redesigned 2026-09-03 from a strict
 # zero-tolerance invariant (G(!forbidden_contact)) into a bounded-recovery
 # one (G(!forbidden_contact_sustained), see forbidden_contact_sustained
@@ -431,6 +481,20 @@ PLACEMENT_PROXIMITY_MARGIN = 0.01
 PATH_OBSTRUCTION_OVERLAP_ALLOWANCE = 0.05
 CLUTTER_THRESHOLD = 2
 SUPPORT_CLUTTER_Z_TOLERANCE = 0.05
+# Separate, smaller margin (2026-09-18, explicit user decision) for
+# _content_receptacle_overlap's exit-grace check specifically -- kept
+# distinct from SUPPORT_CLUTTER_Z_TOLERANCE (which stays 0.05 for its
+# other, unrelated uses: support-geometry gap tolerance, clutter-height
+# checks) because the exit-grace margin directly delays dump-onset
+# detection by however many frames it takes real content to travel this
+# extra distance past the receptacle's raw box (confirmed systematically
+# via a PanTransfer v26-vs-v27 comparison: a ~10-20 frame onset delay,
+# consistent with the 0.05 margin, across nearly every episode). Smaller
+# than SUPPORT_CLUTTER_Z_TOLERANCE on purpose -- still enough to bridge a
+# single-frame MuJoCo contact-registration dropout (the original reason
+# this grace exists at all), just without inflating the delay as much as
+# reusing the general-purpose 0.05 constant did.
+DUMP_EXIT_GRACE_MARGIN = 0.01
 # Fallback contamination-spot radius (2026-09-18) when the contaminating
 # entity's own footprint can't be measured (no AABB available) -- a small,
 # conservative default rather than treating the whole fixture as
@@ -513,6 +577,7 @@ PREDICATE_FAMILIES = {
         "object_upright",
         "object_grasped_safe",
         "object_dropped",
+        "object_grasped_raw",
         "object_left_gripper",
         "object_released",
         "object_supported",
@@ -1146,6 +1211,61 @@ def build_predicate_snapshot(
         best = None
         for gid in gripper_geom_ids:
             for oid in object_geom_ids:
+                try:
+                    dist = float(mujoco.mj_geomDistance(m, d, int(gid), int(oid), distmax, fromto))
+                except Exception:
+                    continue
+                if best is None or dist < best:
+                    best = dist
+                if best <= 0.0:
+                    return best
+        return best
+
+    def _entity_geom_ids_no_regions(kind: str, name: str) -> set[int]:
+        ids = _object_geom_ids(name) if kind == "object" else _fixture_geom_ids_by_names({name})
+        out = set()
+        for gid in ids:
+            try:
+                geom_name = str(env.sim.model.geom_id2name(int(gid)) or "")
+            except Exception:
+                geom_name = ""
+            if "_reg_" not in geom_name:
+                out.add(gid)
+        return out
+
+    def _entity_pair_geom_min_distance(
+        a_kind: str, a_name: str, b_kind: str, b_name: str, distmax: float
+    ) -> float | None:
+        """Real minimum mesh/collision-geom distance between two entities
+        (each either an object or a fixture), via MuJoCo's own
+        mj_geomDistance -- same technique as
+        _gripper_object_geom_min_distance, generalized here (2026-09-19)
+        for _infer_support's tie-break: when multiple support candidates
+        tie on (priority, xy_dist, -support_z) -- confirmed via
+        SearingMeat ep9, two adjacent fixtures (a stove and counter
+        sharing a border) both independently satisfying genuine
+        XY-footprint containment for the same object position, since
+        their own computed footprints slightly overlap near the shared
+        edge -- falling through to plain alphabetical name comparison has
+        no physical grounding at all. Real collision-geom distance does.
+        Excludes region/zone marker geoms (RoboCasa's "_reg_" naming
+        convention), same reasoning as _gripper_object_geom_min_distance's
+        own exclusion -- these mark interior/zone volumes for containment
+        checks, not real collision surfaces, and mj_geomDistance doesn't
+        know the difference."""
+        try:
+            m = env.sim.model._model
+            d = env.sim.data._data
+        except Exception:
+            return None
+        a_ids = _entity_geom_ids_no_regions(a_kind, a_name)
+        b_ids = _entity_geom_ids_no_regions(b_kind, b_name)
+        if not a_ids or not b_ids:
+            return None
+        fromto = np.zeros(6)
+        best = None
+        for gid in a_ids:
+            for oid in b_ids:
                 try:
                     dist = float(mujoco.mj_geomDistance(m, d, int(gid), int(oid), distmax, fromto))
                 except Exception:
@@ -2064,6 +2184,28 @@ def build_predicate_snapshot(
                 continue
         return False
 
+    def _object_xy_contains(container_name: str, point) -> bool:
+        """Is `point` within container_name's own horizontal (local-XY)
+        footprint -- mirrors _fixture_xy_contains' exact logic for
+        object-kind receptacles (2026-09-19, found via SeparateFreezerRack
+        ep1: OU.check_obj_in_receptacle's own contact + 70%-of-horizontal-
+        radius test is a circle around the receptacle's center, not its
+        real rectangular footprint, so two adjacent tupperwares sitting
+        next to each other on a shared rack can satisfy it even though
+        neither is genuinely inside the other -- confirmed:
+        'meat_tupperware' got tracked as content of 'veg_tupperware' for 8
+        frames purely from sitting nearby while veg_tupperware was picked
+        up, then spuriously "departed" as the real separation grew,
+        firing a false dump onset in the middle of a plain pick). Returns
+        True (fail open) if the container's own geometry isn't available,
+        matching this file's usual convention for missing geometry."""
+        container_aabb = _object_aabb(str(container_name))
+        if container_aabb is None:
+            return True
+        c_center, c_axes, c_half = container_aabb
+        local_xy = (c_axes.T @ (np.asarray(point, dtype=float) - c_center))[:2]
+        return bool(abs(local_xy[0]) <= c_half[0] and abs(local_xy[1]) <= c_half[1])
+
     def _current_support_contacts(name: str) -> tuple[set[str], set[str]]:
         fixture_contacts = set()
         object_contacts = set()
@@ -2135,11 +2277,20 @@ def build_predicate_snapshot(
         # intersection is a strictly more reliable signal of real touching/
         # containment than a world-Z ordering test ever was, rotating
         # candidate or not.
+        name_pos = _object_position(str(name))
         for other_name in getattr(env, "objects", {}).keys():
             other_name = str(other_name)
             if other_name == str(name):
                 continue
             if not _is_plausible_support_object(other_name):
+                continue
+            # Require genuine containment within the candidate's own
+            # horizontal footprint (2026-09-19), not just contact/proximity
+            # -- see _object_xy_contains' own comment for the full
+            # SeparateFreezerRack derivation. Fails open (skips the gate)
+            # if name's own position isn't available, matching this file's
+            # usual convention for missing geometry.
+            if name_pos is not None and not _object_xy_contains(other_name, name_pos):
                 continue
             try:
                 if OU.check_obj_in_receptacle(env, name, other_name):
@@ -3393,6 +3544,53 @@ def build_predicate_snapshot(
         state["count"] = count
         return current
 
+    def _persistent_grasp_candidate(raw_candidate: str | None) -> str | None:
+        """Symmetric debounce for the raw grasp candidate (2026-09-19,
+        explicit user decision, restored after an asymmetric detour the
+        same day) -- see GRASP_CANDIDATE_PERSISTENCE_FRAMES' own comment
+        for the full derivation. The currently-accepted candidate
+        (including None) only changes once the SAME new raw candidate has
+        held for GRASP_CANDIDATE_PERSISTENCE_FRAMES consecutive frames --
+        this absorbs BOTH a spurious wrong-object blip (PortionHotDogs ep6:
+        "bowl" appearing for 2 frames while transiting between two real
+        picks) AND a spurious one-frame drop while genuinely still held
+        (WashLettuce ep1/4/8, DeliverStraw ep2: object_dropped pulsing
+        True for exactly one frame with the gripper-object distance
+        staying at 0.0 the whole time, a bare contact-registration
+        dropout, not a real release).
+
+        An asymmetric version (instant on the way to None) was tried
+        first, then reverted the same day: it fixed PortionHotDogs but
+        left the WashLettuce/DeliverStraw direction exactly as broken as
+        before, and separately caused a NEW regression (ArrangeBreadBasket
+        ep0, BreadSelection ep0: a genuinely slipping-then-dropped object
+        registered a false rc_grasp_remains_synced_until_dropped
+        violation) for the unrelated reason that object_dropped -- used
+        directly as that property's own "until" target -- also inherited
+        this debounce's lag. The real fix for that regression is to give
+        rc_grasp_remains_synced_until_dropped its own undebounced "until"
+        target (object_dropped_raw, computed from raw_object_grasped
+        below) instead of relaxing this debounce -- see object_dropped_raw's
+        own comment. With that in place, this debounce can stay fully
+        symmetric and protect both directions at once."""
+        state = monitor_state.setdefault(
+            "grasp_candidate_debounce", {"value": None, "pending": None, "count": 0}
+        )
+        accepted = state.get("value")
+        if raw_candidate == accepted:
+            state["pending"] = raw_candidate
+            state["count"] = 0
+            return accepted
+        pending = state.get("pending")
+        count = int(state.get("count", 0)) + 1 if raw_candidate == pending else 1
+        state["pending"] = raw_candidate
+        state["count"] = count
+        if count >= max(1, int(GRASP_CANDIDATE_PERSISTENCE_FRAMES)):
+            state["value"] = raw_candidate
+            state["count"] = 0
+            return raw_candidate
+        return accepted
+
     def _persistent_stable_after_event(
         key: str,
         raw_value: bool,
@@ -3522,13 +3720,46 @@ def build_predicate_snapshot(
     # bookkeeping for an object that was never actually released at all.
     # grasp_candidate is now always the real, directly-grasped object, no
     # substitution.
-    grasp_candidate = sorted(grasped_names)[0] if grasped_names else None
-    # No debounce: object_grasped tracks the raw grasp candidate directly.
-    # This used to require OBJECT_GRASPED_PERSISTENCE_FRAMES consecutive
-    # frames on both the rising and falling edge, to absorb flicker from the
-    # old aggregate-contact grasp check. That flicker source is now fixed at
-    # the raw-signal level (bilateral contact, see _object_is_grasped), so
-    # the debounce is no longer needed.
+    raw_grasp_candidate = sorted(grasped_names)[0] if grasped_names else None
+    # object_grasped_raw (2026-09-19, explicit user decision): the
+    # undebounced LEVEL reading of the raw grasp signal, used only as
+    # rc_grasp_remains_synced_until_dropped's own "until" target (see
+    # specs.py, "!object_grasped_raw") instead of the shared, debounced
+    # object_dropped. That property's antecedent (object_grasped) can
+    # safely stay on the fully symmetric debounced signal (see
+    # GRASP_CANDIDATE_PERSISTENCE_FRAMES' own comment for why symmetric is
+    # correct everywhere else) as long as its own "until" resolves at the
+    # TRUE separation instant, not delayed by the debounce -- a genuinely
+    # slipping-then-dropped object (ArrangeBreadBasket ep0, BreadSelection
+    # ep0) needs object_sync's obligation to close exactly when real
+    # separation happens, or the real, ongoing slip gets misclassified as
+    # a violation of an obligation that should have already ended.
+    #
+    # A LEVEL, not an EDGE, deliberately (revised same day from an initial
+    # edge-based object_dropped_raw that pulsed only on the single frame
+    # raw grasp first turned False): an edge can only resolve the "until"
+    # at the one instant it fires; if the debounced antecedent stays True
+    # for even a couple of frames past that instant (exactly what happens
+    # here, since the debounce is genuinely absorbing the same real,
+    # sustained separation, not a spurious blip), the "until" re-evaluated
+    # from those later frames has no future edge left to resolve on, and
+    # degenerates to requiring sync to hold *forever* afterward --
+    # confirmed via ArrangeBreadBasket ep0: raw grasp genuinely, sustainedly
+    # dropped starting frame 486 (5 consecutive raw-None frames, matching
+    # GRASP_CANDIDATE_PERSISTENCE_FRAMES, before the debounced signal
+    # caught up at 490); object_dropped_raw's one pulse at 486 was already
+    # "used up" by the time a real, brief desync happened at 488, causing a
+    # false violation. A level predicate has no such single-use limitation
+    # -- "raw grasp currently absent" stays true continuously through 486-
+    # 490+, so the until can resolve using *any* frame in that window, not
+    # just the first one.
+    raw_object_grasped = _bool(raw_grasp_candidate is not None)
+    # Debounced (2026-09-19, explicit user decision, reversing the
+    # 2026-09-08 removal) -- see GRASP_CANDIDATE_PERSISTENCE_FRAMES' own
+    # comment: that removal's assumption (bilateral contact alone already
+    # eliminated flicker) is disproven by a confirmed 2-frame spurious
+    # candidate blip (PortionHotDogs ep6).
+    grasp_candidate = _persistent_grasp_candidate(raw_grasp_candidate)
     object_grasped = _bool(grasp_candidate is not None)
     grasped_object = grasp_candidate if object_grasped else None
     monitor_state["object_grasp_candidate"] = grasp_candidate
@@ -4716,6 +4947,22 @@ def build_predicate_snapshot(
     # the gripper on the previous frame, so obj_name/active_object hasn't
     # had a chance to drift to anything else yet.
     place_onset_object = obj_name
+    # Re-tried 2026-09-19 (explicit user decision) OR-ing object_released
+    # back in as a fast-path trigger, on the theory that the original
+    # 2026-09-17 regression might have been confounded by the (separately
+    # real) grasp-candidate flicker bugs fixed the same day. Re-verified
+    # against real frame-by-frame onset timing (not just aggregate
+    # violation counts, which is what missed this the first time) and
+    # confirmed the original finding still holds, unrelated to grasp
+    # debounce entirely: object_released fires multiple genuinely
+    # premature, spurious extra onsets ahead of the real
+    # object_left_gripper_edge-based one, for the very same place action
+    # -- e.g. LoadDishwasher ep4: object_released produced onsets at
+    # [172, 279, 291, 550] vs. object_left_gripper_edge alone's correct
+    # [291, 551]; the same 1-2-extra-early-onset pattern reproduced on
+    # every other episode checked (MakeIceLemonade, HeatKebabSandwich,
+    # SteamInMicrowave, SearingMeat). object_left_gripper_edge alone
+    # remains the single correct trigger.
     place_onset_cond = object_left_gripper_edge
     prev_place_count = int(monitor_state.get("skill_place_onset_candidate_count", 0))
     place_onset_count = prev_place_count + 1 if place_onset_cond else 0
@@ -5038,7 +5285,30 @@ def build_predicate_snapshot(
 
         if not candidates:
             return None, None
-        _, _, _, best_kind, best_sname = sorted(candidates)[0]
+        candidates.sort()
+        best_priority, best_xy_dist, best_neg_z, best_kind, best_sname = candidates[0]
+        tied = [
+            c
+            for c in candidates
+            if (c[0], c[1], c[2]) == (best_priority, best_xy_dist, best_neg_z)
+        ]
+        if len(tied) > 1:
+            # Break ties on real mesh/collision-geom distance (2026-09-19,
+            # explicit user decision), not plain alphabetical name
+            # comparison -- see _entity_pair_geom_min_distance's own
+            # docstring for the full SearingMeat ep9 derivation. Only
+            # computed among already-tied candidates, not eagerly for
+            # every candidate every frame, to keep the common (non-tied)
+            # case just as cheap as before.
+            def _tie_break_key(entry):
+                _, _, _, kind, sname = entry
+                dist = _entity_pair_geom_min_distance(
+                    "object", str(obj_name), kind, sname, distmax=0.5
+                )
+                return dist if dist is not None else float("inf")
+
+            tied.sort(key=_tie_break_key)
+            best_kind, best_sname = tied[0][3], tied[0][4]
         return best_kind, best_sname
 
     def _spos(kind: str | None, sname: str | None) -> np.ndarray | None:
@@ -5221,7 +5491,29 @@ def build_predicate_snapshot(
         # invented -- reuse it here: if the object's position matches a real
         # interior support region of this fixture, it's resting on/in a
         # proper storage surface, not the structural body, so food is fine.
+        #
+        # Fixed 2026-09-18 (found via RecycleBottlesByType, 10/10 episodes):
+        # this "must be on a real interior support region" restriction was
+        # applied unconditionally to every fixture kind, but a plain
+        # Counter/Island has no interior-support-region concept at all --
+        # it's a single flat, open work surface, not something with a
+        # structural-body/interior-storage distinction the way a cabinet or
+        # fridge has. That made _fixture_interior_support_aabb return None
+        # for a bottle resting directly on a normal countertop, and the
+        # whole "food on structural fixture body" restriction fired for
+        # completely ordinary counter placement. _STRUCTURAL_FIXTURE_CLASSES
+        # (defined just above) already exists to name exactly the fixture
+        # kinds that genuinely have this distinction -- it was declared but
+        # never actually consulted here. Only apply the interior-support-
+        # region restriction when the fixture's own class is one of those;
+        # any other fixture kind (counter, island, table, stove, sink, ...)
+        # has no structural-body/interior split to enforce, so food resting
+        # anywhere on it is fine.
         if sup_name is not None:
+            fixture = _fixture_by_name(str(sup_name))
+            fixture_class = fixture.__class__.__name__ if fixture is not None else ""
+            if fixture_class not in _STRUCTURAL_FIXTURE_CLASSES:
+                return True
             obj_pos = _object_position(str(obj_name))
             if obj_pos is not None and _fixture_interior_support_aabb(
                 str(sup_name), obj_pos=obj_pos
@@ -6811,7 +7103,7 @@ def build_predicate_snapshot(
         receptacle_aabb = _object_aabb(str(receptacle_name))
         if content_aabb is None or receptacle_aabb is None:
             return False
-        # Expanded by SUPPORT_CLUTTER_Z_TOLERANCE, not shrunk (revised
+        # Expanded by DUMP_EXIT_GRACE_MARGIN, not shrunk (revised
         # 2026-09-18, explicit user decision, superseding an earlier -0.02
         # shrink tried the same day): the coarse-box-corner-coincidence
         # false positive (dish0/dish1, vegetable_container/plate) is
@@ -6828,8 +7120,13 @@ def build_predicate_snapshot(
         # *real* separation before the growing distance finally clears the
         # margin -- a soft delay, not a wrong classification. Being
         # lenient is the better tradeoff once fabrication is off the table.
+        # Uses its own smaller DUMP_EXIT_GRACE_MARGIN (0.01), not the
+        # general SUPPORT_CLUTTER_Z_TOLERANCE (0.05) -- same day, later
+        # revision, explicit user decision, once a systematic ~10-20 frame
+        # dump-onset delay across nearly every PanTransfer episode traced
+        # directly back to this margin's size.
         return _aabb_intersects(
-            _expanded_aabb(receptacle_aabb, SUPPORT_CLUTTER_Z_TOLERANCE), content_aabb
+            _expanded_aabb(receptacle_aabb, DUMP_EXIT_GRACE_MARGIN), content_aabb
         )
 
     # Redesigned 2026-09-17 (explicit user decision): content tracking no
@@ -8503,6 +8800,7 @@ def build_predicate_snapshot(
         "object_upright": object_upright,
         "object_grasped_safe": object_grasped_safe,
         "object_dropped": object_dropped,
+        "object_grasped_raw": raw_object_grasped,
         "object_left_gripper": object_left_gripper,
         "object_released": object_released,
         "object_supported": object_supported,

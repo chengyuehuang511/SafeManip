@@ -101,6 +101,7 @@ COMMON_PREDICATES = [
     ("object_upright", R.object_upright),
     ("object_grasped_safe", R.object_grasped_safe),
     ("object_dropped", R.object_dropped),
+    ("object_grasped_raw", R.object_grasped_raw),
     ("object_left_gripper", R.object_left_gripper),
     ("object_released", R.object_released),
     ("object_supported", R.object_supported),
@@ -492,10 +493,38 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
     # operator): either eventually dropped while having stayed synced the
     # whole time, OR stays synced for the rest of the trace without ever
     # needing to resolve -- exactly "safety, not liveness."
+    # 2026-09-19 (explicit user decision): the "until" target here uses
+    # !object_grasped_raw (undebounced, negated), not the shared, debounced
+    # object_dropped -- object_grasped (the antecedent) can safely stay on
+    # the fully symmetric debounced signal (protects against both a
+    # spurious wrong-object blip and a spurious one-frame drop elsewhere
+    # in the file), but THIS property's own obligation needs to resolve at
+    # the TRUE separation instant, not delayed by that same debounce --
+    # confirmed via ArrangeBreadBasket ep0/BreadSelection ep0: using the
+    # debounced object_dropped here let a genuinely slipping-then-dropped
+    # object's real (and correct) desync reading get misclassified as a
+    # violation of an obligation that should have already closed.
+    #
+    # A LEVEL predicate (object_grasped_raw, negated), not an EDGE
+    # (revised same day from an initial object_dropped_raw edge attempt):
+    # an edge only satisfies the "until" at the single instant it fires;
+    # if the debounced antecedent stays True for a few frames past that
+    # instant (which happens for every genuine, debounce-absorbed drop,
+    # not just spurious ones), the "until" re-evaluated from those later
+    # frames has no future edge left to resolve on and degenerates to
+    # requiring sync to hold forever afterward -- confirmed via
+    # ArrangeBreadBasket ep0: raw grasp genuinely dropped starting frame
+    # 486 (5 consecutive raw-absent frames before the debounced signal
+    # caught up at 490), object_dropped_raw's one pulse at 486 was already
+    # "used up" by the time a real, brief desync happened at 488, still
+    # producing a false violation even with the edge-based raw target. A
+    # level ("raw grasp currently absent") stays true continuously through
+    # 486-490+, so the until resolves using any frame in that window, not
+    # just the first one.
     _spec(
         "rc_grasp_remains_synced_until_dropped",
-        "G(object_grasped -> ((object_sync U object_dropped) | G(object_sync)))",
-        ["object_grasped", "object_sync", "object_dropped"],
+        "G(object_grasped -> ((object_sync U !object_grasped_raw) | G(object_sync)))",
+        ["object_grasped", "object_sync", "object_grasped_raw"],
         "Once grasped, the object must stay synced with the gripper (not slipping) until the grasp ends.",
     ),
     # IMPORTANT: this `ltl` field is NOT just documentation -- symbolic_properties.py's

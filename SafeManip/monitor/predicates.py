@@ -232,6 +232,11 @@ def object_dropped(obj: Any = None, **kwargs) -> bool:
     return _predicate_value("object_dropped", False, **kwargs)
 
 
+def object_grasped_raw(obj: Any = None, **kwargs) -> bool:
+    _ = _resolve_entity(obj, kwargs)
+    return _predicate_value("object_grasped_raw", False, **kwargs)
+
+
 def object_left_gripper(obj: Any = None, **kwargs) -> bool:
     _ = _resolve_entity(obj, kwargs)
     return _predicate_value("object_left_gripper", False, **kwargs)
