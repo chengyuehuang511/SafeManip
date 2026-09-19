@@ -22,6 +22,257 @@ from .attributes import (
 )
 
 
+# Oriented-bounding-box (OBB) geometry core (2026-09-18, explicit user
+# decision, replacing the previous world-frame axis-aligned bounding box
+# (AABB) system used throughout this file). Found via PanTransfer ep9: a
+# world-frame AABB of a *rotating* object (vegetable_container being tilted
+# to pour) inflates as the object rotates -- its axis-aligned envelope grows
+# even though the object's own real extent hasn't changed -- which made
+# _other_name_is_below's "is the support's top below my bottom" world-Z
+# comparison flip to False well before the container's contents had
+# genuinely separated (confirmed: AABB overlap and literal MuJoCo contact
+# both stayed True/True from frame 103 through the real separation at frame
+# ~261; only the world-frame directional Z check broke early, at frame 110,
+# purely from rotation inflating the container's own AABB top). A true OBB
+# (a box aligned with the object's own live rotation, not the world axes)
+# doesn't have this artifact -- its own extent stays constant regardless of
+# how the object is oriented, only its pose changes. Every AABB-shaped
+# helper in this file (_object_aabb, _fixture_aabb, _aabb_intersects,
+# _aabb_distance, etc.) was rewritten to build/consume this OBB
+# representation instead of a plain (min_corner, max_corner) tuple, per an
+# explicit user decision to do this globally rather than only in the one
+# call path that surfaced the bug.
+#
+# Representation: OBB = (center, axes, half_extents).
+#   center: (3,) world-frame position of the box's own center.
+#   axes: (3,3) matrix whose COLUMNS are the box's own unit local X/Y/Z
+#     axes, expressed in world coordinates (the same convention MuJoCo uses
+#     for geom_xmat/body_xmat: world_point = center + axes @ local_point).
+#   half_extents: (3,) half-widths of the box along its own local axes.
+# A plain axis-aligned box (used where no meaningful single rotation
+# exists, e.g. a swept-path corridor spanning two different poses) is
+# represented as an OBB with axes=identity -- the same SAT/point/distance
+# math below handles this as a degenerate special case with no branching
+# needed, since an axis-aligned box *is* an OBB whose local axes happen to
+# coincide with world axes.
+def _obb_make(center: np.ndarray, axes: np.ndarray, half_extents: np.ndarray):
+    return (
+        np.asarray(center, dtype=float).reshape(3),
+        np.asarray(axes, dtype=float).reshape(3, 3),
+        np.asarray(half_extents, dtype=float).reshape(3),
+    )
+
+
+def _obb_from_minmax(lower: np.ndarray, upper: np.ndarray):
+    lower = np.asarray(lower, dtype=float).reshape(3)
+    upper = np.asarray(upper, dtype=float).reshape(3)
+    return _obb_make((lower + upper) / 2.0, np.eye(3), (upper - lower) / 2.0)
+
+
+def _obb_from_corner_sites(p0: np.ndarray, px: np.ndarray, py: np.ndarray, pz: np.ndarray):
+    """Build a true OBB from RoboCasa's own p0/px/py/pz corner-site
+    convention (p0 = -x-y-z corner, px/py/pz = the corners reached by
+    flipping just one axis -- see fixture.py's own region-construction code,
+    lines ~161-164: p0 = pos-half, px = pos+[h,-h,-h], etc.) -- the edge
+    vectors px-p0/py-p0/pz-p0 already encode the region's real rotation
+    (e.g. a fixture rotated to face a different kitchen wall direction, or a
+    hand-tilted container), unlike taking the axis-aligned min/max of these
+    same 4 points (the previous approach), which discards that rotation and
+    reintroduces exactly the inflation-under-rotation artifact this whole
+    OBB system exists to avoid."""
+    p0 = np.asarray(p0, dtype=float).reshape(3)
+    px = np.asarray(px, dtype=float).reshape(3)
+    py = np.asarray(py, dtype=float).reshape(3)
+    pz = np.asarray(pz, dtype=float).reshape(3)
+    ex, ey, ez = px - p0, py - p0, pz - p0
+    hx, hy, hz = np.linalg.norm(ex), np.linalg.norm(ey), np.linalg.norm(ez)
+    axes = np.eye(3)
+    if hx > 1e-9:
+        axes[:, 0] = ex / hx
+    if hy > 1e-9:
+        axes[:, 1] = ey / hy
+    if hz > 1e-9:
+        axes[:, 2] = ez / hz
+    center = (px + py + pz - p0) / 2.0
+    return _obb_make(center, axes, [hx / 2.0, hy / 2.0, hz / 2.0])
+
+
+def _quat_to_mat(quat: np.ndarray) -> np.ndarray:
+    """MuJoCo (wxyz) quaternion -> rotation matrix whose columns are the
+    local axes in world coordinates -- same convention as geom_xmat/
+    body_xmat, so a quaternion-derived OBB composes seamlessly with
+    geom/body-derived ones."""
+    w, x, y, z = np.asarray(quat, dtype=float).reshape(4)
+    return np.array(
+        [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ]
+    )
+
+
+def _obb_corners(obb) -> np.ndarray:
+    center, axes, half = obb
+    corners = []
+    for sx in (-1.0, 1.0):
+        for sy in (-1.0, 1.0):
+            for sz in (-1.0, 1.0):
+                local = np.array([sx * half[0], sy * half[1], sz * half[2]])
+                corners.append(center + axes @ local)
+    return np.asarray(corners, dtype=float)
+
+
+def _obb_world_envelope(obb) -> tuple[np.ndarray, np.ndarray]:
+    """World-frame axis-aligned envelope of an OBB -- used only where a
+    swept-path corridor genuinely has no single coherent rotation of its
+    own (it spans two different poses of a moving object/gripper), not as a
+    general substitute for OBB-aware math elsewhere."""
+    corners = _obb_corners(obb)
+    return np.min(corners, axis=0), np.max(corners, axis=0)
+
+
+def _obb_union(a, b):
+    lower_a, upper_a = _obb_world_envelope(a)
+    lower_b, upper_b = _obb_world_envelope(b)
+    return _obb_from_minmax(np.minimum(lower_a, lower_b), np.maximum(upper_a, upper_b))
+
+
+def _obb_translate(obb, delta: np.ndarray):
+    center, axes, half = obb
+    return _obb_make(center + np.asarray(delta, dtype=float).reshape(3), axes, half)
+
+
+def _obb_sat_intersects(a, b) -> tuple[bool, float]:
+    """Standard 15-axis oriented-bounding-box separating-axis test (the 3
+    face normals of each box, plus the 9 pairwise cross products of their
+    edge directions -- see e.g. Ericson, 'Real-Time Collision Detection'
+    sec 4.4.1, or Gottschalk's original RAPID paper). Returns
+    (intersects, penetration_depth) -- depth is the minimum positive slack
+    across all 15 axes when intersecting (a standard SAT-derived measure of
+    'how much they overlap'), 0.0 when separated."""
+    a_c, a_ax, a_h = a
+    b_c, b_ax, b_h = b
+    t = b_c - a_c
+    R = a_ax.T @ b_ax
+    t_a = a_ax.T @ t
+    abs_r = np.abs(R) + 1e-9
+
+    best_slack = None
+
+    def _check(ra: float, rb: float, proj: float) -> bool:
+        nonlocal best_slack
+        slack = (ra + rb) - abs(proj)
+        if slack < 0.0:
+            return False
+        if best_slack is None or slack < best_slack:
+            best_slack = slack
+        return True
+
+    for i in range(3):
+        ra = float(a_h[i])
+        rb = float(b_h @ abs_r[i, :])
+        if not _check(ra, rb, float(t_a[i])):
+            return False, 0.0
+    for j in range(3):
+        ra = float(a_h @ abs_r[:, j])
+        rb = float(b_h[j])
+        proj = float(t_a @ R[:, j])
+        if not _check(ra, rb, proj):
+            return False, 0.0
+    for i in range(3):
+        i1, i2 = (i + 1) % 3, (i + 2) % 3
+        for j in range(3):
+            j1, j2 = (j + 1) % 3, (j + 2) % 3
+            ra = float(a_h[i1] * abs_r[i2, j] + a_h[i2] * abs_r[i1, j])
+            rb = float(b_h[j1] * abs_r[i, j2] + b_h[j2] * abs_r[i, j1])
+            proj = float(t_a[i2] * R[i1, j] - t_a[i1] * R[i2, j])
+            if not _check(ra, rb, proj):
+                return False, 0.0
+    return True, float(best_slack if best_slack is not None else 0.0)
+
+
+def _obb_intersects(a, b) -> bool:
+    intersects, _ = _obb_sat_intersects(a, b)
+    return intersects
+
+
+def _obb_overlap_depth(a, b) -> float:
+    _, depth = _obb_sat_intersects(a, b)
+    return depth
+
+
+def _obb_point_closest(obb, point: np.ndarray) -> np.ndarray:
+    center, axes, half = obb
+    point = np.asarray(point, dtype=float).reshape(3)
+    local = axes.T @ (point - center)
+    clamped = np.clip(local, -half, half)
+    return center + axes @ clamped
+
+
+def _obb_point_distance(obb, point: np.ndarray) -> float:
+    return float(np.linalg.norm(np.asarray(point, dtype=float).reshape(3) - _obb_point_closest(obb, point)))
+
+
+def _obb_distance(a, b) -> float:
+    """Approximate (not exact) closest distance between two OBBs when they
+    don't intersect: minimum over every corner of each box of that corner's
+    distance to the other box. Exact convex-convex distance (e.g. via GJK)
+    can differ in rare edge-edge-closest configurations, but this is exact
+    for the much more common vertex/face-closest cases and is already far
+    more accurate than the previous plain axis-aligned gap formula for any
+    rotated box."""
+    if _obb_intersects(a, b):
+        return 0.0
+    a_corners = _obb_corners(a)
+    b_corners = _obb_corners(b)
+    d1 = min(_obb_point_distance(b, c) for c in a_corners)
+    d2 = min(_obb_point_distance(a, c) for c in b_corners)
+    return float(min(d1, d2))
+
+
+def _obb_xy_distance(a, b) -> float:
+    """Same corner-sampling approximation as _obb_distance, but measuring
+    only the XY (horizontal) gap between the two boxes' world-envelope
+    footprints -- used where callers only care about lateral/planar
+    separation (e.g. path-obstruction lateral offset), not full 3D
+    distance."""
+    a_lower, a_upper = _obb_world_envelope(a)
+    b_lower, b_upper = _obb_world_envelope(b)
+    gap = np.maximum(0.0, np.maximum(b_lower[:2] - a_upper[:2], a_lower[:2] - b_upper[:2]))
+    return float(np.linalg.norm(gap))
+
+
+def _obb_point_xy_distance(point: np.ndarray, obb) -> float:
+    center, axes, half = obb
+    point = np.asarray(point, dtype=float).reshape(3)
+    local = axes.T @ (point - center)
+    clamped_local = np.array(
+        [
+            float(np.clip(local[0], -half[0], half[0])),
+            float(np.clip(local[1], -half[1], half[1])),
+            local[2],
+        ]
+    )
+    closest = center + axes @ clamped_local
+    return float(np.linalg.norm(point[:2] - closest[:2]))
+
+
+def _obb_closest_point_on_top_face(point: np.ndarray, obb) -> np.ndarray:
+    """Generalizes 'clip an XY point to a support surface's own footprint,
+    then return the point resting on top of that surface' to a rotated
+    box: clip within the box's own local XY footprint (not world XY), then
+    return the point at the box's own local +Z face -- correct regardless
+    of how the support box itself is rotated (a fixture facing a different
+    kitchen-wall direction, or a hand-held container tilted mid-pour)."""
+    center, axes, half = obb
+    point = np.asarray(point, dtype=float).reshape(3)
+    local = axes.T @ (point - center)
+    clamped_xy = np.clip(local[:2], -half[:2], half[:2])
+    local_top = np.array([clamped_xy[0], clamped_xy[1], half[2]])
+    return center + axes @ local_top
+
+
 GRIPPER_CLOSED_THRESHOLD = 0.0399
 GRIPPER_FAR_THRESHOLD = 0.01
 OBJ_LINEAR_STABLE_THRESHOLD = 0.05
@@ -180,6 +431,11 @@ PLACEMENT_PROXIMITY_MARGIN = 0.01
 PATH_OBSTRUCTION_OVERLAP_ALLOWANCE = 0.05
 CLUTTER_THRESHOLD = 2
 SUPPORT_CLUTTER_Z_TOLERANCE = 0.05
+# Fallback contamination-spot radius (2026-09-18) when the contaminating
+# entity's own footprint can't be measured (no AABB available) -- a small,
+# conservative default rather than treating the whole fixture as
+# contaminated in that rare case.
+DEFAULT_CONTAMINATION_RADIUS = 0.05
 # Unified 2026-09-16 (explicit user decision): also now used for
 # access_fixture_fully_open/the open_close-suppression logic, which
 # previously had their own separate, stricter constant
@@ -1850,37 +2106,35 @@ def build_predicate_snapshot(
             if _fixture_rack_contact(str(fixture_name), str(name)):
                 fixture_contacts.add(str(fixture_name))
                 continue
-        def _other_name_is_below(other_name: str) -> bool:
-            # Fixed 2026-09-03 (found via systematic corpus-wide failure
-            # clustering): neither OU.check_obj_in_receptacle (contact +
-            # horizontal-distance only, no Z-axis check at all -- returns
-            # True symmetrically regardless of which object is "really" the
-            # receptacle) nor the plain env.check_contact fallback (no
-            # directional awareness whatsoever) verify which of the two
-            # touching objects is actually above/supporting the other. An
-            # object freshly placed ONTO/INTO `name` (e.g. a place onset's
-            # content landing in a container) was getting added as if *it*
-            # were `name`'s own support (backwards) the instant contact
-            # registered -- confirmed via real data (ArrangeTea ep0, frame
-            # 204: container's own _object_stable_relative spuriously read
-            # unstable right when obj2 was released into it, because
-            # _object_support_reference("container") picked up the
-            # freshly-released, still-spinning obj2 as if it supported
-            # container, computing container's "relative" angular velocity
-            # against obj2's own ~0.29 rad/s rotation instead of correctly
-            # finding no real object support -- container's own real
-            # angular velocity was negligible, ~0.0006, the whole time).
-            # Only count other_name as a genuine support if it's actually
-            # positioned at/below name's own bottom (within
-            # SUPPORT_CLUTTER_Z_TOLERANCE) -- if AABBs aren't available for
-            # either, fall back to the old (undirected) behavior rather
-            # than silently dropping a real support relationship.
-            name_aabb = _object_aabb(str(name))
-            other_aabb = _object_aabb(str(other_name))
-            if name_aabb is None or other_aabb is None:
-                return True
-            return float(other_aabb[1][2]) <= float(name_aabb[0][2]) + SUPPORT_CLUTTER_Z_TOLERANCE
-
+        # _other_name_is_below (a world-Z "is other_name positioned at/below
+        # name's own bottom" directional check) was removed entirely
+        # 2026-09-18, during the global true-OBB rewrite -- found via
+        # PanTransfer ep9: this check was fundamentally unreliable for a
+        # *rotating* candidate (a container being tilted to pour), since
+        # world-frame Z ordering between two objects can and does invert
+        # mid-tilt even though nothing about their real contact/containment
+        # has changed (confirmed: not just the axis-aligned envelope but
+        # even the two objects' own center points swapped relative height
+        # around frame ~210-230, while genuine MuJoCo contact persisted
+        # unbroken from frame 103 to the real separation at ~261). No
+        # rotation-robust version of "who's on top" was found that didn't
+        # ALSO break down during a tilt (center-point comparison inverts for
+        # the same physical reason the envelope-based one did).
+        #
+        # This check was originally added (2026-09-03) to stop a freshly-
+        # placed object from being treated as its own receptacle's support
+        # (ArrangeTea ep0: a spinning, just-released object briefly in
+        # contact with the container it landed in was picked up as if it
+        # supported the container, backwards). That specific bug is now
+        # independently prevented by _is_plausible_support_object's
+        # receptacle-category restriction (added 2026-09-17): a freshly-
+        # placed food item is never even a candidate `other_name` when
+        # asking what supports a *receptacle*, since the category filter
+        # excludes non-receptacle objects before this loop ever runs. With
+        # that structural fix already in place, genuine (non-inflated) OBB
+        # intersection is a strictly more reliable signal of real touching/
+        # containment than a world-Z ordering test ever was, rotating
+        # candidate or not.
         for other_name in getattr(env, "objects", {}).keys():
             other_name = str(other_name)
             if other_name == str(name):
@@ -1888,49 +2142,41 @@ def build_predicate_snapshot(
             if not _is_plausible_support_object(other_name):
                 continue
             try:
-                if OU.check_obj_in_receptacle(env, name, other_name) and _other_name_is_below(other_name):
+                if OU.check_obj_in_receptacle(env, name, other_name):
                     object_contacts.add(other_name)
                     continue
             except Exception:
                 pass
             try:
-                if env.check_contact(env.objects[name], env.objects[other_name]) and _other_name_is_below(other_name):
-                    object_contacts.add(other_name)
-                    continue
-            except Exception:
-                pass
-            # Added 2026-09-18 (explicit user decision), found via PanTransfer
-            # ep9: both checks above require MuJoCo to have literally
-            # registered a contact this exact physics step -- confirmed via
-            # live replay that the solver can drop that registration for a
-            # single frame (env.check_contact and OU.check_obj_in_receptacle
-            # both read False at frame 102, True on every neighboring frame)
-            # while vegetable_container was being tilted to pour, with
-            # nothing about the real geometry having changed (the Z-
-            # directional _other_name_is_below check stayed comfortably True
-            # the whole time). Tried debouncing this in time first, but
-            # reverted (see _content_receptacle_overlap's own history) --
-            # dump onset fires on this exact signal's True->False edge, so
-            # any temporal smoothing here is smoothing the onset trigger
-            # itself, defeating the instantaneous-edge-trigger design onset
-            # detection was deliberately redesigned around. AABB overlap is
-            # a purely spatial (not temporal) proxy for "still genuinely
-            # touching/overlapping" that isn't gated on the solver's
-            # contact-registration bookkeeping for this one frame, so a
-            # single dropped registration no longer flips the result.
-            try:
-                name_aabb = _object_aabb(str(name))
-                other_aabb = _object_aabb(str(other_name))
-                if (
-                    name_aabb is not None
-                    and other_aabb is not None
-                    and _aabb_intersects(name_aabb, other_aabb)
-                    and _other_name_is_below(other_name)
-                ):
+                if env.check_contact(env.objects[name], env.objects[other_name]):
                     object_contacts.add(other_name)
             except Exception:
                 continue
         return fixture_contacts, object_contacts
+        # A third, genuine-OBB-intersection fallback was tried here
+        # 2026-09-18 (found via PanTransfer ep9's single-frame contact-
+        # registration dropout, frame 102) and then reverted the same day
+        # (found via LoadDishwasher ep4 + a second PanTransfer ep9 case,
+        # 'plate'): this function is generic and has many callers beyond
+        # dump/content tracking (general support inference, pick/place
+        # blockers, clutter checks, ...) -- a bare geometric-overlap
+        # fallback with no other corroborating signal is fine for
+        # *confirming* an already-established relationship survived a
+        # one-frame solver hiccup, but wrong for *discovering brand-new*
+        # ones: a coarse box's corners routinely extend past the real
+        # mesh's surface, so a moving/rotating candidate's box can
+        # genuinely intersect an unrelated, merely-nearby stationary
+        # object's box (confirmed: dish0 -- actively carried -- swept its
+        # box across stationary dish1's; vegetable_container -- tilting --
+        # swept its box across stationary plate's; both produced the exact
+        # same flicker-in/flicker-out false-positive pattern the original
+        # fallback was meant to prevent, just for a different pair). The
+        # "tolerate a one-frame contact dropout" grace belongs scoped to
+        # where a relationship is already known to be established --
+        # _content_receptacle_overlap's own exit check now does this
+        # itself, rather than baking it into this shared, generic
+        # primitive where it can't distinguish "continuing" from
+        # "discovering."
 
     def _object_attributes(name: str = "obj") -> set[str]:
         objects = ((static_info or {}).get("scene_layout") or {}).get("objects") or {}
@@ -2010,7 +2256,14 @@ def build_predicate_snapshot(
         ).get("velocity") or {}
         return _norm(velocity.get("linear")), _norm(velocity.get("angular"))
 
-    def _object_ou_bbox_aabb(name: str) -> tuple[np.ndarray, np.ndarray] | None:
+    def _object_ou_bbox_aabb(name: str):
+        # Returns an OBB now (2026-09-18): body_xquat gives this object's
+        # real live rotation, so the box is built directly in that rotated
+        # frame via get_bbox_points' own local-frame extent (bbox.min/max
+        # semantics mirrored below in _object_bbox_aabb), rather than taking
+        # the axis-aligned envelope of the already-rotated world points
+        # (which would reintroduce the same rotation-inflation artifact this
+        # whole OBB system exists to avoid).
         try:
             body_id = env.obj_body_id[str(name)]
             trans = np.asarray(env.sim.data.body_xpos[body_id], dtype=float)
@@ -2024,9 +2277,19 @@ def build_predicate_snapshot(
             return None
         if coords.ndim != 2 or coords.shape[1] < 3 or not np.all(np.isfinite(coords)):
             return None
-        return np.min(coords[:, :3], axis=0), np.max(coords[:, :3], axis=0)
+        axes = _quat_to_mat(rot_quat)
+        local = (coords[:, :3] - trans) @ axes  # (axes.T @ (p - trans).T).T
+        local_lower = np.min(local, axis=0)
+        local_upper = np.max(local, axis=0)
+        local_center = (local_lower + local_upper) / 2.0
+        half = (local_upper - local_lower) / 2.0
+        return _obb_make(trans + axes @ local_center, axes, half)
 
-    def _object_bbox_aabb(name: str) -> tuple[np.ndarray, np.ndarray] | None:
+    def _object_bbox_aabb(name: str):
+        # Returns an OBB (2026-09-18): the stored bbox min/max is already
+        # object-local-frame data (offset from the object's own position),
+        # so use the object's own live rotation as the OBB's axes instead of
+        # applying it as a plain world-frame translation-only box.
         pos = _object_position(name)
         if pos is None:
             return None
@@ -2048,9 +2311,16 @@ def build_predicate_snapshot(
             or not np.all(np.isfinite(upper[:3]))
         ):
             return None
-        return pos + lower[:3], pos + upper[:3]
+        try:
+            body_id = env.obj_body_id[str(name)]
+            axes = np.asarray(env.sim.data.body_xmat[body_id], dtype=float).reshape(3, 3)
+        except Exception:
+            axes = np.eye(3)
+        local_center = (lower[:3] + upper[:3]) / 2.0
+        half = (upper[:3] - lower[:3]) / 2.0
+        return _obb_make(pos + axes @ local_center, axes, half)
 
-    def _object_aabb(name: str) -> tuple[np.ndarray, np.ndarray] | None:
+    def _object_aabb(name: str):
         # Fallback order deliberately changed (2026-09-03, KNOWN_BUGS.md #11)
         # from [_object_ou_bbox_aabb, _object_contact_aabb, _object_bbox_aabb]
         # to this: _object_ou_bbox_aabb (upstream robocasa's
@@ -2083,7 +2353,15 @@ def build_predicate_snapshot(
             or _object_bbox_aabb(str(name))
         )
 
-    def _geom_aabb(geom_id: int) -> tuple[np.ndarray, np.ndarray] | None:
+    def _geom_aabb(geom_id: int):
+        # Returns a true per-geom OBB (2026-09-18): center=geom_xpos,
+        # axes=geom_xmat (the geom's own live rotation), half=geom_size --
+        # no envelope/inflation step at all, since a geom's own live pose
+        # and size already fully define its oriented box. size is treated
+        # uniformly as box half-extents along the geom's local axes (the
+        # same approximation the previous world-envelope version already
+        # made for non-box geom types -- unchanged here, just no longer
+        # combined with a rotation-inflating min/max step).
         try:
             center = np.asarray(env.sim.data.geom_xpos[int(geom_id)], dtype=float)[:3]
             xmat = np.asarray(
@@ -2101,27 +2379,68 @@ def build_predicate_snapshot(
             or not np.all(np.isfinite(size))
         ):
             return None
-        half_extents = np.abs(xmat) @ np.maximum(size, 0.0)
-        return center - half_extents, center + half_extents
+        return _obb_make(center, xmat, np.maximum(size, 0.0))
 
-    def _geom_ids_aabb(geom_ids: set[int]) -> tuple[np.ndarray, np.ndarray] | None:
-        geom_aabbs = [
-            aabb
+    def _geom_ids_obb(geom_ids: set[int]):
+        """Merge multiple geoms into one tight OBB. Geoms rigidly attached
+        to the same MuJoCo body share that body's live rotation, so the
+        combined box is built in the body's own local frame (transform
+        every geom's corners into that frame, take the local min/max) --
+        this stays a true, non-inflated oriented box for the common case of
+        one rigid object/fixture made of several geoms. If the geoms span
+        more than one distinct body (rare -- e.g. a compound assembly with
+        independently-jointed parts merged into one query), there's no
+        single rotation that correctly describes the whole set, so this
+        falls back to the axis-aligned envelope of each geom's own OBB
+        (the same degeneration the old world-frame code effectively always
+        did, so this rare case is no worse than before, just no longer
+        assumed for the common single-body case)."""
+        geom_obbs = [
+            obb
             for geom_id in geom_ids
-            for aabb in [_geom_aabb(geom_id)]
-            if aabb is not None
+            for obb in [_geom_aabb(geom_id)]
+            if obb is not None
         ]
-        if not geom_aabbs:
+        if not geom_obbs:
             return None
-        lowers = [aabb[0] for aabb in geom_aabbs]
-        uppers = [aabb[1] for aabb in geom_aabbs]
-        return np.min(lowers, axis=0), np.max(uppers, axis=0)
+        if len(geom_obbs) == 1:
+            return geom_obbs[0]
+        body_ids = set()
+        for geom_id in geom_ids:
+            try:
+                body_ids.add(int(env.sim.model.geom_bodyid[int(geom_id)]))
+            except Exception:
+                body_ids.add(None)
+        if len(body_ids) == 1 and None not in body_ids:
+            body_id = next(iter(body_ids))
+            try:
+                body_center = np.asarray(env.sim.data.body_xpos[body_id], dtype=float)
+                body_axes = np.asarray(env.sim.data.body_xmat[body_id], dtype=float).reshape(3, 3)
+            except Exception:
+                body_center, body_axes = None, None
+            if body_center is not None:
+                all_local = []
+                for obb in geom_obbs:
+                    corners = _obb_corners(obb)
+                    all_local.append(body_axes.T @ (corners - body_center).T)
+                local = np.concatenate(all_local, axis=1)
+                local_lower = np.min(local, axis=1)
+                local_upper = np.max(local, axis=1)
+                local_center = (local_lower + local_upper) / 2.0
+                half = (local_upper - local_lower) / 2.0
+                return _obb_make(body_center + body_axes @ local_center, body_axes, half)
+        lower, upper = _obb_world_envelope(geom_obbs[0])
+        for obb in geom_obbs[1:]:
+            o_lower, o_upper = _obb_world_envelope(obb)
+            lower = np.minimum(lower, o_lower)
+            upper = np.maximum(upper, o_upper)
+        return _obb_from_minmax(lower, upper)
 
-    def _object_contact_aabb(name: str) -> tuple[np.ndarray, np.ndarray] | None:
-        return _geom_ids_aabb(_object_contact_geom_ids(str(name)))
+    def _object_contact_aabb(name: str):
+        return _geom_ids_obb(_object_contact_geom_ids(str(name)))
 
-    def _gripper_contact_aabb() -> tuple[np.ndarray, np.ndarray] | None:
-        return _geom_ids_aabb(_gripper_contact_geom_ids())
+    def _gripper_contact_aabb():
+        return _geom_ids_obb(_gripper_contact_geom_ids())
 
     def _fixture_contact_geom_ids(name: str) -> set[int]:
         fixture = getattr(env, "fixtures", {}).get(str(name))
@@ -2132,34 +2451,44 @@ def build_predicate_snapshot(
         except Exception:
             return set()
 
-    def _fixture_contact_aabb(name: str) -> tuple[np.ndarray, np.ndarray] | None:
-        return _geom_ids_aabb(_fixture_contact_geom_ids(str(name)))
+    def _fixture_contact_aabb(name: str):
+        return _geom_ids_obb(_fixture_contact_geom_ids(str(name)))
 
-    def _fixture_ext_sites_aabb(name: str) -> tuple[np.ndarray, np.ndarray] | None:
+    def _fixture_ext_sites_aabb(name: str):
+        # Returns a true OBB (2026-09-18): request just the 4 base corner
+        # sites (all_points=False) instead of all 8 (all_points=True), and
+        # build the box from their real edge vectors via
+        # _obb_from_corner_sites -- this preserves the fixture's own
+        # rotation (e.g. facing a different kitchen-wall direction) instead
+        # of discarding it into a world-axis-aligned envelope the way
+        # min/max-of-8-corners did. relative=False (fixture.pos-based, not
+        # live-sim) is fine here specifically -- unlike interior sites,
+        # which move with an articulated drawer/door, a fixture's own
+        # exterior footprint doesn't change after initial placement.
         fixture = _fixture_by_name(str(name))
         if fixture is None:
             return None
         try:
-            points = fixture.get_ext_sites(all_points=True, relative=False)
-            coords = np.asarray(points, dtype=float)
+            p0, px, py, pz = fixture.get_ext_sites(all_points=False, relative=False)
         except Exception:
             return None
-        if coords.ndim != 2 or coords.shape[1] < 3 or not np.all(np.isfinite(coords)):
+        try:
+            return _obb_from_corner_sites(p0, px, py, pz)
+        except Exception:
             return None
-        return np.min(coords[:, :3], axis=0), np.max(coords[:, :3], axis=0)
 
-    def _fixture_aabb(name: str) -> tuple[np.ndarray, np.ndarray] | None:
+    def _fixture_aabb(name: str):
         return (
             _fixture_ext_sites_aabb(str(name))
             or _fixture_contact_aabb(str(name))
-            or _geom_ids_aabb(_fixture_geom_ids_by_names({str(name)}))
+            or _geom_ids_obb(_fixture_geom_ids_by_names({str(name)}))
         )
 
     def _fixture_interior_support_aabb(
         name: str,
         obj_pos: np.ndarray | None = None,
         region_keywords: tuple[str, ...] | None = None,
-    ) -> tuple[np.ndarray, np.ndarray] | None:
+    ):
         fixture = _fixture_by_name(str(name))
         if fixture is None:
             return None
@@ -2180,25 +2509,12 @@ def build_predicate_snapshot(
         if not region_names:
             return None
 
-        # Switched 2026-09-17 (explicit user decision) from
-        # fixture.get_int_sites(relative=False) to fixture.get_site_info(sim)
-        # -- found via SetUpCuttingStation ep4 (an open Drawer): get_int_sites'
-        # own relative=False path goes through OU.get_pos_after_rel_offset,
-        # which computes `fixture.pos + fixture_mat @ offset` -- a pure
-        # Python-side calculation using the fixture's *nominal, reset-time*
-        # pose, never touching the live simulation at all. For an articulated
-        # fixture whose interior physically slides (a drawer), this returns
-        # the interior region's position as if the drawer were still at its
-        # original reset configuration, not accounting for how far it's
-        # actually been pulled open during the rollout -- confirmed by
-        # comparing against the drawer's own genuinely live "int_p0/px/py/pz"
-        # site positions (same ones our own extraction already exports under
-        # scene.fixtures[name].sites, via this exact get_site_info call) and
-        # finding the two didn't correspond to the same real Y-position/
-        # direction of drift. get_site_info(sim) instead calls
-        # sim.data.get_site_xpos(name) directly -- a genuine live MuJoCo site
-        # query that correctly reflects the fixture's actual current
-        # configuration, including any joint-driven motion.
+        # get_site_info(sim), not fixture.get_int_sites(relative=False) --
+        # see this function's own history (CHANGES around SetUpCuttingStation
+        # ep4, an open Drawer): get_int_sites' relative=False path is a
+        # static, reset-time-only computation that doesn't track an
+        # articulated fixture's actual live joint position, while
+        # get_site_info(sim) queries the live MuJoCo site position directly.
         try:
             site_info = fixture.get_site_info(env.sim)
         except Exception:
@@ -2207,39 +2523,73 @@ def build_predicate_snapshot(
 
         candidates = []
         for region_name in region_names:
+            volume_obb = None
             try:
                 p0 = np.asarray(site_info[f"{naming_prefix}{region_name}_p0"], dtype=float)
                 px = np.asarray(site_info[f"{naming_prefix}{region_name}_px"], dtype=float)
                 py = np.asarray(site_info[f"{naming_prefix}{region_name}_py"], dtype=float)
                 pz = np.asarray(site_info[f"{naming_prefix}{region_name}_pz"], dtype=float)
+                volume_obb = _obb_from_corner_sites(p0, px, py, pz)
             except Exception:
+                volume_obb = None
+            # Fallback for a degenerate site-derived box (2026-09-18, found
+            # via SetUpCuttingStation ep2's drawer 'stack_1_right_group_2':
+            # its own '_int_p0/px/py/pz' *sites* -- separate MJCF <site>
+            # elements from the geom-based _regions used for reset-object-
+            # placement sampling -- were essentially coincident, a near-
+            # zero-volume box, for this specific asset variant, even though
+            # get_site_info(sim) genuinely queried them live and correctly).
+            # This looks like a RoboCasa asset-authoring inconsistency for
+            # this particular fixture variant (not something SafeManip can
+            # fix in the asset itself), not a live-tracking bug -- so when
+            # the sites give a degenerate box, fall back to the region's own
+            # GEOM (fixture._regions, computed from the geom's real pos/
+            # size at model-build time -- confirmed correctly sized) and
+            # its live *body* transform (found via the geom's own
+            # geom_bodyid, not the fixture's static root pos/rot -- the
+            # same "live body pose, not nominal fixture.pos" principle the
+            # get_site_info switch above already established, just applied
+            # to a different data source for the one case where the sites
+            # themselves are unusable).
+            if volume_obb is None or np.any(np.asarray(volume_obb[2], dtype=float) < 0.01):
+                try:
+                    region_dict = fixture._regions.get(region_name)
+                    geom_id = env.sim.model.geom_name2id(f"{naming_prefix}reg_{region_name}")
+                    body_id = int(env.sim.model.geom_bodyid[int(geom_id)])
+                    body_pos, body_axes = _spot_body_pose(body_id)
+                    if region_dict is not None and body_pos is not None:
+                        world_corners = {
+                            key: body_pos + body_axes @ np.asarray(region_dict[key], dtype=float)
+                            for key in ("p0", "px", "py", "pz")
+                        }
+                        fallback_obb = _obb_from_corner_sites(
+                            world_corners["p0"], world_corners["px"],
+                            world_corners["py"], world_corners["pz"],
+                        )
+                        if not np.any(np.asarray(fallback_obb[2], dtype=float) < 0.01):
+                            volume_obb = fallback_obb
+                except Exception:
+                    pass
+            if volume_obb is None:
                 continue
-            points = [
-                p0, px, py, pz,
-                np.array([p0[0], py[1], pz[2]]),
-                np.array([px[0], py[1], pz[2]]),
-                np.array([px[0], py[1], p0[2]]),
-                np.array([px[0], p0[1], pz[2]]),
-            ]
-            try:
-                coords = np.asarray(points, dtype=float)
-            except Exception:
-                continue
-            if (
-                coords.ndim != 2
-                or coords.shape[1] < 3
-                or not np.all(np.isfinite(coords))
-            ):
-                continue
-            lower = np.min(coords[:, :3], axis=0)
-            upper = np.max(coords[:, :3], axis=0)
+            # Flattened to the region's own floor plane (2026-09-18, true-OBB
+            # rewrite of this function -- same flattening the previous
+            # world-axis-aligned version already did, just now expressed in
+            # the region's own live rotation instead of discarding it):
+            # p0 is the region's -local-Z (floor) corner per robocasa's own
+            # region-construction convention (fixture.py: p0 = reg_pos -
+            # halfsize), so _obb_from_corner_sites' local +Z axis points
+            # from floor to ceiling -- an object resting *in* the region
+            # sits at the floor, not floating at the ceiling, so the usable
+            # support surface is the floor face, not the generic +Z face a
+            # freestanding box would use.
+            center, axes, half = volume_obb
+            floor_center = center - axes[:, 2] * half[2]
+            support_obb = _obb_make(floor_center, axes, [half[0], half[1], 0.0])
+            lower, upper = _obb_world_envelope(support_obb)
             support_z = float(lower[2])
-            support_aabb = (
-                np.asarray([lower[0], lower[1], support_z], dtype=float),
-                np.asarray([upper[0], upper[1], support_z], dtype=float),
-            )
             if obj_pos is None:
-                candidates.append((0.0, -support_z, support_aabb))
+                candidates.append((0.0, -support_z, support_obb))
                 continue
             if support_z > float(obj_pos[2]) + SUPPORT_CLUTTER_Z_TOLERANCE:
                 continue
@@ -2247,15 +2597,15 @@ def build_predicate_snapshot(
                 0.0,
                 np.maximum(lower[:2] - obj_pos[:2], obj_pos[:2] - upper[:2]),
             )
-            candidates.append((float(np.linalg.norm(xy_gap)), -support_z, support_aabb))
+            candidates.append((float(np.linalg.norm(xy_gap)), -support_z, support_obb))
         if not candidates:
             return None
-        return sorted(candidates)[0][2]
+        return sorted(candidates, key=lambda c: (c[0], c[1]))[0][2]
 
     def _fixture_rack_aabb(
         name: str,
         obj_pos: np.ndarray | None = None,
-    ) -> tuple[np.ndarray, np.ndarray] | None:
+    ):
         fixture = _fixture_by_name(str(name))
         if fixture is None:
             return None
@@ -2286,12 +2636,12 @@ def build_predicate_snapshot(
             for geom_id, geom_body_id in enumerate(env.sim.model.geom_bodyid):
                 if int(geom_body_id) == body_id:
                     geom_ids.add(int(geom_id))
-        return _geom_ids_aabb(geom_ids)
+        return _geom_ids_obb(geom_ids)
 
     def _fixture_support_aabb(
         name: str,
         obj_pos: np.ndarray | None = None,
-    ) -> tuple[np.ndarray, np.ndarray] | None:
+    ):
         fixture = _fixture_by_name(str(name))
         fixture_text = f"{name} {fixture.__class__.__name__ if fixture is not None else ''}".lower()
         interior_support_fixture_keywords = (
@@ -2320,97 +2670,57 @@ def build_predicate_snapshot(
         )
         return rack_aabb or interior_aabb or _fixture_aabb(str(name))
 
-    def _closest_point_on_aabb_xy(
-        point: np.ndarray,
-        aabb: tuple[np.ndarray, np.ndarray],
-    ) -> np.ndarray:
-        a_min, a_max = aabb
-        return np.asarray(
-            [
-                float(np.clip(point[0], a_min[0], a_max[0])),
-                float(np.clip(point[1], a_min[1], a_max[1])),
-                float(a_max[2]),
-            ],
-            dtype=float,
-        )
+    # The following wrappers keep the pre-2026-09-18 function names (unchanged
+    # call sites throughout the rest of this file) but now delegate to the
+    # true-OBB math defined near the top of the module, instead of doing
+    # world-frame-axis-aligned min/max arithmetic directly.
+    def _closest_point_on_aabb_xy(point: np.ndarray, aabb) -> np.ndarray:
+        return _obb_closest_point_on_top_face(point, aabb)
 
-    def _aabb_distance(
-        a: tuple[np.ndarray, np.ndarray], b: tuple[np.ndarray, np.ndarray]
-    ) -> float:
-        a_min, a_max = a
-        b_min, b_max = b
-        gap = np.maximum(0.0, np.maximum(b_min - a_max, a_min - b_max))
-        return float(np.linalg.norm(gap))
+    def _aabb_distance(a, b) -> float:
+        return _obb_distance(a, b)
 
-    def _aabb_xy_distance(
-        a: tuple[np.ndarray, np.ndarray], b: tuple[np.ndarray, np.ndarray]
-    ) -> float:
-        a_min, a_max = a
-        b_min, b_max = b
-        gap = np.maximum(0.0, np.maximum(b_min[:2] - a_max[:2], a_min[:2] - b_max[:2]))
-        return float(np.linalg.norm(gap))
+    def _aabb_xy_distance(a, b) -> float:
+        return _obb_xy_distance(a, b)
 
-    def _point_aabb_xy_distance(
-        point: np.ndarray, aabb: tuple[np.ndarray, np.ndarray]
-    ) -> float:
-        a_min, a_max = aabb
-        clipped = np.minimum(np.maximum(point[:2], a_min[:2]), a_max[:2])
-        return float(np.linalg.norm(point[:2] - clipped))
+    def _point_aabb_xy_distance(point: np.ndarray, aabb) -> float:
+        return _obb_point_xy_distance(point, aabb)
 
-    def _aabb_overlap_depth(
-        a: tuple[np.ndarray, np.ndarray],
-        b: tuple[np.ndarray, np.ndarray],
-    ) -> float:
-        a_min, a_max = a
-        b_min, b_max = b
-        overlap = np.minimum(a_max, b_max) - np.maximum(a_min, b_min)
-        if np.any(overlap <= 0.0):
-            return 0.0
-        return float(np.min(overlap))
+    def _aabb_overlap_depth(a, b) -> float:
+        return _obb_overlap_depth(a, b)
 
-    def _aabb_intersects(
-        a: tuple[np.ndarray, np.ndarray],
-        b: tuple[np.ndarray, np.ndarray],
-    ) -> bool:
-        return _aabb_overlap_depth(a, b) > 0.0
+    def _aabb_intersects(a, b) -> bool:
+        return _obb_intersects(a, b)
 
-    def _aabb_obstructs_path(
-        blocker: tuple[np.ndarray, np.ndarray],
-        corridor: tuple[np.ndarray, np.ndarray],
-    ) -> bool:
+    def _aabb_obstructs_path(blocker, corridor) -> bool:
         return (
-            _aabb_overlap_depth(blocker, corridor) > PATH_OBSTRUCTION_OVERLAP_ALLOWANCE
+            _obb_overlap_depth(blocker, corridor) > PATH_OBSTRUCTION_OVERLAP_ALLOWANCE
         )
 
-    def _aabb_obstructs_between_endpoints(
-        blocker: tuple[np.ndarray, np.ndarray],
-        start: tuple[np.ndarray, np.ndarray],
-        end: tuple[np.ndarray, np.ndarray],
-    ) -> bool:
+    def _aabb_obstructs_between_endpoints(blocker, start, end) -> bool:
         if not _aabb_obstructs_path(blocker, _union_aabb(start, end)):
             return False
         if _aabb_intersects(blocker, start) or _aabb_intersects(blocker, end):
             return False
-        start_center = (start[0] + start[1]) / 2.0
-        end_center = (end[0] + end[1]) / 2.0
+        start_center, end_center = start[0], end[0]
         segment_xy = end_center[:2] - start_center[:2]
         segment_len_sq = float(np.dot(segment_xy, segment_xy))
         if segment_len_sq <= 1e-9:
             return False
-        blocker_center = (blocker[0] + blocker[1]) / 2.0
+        blocker_center = blocker[0]
         projection = float(
             np.dot(blocker_center[:2] - start_center[:2], segment_xy) / segment_len_sq
         )
         if projection <= 0.0 or projection >= 1.0:
             return False
         closest_xy = start_center[:2] + projection * segment_xy
-        segment_xy_distance = _point_aabb_xy_distance(
+        segment_xy_distance = _obb_point_xy_distance(
             np.array([closest_xy[0], closest_xy[1], blocker_center[2]], dtype=float),
-            (blocker[0], blocker[1]),
+            blocker,
         )
         if segment_xy_distance > PATH_OBSTRUCTION_OVERLAP_ALLOWANCE:
             return False
-        blocker_min, blocker_max = blocker
+        blocker_min, blocker_max = _obb_world_envelope(blocker)
         for axis in range(3):
             low = min(start_center[axis], end_center[axis])
             high = max(start_center[axis], end_center[axis])
@@ -2418,22 +2728,33 @@ def build_predicate_snapshot(
                 return False
         return True
 
-    def _union_aabb(
-        a: tuple[np.ndarray, np.ndarray],
-        b: tuple[np.ndarray, np.ndarray],
-    ) -> tuple[np.ndarray, np.ndarray]:
-        a_min, a_max = a
-        b_min, b_max = b
-        return np.minimum(a_min, b_min), np.maximum(a_max, b_max)
+    def _union_aabb(a, b):
+        return _obb_union(a, b)
 
-    def _translate_aabb(
-        aabb: tuple[np.ndarray, np.ndarray],
-        delta: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        a_min, a_max = aabb
-        return a_min + delta, a_max + delta
+    def _translate_aabb(aabb, delta: np.ndarray):
+        return _obb_translate(aabb, delta)
 
-    def _gripper_link_aabb() -> tuple[np.ndarray, np.ndarray] | None:
+    def _expanded_aabb(aabb, margin: float):
+        # Expand an OBB's own half-extents by margin along its own local
+        # axes (2026-09-18, true-OBB rewrite), keeping its center/axes --
+        # the rotation-correct analog of padding a world-frame min/max box.
+        # Moved here (was originally much further down the file, near
+        # _fixture_retract_path_blockers) once _support_geometry_valid and
+        # _dump_support_geometry_valid needed it too, much earlier in this
+        # function's own execution order -- a nested def can reference a
+        # name bound later in the enclosing function, but only if it isn't
+        # *called* before that binding happens, and both of those are
+        # called well before line ~7940.
+        center, axes, half = aabb
+        return _obb_make(center, axes, np.maximum(half + margin, 0.0))
+
+    def _gripper_link_aabb():
+        # No single coherent rigid rotation across "every gripper/finger/eef
+        # link point" as a set (they're several distinct bodies), so this
+        # stays a plain axis-aligned envelope (an OBB with identity axes) --
+        # a principled exception, not a legacy holdout: unlike a single
+        # rigid object/fixture, there's no one rotation to build with sole
+        # reference to.
         link_poses = (dynamic_info.get("robot") or {}).get("link_poses") or {}
         points = []
         if isinstance(link_poses, dict):
@@ -2459,24 +2780,19 @@ def build_predicate_snapshot(
         if not points:
             return None
         arr = np.asarray(points, dtype=float)
-        return np.min(arr, axis=0), np.max(arr, axis=0)
+        return _obb_from_minmax(np.min(arr, axis=0), np.max(arr, axis=0))
 
-    def _gripper_aabb() -> tuple[np.ndarray, np.ndarray] | None:
+    def _gripper_aabb():
         return _gripper_contact_aabb() or _gripper_link_aabb()
 
-    def _pick_swept_endpoint_aabbs(
-        object_name: str,
-    ) -> tuple[tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]] | None:
+    def _pick_swept_endpoint_aabbs(object_name: str):
         gripper_aabb = _gripper_aabb()
         target_aabb = _object_aabb(object_name)
         if gripper_aabb is None or target_aabb is None:
             return None
         return gripper_aabb, target_aabb
 
-    def _object_swept_to_point_endpoint_aabbs(
-        object_name: str,
-        end: np.ndarray,
-    ) -> tuple[tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]] | None:
+    def _object_swept_to_point_endpoint_aabbs(object_name: str, end: np.ndarray):
         start = _object_position(object_name)
         object_aabb = _object_aabb(object_name)
         if start is None or object_aabb is None:
@@ -2713,6 +3029,60 @@ def build_predicate_snapshot(
             and angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD
         )
 
+    def _fixture_support_reference(name: str) -> str | None:
+        """Name of the fixture currently supporting `name`, if any -- the
+        fixture-kind counterpart to _object_support_reference below."""
+        try:
+            fixture_contacts, _ = _current_support_contacts(name)
+        except Exception:
+            return None
+        if not fixture_contacts:
+            return None
+        return sorted(fixture_contacts)[0]
+
+    def _fixture_velocity_near(fname: str, position: np.ndarray | None):
+        """Live (linear, angular) world-frame velocity of whichever body of
+        fixture `fname` is physically closest to `position` -- an
+        approximation of "the specific articulated part (e.g. a drawer)
+        `position` is actually resting on," since fixture geoms can span
+        several distinct bodies (a static housing plus one or more
+        independently-jointed moving parts) and we don't have the exact
+        contact geom on hand here. Returns (None, None) if unavailable."""
+        try:
+            geom_ids = _fixture_geom_ids_by_names({str(fname)})
+        except Exception:
+            return None, None
+        body_ids = set()
+        for geom_id in geom_ids:
+            try:
+                body_ids.add(int(env.sim.model.geom_bodyid[int(geom_id)]))
+            except Exception:
+                continue
+        if not body_ids:
+            return None, None
+        best_body_id = None
+        best_dist = None
+        for body_id in body_ids:
+            try:
+                body_pos = np.asarray(env.sim.data.body_xpos[body_id], dtype=float)
+            except Exception:
+                continue
+            dist = (
+                float(np.linalg.norm(body_pos - np.asarray(position, dtype=float)))
+                if position is not None
+                else 0.0
+            )
+            if best_dist is None or dist < best_dist:
+                best_dist = dist
+                best_body_id = body_id
+        if best_body_id is None:
+            return None, None
+        try:
+            cvel = np.asarray(env.sim.data.cvel[best_body_id], dtype=float)
+            return cvel[3:6], cvel[:3]
+        except Exception:
+            return None, None
+
     def _object_support_reference(name: str) -> str | None:
         """Name of the movable object currently supporting `name`, if any.
 
@@ -2745,6 +3115,20 @@ def build_predicate_snapshot(
         object_settled / trips object_settle_timeout once the receptacle is
         picked up again, even though nothing about the object itself became
         unstable.
+
+        Extended 2026-09-18 (found via PickPlaceDrawerToCounter ep3/7's
+        disputed pick-preconditions annotations) to also correct for a
+        *fixture* support, not just an object one: _object_support_reference
+        only ever returns object-kind supports ("fixture supports are
+        treated as stationary" is its own long-standing, explicit
+        assumption) -- true for a static counter/shelf, but wrong for an
+        articulated fixture whose relevant part is genuinely moving (a
+        drawer being pulled open with the item resting inside it, still
+        genuinely at rest *relative to the drawer* the whole time). Without
+        this, an object sitting perfectly still inside a drawer read as
+        "not stable" the instant the drawer started sliding, purely from
+        picking up the drawer's own world-frame motion, not any real
+        rattling.
         """
         linear_speed, angular_speed = _object_speeds(name)
         support_name = _object_support_reference(name)
@@ -2757,6 +3141,22 @@ def build_predicate_snapshot(
             support_angular = _object_angular_velocity(support_name)
             if obj_angular is not None and support_angular is not None:
                 angular_speed = float(np.linalg.norm(obj_angular - support_angular))
+        else:
+            fixture_name = _fixture_support_reference(name)
+            if fixture_name is not None:
+                obj_pos = _object_position(name)
+                fixture_linear, fixture_angular = _fixture_velocity_near(
+                    fixture_name, obj_pos
+                )
+                if fixture_linear is not None:
+                    obj_linear = _object_linear_velocity(name)
+                    if obj_linear is not None:
+                        linear_speed = float(np.linalg.norm(obj_linear - fixture_linear))
+                    obj_angular = _object_angular_velocity(name)
+                    if obj_angular is not None and fixture_angular is not None:
+                        angular_speed = float(
+                            np.linalg.norm(obj_angular - fixture_angular)
+                        )
         return _bool(
             linear_speed < OBJ_LINEAR_STABLE_THRESHOLD
             and angular_speed < OBJ_ANGULAR_STABLE_THRESHOLD
@@ -2815,8 +3215,30 @@ def build_predicate_snapshot(
             "contamination_transfer_pair": None,
             "contamination_transfer_source": None,
             "contamination_transfer_target": None,
-            "contaminated_objects": [],
-            "contaminated_fixtures": [],
+            # Redesigned 2026-09-18 (explicit user decision) from two flat
+            # set[str]s of object/fixture *names* to one unified list of
+            # spot records (each {"kind", "name", "body_id", "local_offset",
+            # "radius"}): the old design treated an entire object or
+            # fixture *body* as contaminated the instant any one point on
+            # it was touched by something raw/contaminated -- true enough
+            # for a small object, but wrong for anything with real spatial
+            # extent (a fridge's several shelves, a cabinet's several
+            # compartments, a large bowl's far rim vs. its near rim):
+            # contact with raw food at one spot has no business marking a
+            # physically distant, never-touched part of the same body as
+            # contaminated too. Contamination now spreads only to the
+            # actual contact point (radius = the *contaminating* entity's
+            # own footprint size -- a large pot contaminates a bigger area
+            # than a small lemon slice), and a later object only picks it
+            # up if its own contact point falls within that recorded spot.
+            # Stored as a body-relative local offset (not a raw world
+            # position) precisely because objects (and articulated fixture
+            # parts like a drawer) can move after being contaminated -- a
+            # world-frame spot would silently become wrong the instant the
+            # contaminated object/part moved; recomputing the spot's world
+            # position from the owning body's *current* live pose each
+            # frame keeps it correctly attached regardless of motion.
+            "contaminated_spots": [],
             "active_object": None,
             "awaiting_settle": False,
             "settle_watch_object": None,
@@ -3757,16 +4179,70 @@ def build_predicate_snapshot(
     fixture_geom_ids_by_name = {
         name: _fixture_geom_ids_by_names({name}) for name in fixture_names
     }
-    contaminated_objects = set(
-        str(name)
-        for name in (monitor_state.get("contaminated_objects") or [])
-        if str(name) in all_object_names
-    )
-    contaminated_fixtures = set(
-        str(name)
-        for name in (monitor_state.get("contaminated_fixtures") or [])
-        if str(name) in fixture_names
-    )
+    contaminated_spots = [
+        dict(spot)
+        for spot in (monitor_state.get("contaminated_spots") or [])
+        if isinstance(spot, dict)
+        and (
+            (spot.get("kind") == "object" and str(spot.get("name")) in all_object_names)
+            or (spot.get("kind") == "fixture" and str(spot.get("name")) in fixture_names)
+        )
+    ]
+
+    def _spot_body_pose(body_id: int | None):
+        if body_id is None:
+            return None, None
+        try:
+            return (
+                np.asarray(env.sim.data.body_xpos[int(body_id)], dtype=float),
+                np.asarray(env.sim.data.body_xmat[int(body_id)], dtype=float).reshape(3, 3),
+            )
+        except Exception:
+            return None, None
+
+    def _spot_world_center(spot: dict) -> np.ndarray | None:
+        body_pos, body_axes = _spot_body_pose(spot.get("body_id"))
+        local_offset = spot.get("local_offset")
+        if body_pos is None or local_offset is None:
+            return None
+        return body_pos + body_axes @ np.asarray(local_offset, dtype=float)
+
+    def _entity_spot_contaminated(
+        kind: str, name: str, position: np.ndarray | None
+    ) -> bool:
+        if position is None:
+            return False
+        position = np.asarray(position, dtype=float)
+        for spot in contaminated_spots:
+            if spot.get("kind") != kind or str(spot.get("name")) != str(name):
+                continue
+            center = _spot_world_center(spot)
+            if center is None:
+                continue
+            radius = float(spot.get("radius", DEFAULT_CONTAMINATION_RADIUS))
+            if float(np.linalg.norm(position[:2] - center[:2])) <= radius:
+                return True
+        return False
+
+    def _entity_has_any_contamination(kind: str, name: str) -> bool:
+        # Broad, non-positional query -- for "is this object itself, as a
+        # whole, now considered contaminated" self-checks (e.g. is the
+        # manipulated object safe to still call ready_to_eat), where there's
+        # no other specific spot to check against; unlike
+        # _entity_spot_contaminated, used when asking about an entity's own
+        # general status, not about a specific resting/contact location on
+        # some other entity.
+        return any(
+            spot.get("kind") == kind and str(spot.get("name")) == str(name)
+            for spot in contaminated_spots
+        )
+
+    def _entity_footprint_radius(kind: str, name: str) -> float:
+        aabb = _gripper_aabb() if kind == "robot" else _object_aabb(str(name))
+        if aabb is None:
+            return DEFAULT_CONTAMINATION_RADIUS
+        _, _, half = aabb
+        return float(np.linalg.norm(np.asarray(half, dtype=float)[:2]))
     object_is_rte = _bool(
         has_active_object and "ready_to_eat" in attrs_by_name.get(obj_name, set())
     )
@@ -3795,24 +4271,48 @@ def build_predicate_snapshot(
                 entities.append(("fixture", name))
         return entities
 
-    def _entity_is_raw_or_contaminated(entity: tuple[str, str]) -> bool:
+    def _entity_is_raw_or_contaminated(
+        entity: tuple[str, str], position: np.ndarray | None = None
+    ) -> bool:
         kind, name = entity
         if kind == "robot":
             return bool(robot_contact_raw_active)
-        if kind == "object":
-            return (
-                "raw" in attrs_by_name.get(name, set()) or name in contaminated_objects
-            )
-        if kind == "fixture":
-            return name in contaminated_fixtures
+        if kind in ("object", "fixture"):
+            is_raw = kind == "object" and "raw" in attrs_by_name.get(name, set())
+            return is_raw or _entity_spot_contaminated(kind, name, position)
         return False
 
-    def _mark_contaminated(entity: tuple[str, str]) -> None:
+    def _mark_contaminated(
+        entity: tuple[str, str],
+        geom_id: int | None,
+        source_entity: tuple[str, str] | None = None,
+        position: np.ndarray | None = None,
+    ) -> None:
         kind, name = entity
-        if kind == "object":
-            contaminated_objects.add(name)
-        elif kind == "fixture":
-            contaminated_fixtures.add(name)
+        if position is None or geom_id is None:
+            return
+        try:
+            body_id = int(env.sim.model.geom_bodyid[int(geom_id)])
+        except Exception:
+            return
+        body_pos, body_axes = _spot_body_pose(body_id)
+        if body_pos is None:
+            return
+        local_offset = body_axes.T @ (np.asarray(position, dtype=float) - body_pos)
+        radius = (
+            _entity_footprint_radius(*source_entity)
+            if source_entity is not None
+            else DEFAULT_CONTAMINATION_RADIUS
+        )
+        contaminated_spots.append(
+            {
+                "kind": kind,
+                "name": str(name),
+                "body_id": body_id,
+                "local_offset": [float(x) for x in local_offset],
+                "radius": float(radius),
+            }
+        )
 
     def _contamination_entity_key(entity: tuple[str, str]) -> str:
         return f"{entity[0]}:{entity[1]}"
@@ -3824,6 +4324,10 @@ def build_predicate_snapshot(
             geom2 = int(env.sim.data.contact[contact_idx].geom2)
         except Exception:
             continue
+        try:
+            contact_pos = np.asarray(env.sim.data.contact[contact_idx].pos, dtype=float)
+        except Exception:
+            contact_pos = None
         entities1 = _entities_for_geom(geom1)
         entities2 = _entities_for_geom(geom2)
         # Unlike rc_no_forbidden_contact's identically-named skip above (which
@@ -3869,36 +4373,46 @@ def build_predicate_snapshot(
         for entity1 in entities1:
             for entity2 in entities2:
                 if entity1[0] == "robot" and entity2[0] != "robot":
-                    if _entity_is_raw_or_contaminated(entity2):
+                    if _entity_is_raw_or_contaminated(entity2, contact_pos):
                         raw_contact_sources_now.add(entity2[1])
                     if robot_contact_raw_active:
-                        contamination_transfer_candidates.append((entity1, entity2))
+                        contamination_transfer_candidates.append(
+                            (entity1, entity2, geom2, contact_pos)
+                        )
                 elif entity2[0] == "robot" and entity1[0] != "robot":
-                    if _entity_is_raw_or_contaminated(entity1):
+                    if _entity_is_raw_or_contaminated(entity1, contact_pos):
                         raw_contact_sources_now.add(entity1[1])
                     if robot_contact_raw_active:
-                        contamination_transfer_candidates.append((entity2, entity1))
+                        contamination_transfer_candidates.append(
+                            (entity2, entity1, geom1, contact_pos)
+                        )
                 elif entity1[0] != "robot" and entity2[0] != "robot":
-                    entity1_contaminated = _entity_is_raw_or_contaminated(entity1)
-                    entity2_contaminated = _entity_is_raw_or_contaminated(entity2)
+                    entity1_contaminated = _entity_is_raw_or_contaminated(entity1, contact_pos)
+                    entity2_contaminated = _entity_is_raw_or_contaminated(entity2, contact_pos)
                     if entity1_contaminated and not entity2_contaminated:
-                        contamination_transfer_candidates.append((entity1, entity2))
+                        contamination_transfer_candidates.append(
+                            (entity1, entity2, geom2, contact_pos)
+                        )
                     if entity2_contaminated and not entity1_contaminated:
-                        contamination_transfer_candidates.append((entity2, entity1))
+                        contamination_transfer_candidates.append(
+                            (entity2, entity1, geom1, contact_pos)
+                        )
         raw_contact_surface_sources_now.update(
             name
             for kind, name in entities1 + entities2
-            if kind == "fixture" and name in contaminated_fixtures
+            if kind == "fixture" and _entity_spot_contaminated("fixture", name, contact_pos)
         )
     transfer_pair = None
     transfer_source = None
     transfer_target = None
+    transfer_target_geom = None
+    transfer_pos = None
     if contamination_transfer_candidates:
-        transfer_source, transfer_target = sorted(
+        transfer_source, transfer_target, transfer_target_geom, transfer_pos = sorted(
             contamination_transfer_candidates,
-            key=lambda pair: (
-                _contamination_entity_key(pair[0]),
-                _contamination_entity_key(pair[1]),
+            key=lambda item: (
+                _contamination_entity_key(item[0]),
+                _contamination_entity_key(item[1]),
             ),
         )[0]
         transfer_pair = (
@@ -3930,8 +4444,9 @@ def build_predicate_snapshot(
         transfer_pair = None
         transfer_source = None
         transfer_target = None
-        contaminated_objects.clear()
-        contaminated_fixtures.clear()
+        transfer_target_geom = None
+        transfer_pos = None
+        contaminated_spots.clear()
     monitor_state["robot_contact_raw_candidate"] = raw_contact_candidate
     monitor_state["robot_contact_raw_candidate_sources"] = sorted(pending_raw_sources)
     monitor_state["contamination_transfer_pair"] = transfer_pair
@@ -3947,7 +4462,6 @@ def build_predicate_snapshot(
     ] = robot_contact_raw_activated_frame
     monitor_state["robot_contact_raw_sources"] = sorted(robot_contact_raw_sources)
     robot_contact_raw_contaminated = _bool(robot_contact_raw_active and not sanitized)
-    clean_check_contaminated_objects = set(contaminated_objects)
     robot_contact_clean_objects_now = set()
     for contact_idx in range(contact_number):
         try:
@@ -3955,9 +4469,13 @@ def build_predicate_snapshot(
             geom2 = int(env.sim.data.contact[contact_idx].geom2)
         except Exception:
             continue
+        try:
+            clean_check_pos = np.asarray(env.sim.data.contact[contact_idx].pos, dtype=float)
+        except Exception:
+            clean_check_pos = None
         for name, attrs in attrs_by_name.items():
             name = str(name)
-            if "raw" in attrs or name in clean_check_contaminated_objects:
+            if "raw" in attrs or _entity_spot_contaminated("object", name, clean_check_pos):
                 continue
             if _pair_matches(
                 geom1, geom2, robot_geom_ids, object_geom_ids_by_name.get(name, set())
@@ -3971,9 +4489,13 @@ def build_predicate_snapshot(
     )
     # No debounce here either -- see above.
     if transfer_pair is not None:
-        _mark_contaminated(transfer_target)
-    monitor_state["contaminated_objects"] = sorted(contaminated_objects)
-    monitor_state["contaminated_fixtures"] = sorted(contaminated_fixtures)
+        _mark_contaminated(
+            transfer_target,
+            transfer_target_geom,
+            source_entity=transfer_source,
+            position=transfer_pos,
+        )
+    monitor_state["contaminated_spots"] = contaminated_spots
     robot_contact_clean = _bool(robot_contact_clean_candidate is not None)
     robot_contact_clean_objects = (
         sorted(robot_contact_clean_objects_now) if robot_contact_clean else []
@@ -4007,12 +4529,8 @@ def build_predicate_snapshot(
 
     gripper_is_closing = _gripper_is_closing()
 
-    def _point_aabb_distance(
-        point: np.ndarray, aabb: tuple[np.ndarray, np.ndarray]
-    ) -> float:
-        a_min, a_max = aabb
-        gap = np.maximum(0.0, np.maximum(a_min - point, point - a_max))
-        return float(np.linalg.norm(gap))
+    def _point_aabb_distance(point: np.ndarray, aabb) -> float:
+        return _obb_point_distance(aabb, point)
 
     def _gripper_object_distances() -> dict[str, float]:
         eef_pos = _eef_position()
@@ -4032,8 +4550,7 @@ def build_predicate_snapshot(
             if cpos is None:
                 continue
             if gripper_aabb is not None:
-                clipped = np.minimum(np.maximum(cpos, gripper_aabb[0]), gripper_aabb[1])
-                distances[str(cname)] = float(np.linalg.norm(cpos - clipped))
+                distances[str(cname)] = _obb_point_distance(gripper_aabb, cpos)
             elif eef_pos is not None:
                 distances[str(cname)] = float(np.linalg.norm(eef_pos - cpos))
         return distances
@@ -4339,7 +4856,7 @@ def build_predicate_snapshot(
                 support_aabb = _object_aabb(str(name))
                 support_pos = _object_position(str(name))
                 if support_aabb is not None:
-                    support_z = float(support_aabb[1][2])
+                    support_z = float(_obb_world_envelope(support_aabb)[1][2])
                     obj_aabb = _object_aabb(str(obj_name))
                     xy_dist = (
                         _aabb_xy_distance(obj_aabb, support_aabb)
@@ -4370,7 +4887,7 @@ def build_predicate_snapshot(
                     except Exception:
                         bbox_min_dist = None
                 if support_aabb is not None:
-                    support_z = float(support_aabb[1][2])
+                    support_z = float(_obb_world_envelope(support_aabb)[1][2])
                     obj_aabb = _object_aabb(str(obj_name))
                     xy_dist = (
                         _aabb_xy_distance(obj_aabb, support_aabb)
@@ -4435,7 +4952,7 @@ def build_predicate_snapshot(
         support_fixture_contacts, support_object_contacts = _current_support_contacts(
             str(obj_name)
         )
-        def _fixture_xy_contains(fname: str) -> bool:
+        def _fixture_xy_contains(fname: str, use_support_aabb: bool = False) -> bool:
             # Added 2026-09-17 (explicit user decision), found via
             # PanTransfer ep9: the shortcut below used to accept a target
             # fixture the instant ANY contact registered with it
@@ -4452,12 +4969,38 @@ def build_predicate_snapshot(
             # via a loose contact tolerance. Confirmed the object (still
             # genuinely on the stove) was outside the counter's own XY
             # footprint while incidentally registering contact with it.
-            fixture_aabb = _fixture_aabb(str(fname))
+            #
+            # Tested in the fixture's own local XY (2026-09-18, true-OBB
+            # rewrite), not world XY -- a fixture rotated to face a
+            # different kitchen-wall direction has a footprint that isn't
+            # axis-aligned in world space, so clipping to a world-frame
+            # min/max envelope (the previous approach) could accept a point
+            # genuinely outside a rotated fixture's real rectangular
+            # footprint, or reject one genuinely inside it.
+            # use_support_aabb (2026-09-18, found via LoadDishwasher ep4):
+            # for the dishwasher-specific shortcut below, the *exterior
+            # housing* footprint (_fixture_aabb's ext-sites, a static,
+            # never-moves reference) is the wrong thing to test against --
+            # a dishwasher's rack slides forward, out of the housing, when
+            # the door opens, so an item resting in the extended rack can
+            # genuinely sit outside the housing's own static XY footprint
+            # even though it's exactly where it should be (confirmed:
+            # dish0's real Y position was ~13cm beyond the housing's own
+            # static exterior edge). _fixture_support_aabb already resolves
+            # to the *rack's* own live extent for a dishwasher (via
+            # _fixture_rack_aabb), so use that instead when explicitly
+            # asked to.
+            fixture_aabb = (
+                _fixture_support_aabb(str(fname), obj_pos=mpos)
+                if use_support_aabb
+                else _fixture_aabb(str(fname))
+            )
             if fixture_aabb is None:
                 return True
-            fmin, fmax = fixture_aabb
+            f_center, f_axes, f_half = fixture_aabb
+            local_xy = (f_axes.T @ (np.asarray(mpos, dtype=float) - f_center))[:2]
             return bool(
-                fmin[0] <= mpos[0] <= fmax[0] and fmin[1] <= mpos[1] <= fmax[1]
+                abs(local_xy[0]) <= f_half[0] and abs(local_xy[1]) <= f_half[1]
             )
 
         for oname in sorted(target_support_names & support_object_contacts):
@@ -4471,7 +5014,7 @@ def build_predicate_snapshot(
             if (
                 "dishwasher" in fixture_text
                 and not _fixture_is_floor(fname)
-                and _fixture_xy_contains(fname)
+                and _fixture_xy_contains(fname, use_support_aabb=True)
             ):
                 return "fixture", fname
 
@@ -4585,7 +5128,24 @@ def build_predicate_snapshot(
                 return False
             if _object_is_receptacle(str(sup_name)):
                 return True
-            return support_aabb[1][2] <= obj_aabb[0][2] + SUPPORT_CLUTTER_Z_TOLERANCE
+            # Genuine OBB intersection (2026-09-18, true-OBB rewrite), not a
+            # world-Z "support's top below obj's bottom" ordering test --
+            # same reasoning as _current_support_contacts' removed
+            # _other_name_is_below: that ordering test breaks down for any
+            # rotating candidate (see this file's OBB-core comment), and
+            # genuine (non-inflated) overlap is a strictly more reliable
+            # signal of real support contact regardless of orientation.
+            # Expanded by SUPPORT_CLUTTER_Z_TOLERANCE first (2026-09-18):
+            # unlike the removed world-Z check, a zero-tolerance OBB
+            # intersection test has no allowance at all for the small real
+            # gap that's completely normal between two genuinely-resting
+            # objects (bounding-box coarseness, MuJoCo's own contact
+            # margin, real physical clearance) -- without this, a
+            # perfectly legitimate support relationship with a few mm/cm of
+            # real gap would be wrongly rejected as "geometry invalid."
+            return _aabb_intersects(
+                _expanded_aabb(support_aabb, SUPPORT_CLUTTER_Z_TOLERANCE), obj_aabb
+            )
         if sup_kind == "fixture":
             fixture = getattr(env, "fixtures", {}).get(str(sup_name))
             if fixture is None:
@@ -4593,27 +5153,23 @@ def build_predicate_snapshot(
             support_pos = _spos(sup_kind, sup_name)
             if support_pos is None:
                 return False
-            try:
-                if not OU.point_in_fixture(
-                    point=np.asarray(support_pos, dtype=float),
-                    fixture=fixture,
-                    only_2d=True,
-                ):
-                    return False
-            except Exception:
-                fixture_aabb = _fixture_aabb(str(sup_name))
-                if fixture_aabb is None:
-                    return False
-                fmin, fmax = fixture_aabb
-                return _bool(
-                    fmin[0] <= support_pos[0] <= fmax[0]
-                    and fmin[1] <= support_pos[1] <= fmax[1]
-                )
-            try:
-                fixture.get_ext_sites(relative=False)
-            except Exception:
+            # Use the support's own live extent (2026-09-18), not the
+            # fixture's static exterior housing footprint via
+            # OU.point_in_fixture/get_ext_sites: a dishwasher rack (or
+            # drawer) slides out of its housing when open, so an object
+            # genuinely resting on the extended rack can sit outside the
+            # housing's static footprint (same bug class as
+            # _fixture_xy_contains's use_support_aabb fix). Falls back to
+            # the plain fixture footprint for fixtures with no dedicated
+            # support-region logic.
+            fixture_aabb = _fixture_support_aabb(str(sup_name), obj_pos=support_pos)
+            if fixture_aabb is None:
                 return False
-            return True
+            f_center, f_axes, f_half = fixture_aabb
+            local_xy = (f_axes.T @ (np.asarray(support_pos, dtype=float) - f_center))[:2]
+            return _bool(
+                abs(local_xy[0]) <= f_half[0] and abs(local_xy[1]) <= f_half[1]
+            )
         return False
 
     _STRUCTURAL_FIXTURE_CLASSES = {
@@ -4677,14 +5233,26 @@ def build_predicate_snapshot(
         if obj_name is None:
             return True
         manip_attrs = attrs_by_name.get(str(obj_name), set())
-        if "ready_to_eat" not in manip_attrs or str(obj_name) in contaminated_objects:
+        if "ready_to_eat" not in manip_attrs or _entity_has_any_contamination(
+            "object", str(obj_name)
+        ):
             return True
+        # Spot-checked (2026-09-18) at the manipulated object's own current
+        # position -- i.e. is the *specific spot* of the support it's
+        # actually resting on contaminated, not "is this fixture/object
+        # contaminated anywhere at all" (see contaminated_spots' own
+        # redesign comment: a fridge shelf or a bowl's far rim shouldn't be
+        # implicated just because a different shelf/rim spot once touched
+        # something raw).
         if sup_kind == "fixture":
-            return str(sup_name) not in contaminated_fixtures
+            return not _entity_spot_contaminated(
+                "fixture", str(sup_name), _object_position(str(obj_name))
+            )
         if sup_kind == "object" and sup_name is not None:
-            return (
-                "raw" not in attrs_by_name.get(sup_name, set())
-                and sup_name not in contaminated_objects
+            return "raw" not in attrs_by_name.get(
+                sup_name, set()
+            ) and not _entity_spot_contaminated(
+                "object", str(sup_name), _object_position(str(obj_name))
             )
         return True
 
@@ -4693,8 +5261,8 @@ def build_predicate_snapshot(
             return []
         manip_attrs = attrs_by_name.get(str(obj_name), set())
         manip_raw = "raw" in manip_attrs
-        manip_rte = (
-            "ready_to_eat" in manip_attrs and str(obj_name) not in contaminated_objects
+        manip_rte = "ready_to_eat" in manip_attrs and not _entity_has_any_contamination(
+            "object", str(obj_name)
         )
         spos = _spos(sup_kind, sup_name)
         if spos is None:
@@ -4716,8 +5284,10 @@ def build_predicate_snapshot(
             if not near_support:
                 continue
             o_attrs = attrs_by_name.get(str(oname), set())
-            o_rte = "ready_to_eat" in o_attrs and str(oname) not in contaminated_objects
-            o_raw = "raw" in o_attrs or str(oname) in contaminated_objects
+            o_rte = "ready_to_eat" in o_attrs and not _entity_has_any_contamination(
+                "object", str(oname)
+            )
+            o_raw = "raw" in o_attrs or _entity_has_any_contamination("object", str(oname))
             if manip_raw and o_rte:
                 issues.append({"object": str(oname), "reason": "ready_to_eat"})
             if manip_rte and o_raw:
@@ -4771,10 +5341,11 @@ def build_predicate_snapshot(
                     abs(float(opos[2] - spos[2])) <= SUPPORT_CLUTTER_Z_TOLERANCE
                 )
             else:
+                o_lower, o_upper = _obb_world_envelope(oaabb)
                 same_support_height = (
-                    oaabb[0][2] - SUPPORT_CLUTTER_Z_TOLERANCE
+                    o_lower[2] - SUPPORT_CLUTTER_Z_TOLERANCE
                     <= spos[2]
-                    <= oaabb[1][2] + SUPPORT_CLUTTER_Z_TOLERANCE
+                    <= o_upper[2] + SUPPORT_CLUTTER_Z_TOLERANCE
                 )
             if not same_support_height:
                 continue
@@ -5019,14 +5590,10 @@ def build_predicate_snapshot(
         selected.update(_fixture_component_body_geom_ids(fname, keywords))
         return selected
 
-    def _fixture_component_aabb(
-        fname: str, action: str
-    ) -> tuple[np.ndarray, np.ndarray] | None:
-        return _geom_ids_aabb(_fixture_component_geom_ids(fname, action))
+    def _fixture_component_aabb(fname: str, action: str):
+        return _geom_ids_obb(_fixture_component_geom_ids(fname, action))
 
-    def _target_aabb(
-        target_id: str | None, action: str
-    ) -> tuple[np.ndarray, np.ndarray] | None:
+    def _target_aabb(target_id: str | None, action: str):
         kind, name = _split_target_id(target_id)
         if kind == "fixture" and name is not None:
             return _fixture_component_aabb(name, action)
@@ -5037,7 +5604,7 @@ def build_predicate_snapshot(
     def _target_center(target_id: str, action: str) -> np.ndarray | None:
         aabb = _target_aabb(target_id, action)
         if aabb is not None:
-            return (aabb[0] + aabb[1]) / 2.0
+            return aabb[0]  # aabb[0] is the OBB's own center
         kind, name = _split_target_id(target_id)
         if kind == "fixture" and name is not None:
             return _fixture_pos(name)
@@ -5127,17 +5694,13 @@ def build_predicate_snapshot(
                 if aabb is not None and gripper_aabb is not None:
                     current = _aabb_distance(gripper_aabb, aabb)
                 elif aabb is not None and eef_pos is not None:
-                    clipped = np.minimum(np.maximum(eef_pos, aabb[0]), aabb[1])
-                    current = float(np.linalg.norm(eef_pos - clipped))
+                    current = _obb_point_distance(aabb, eef_pos)
                 else:
                     center = _target_center(target_id, action)
                     if center is None:
                         continue
                     if gripper_aabb is not None:
-                        clipped = np.minimum(
-                            np.maximum(center, gripper_aabb[0]), gripper_aabb[1]
-                        )
-                        current = float(np.linalg.norm(center - clipped))
+                        current = _obb_point_distance(gripper_aabb, center)
                     elif eef_pos is not None:
                         current = float(np.linalg.norm(eef_pos - center))
                     else:
@@ -6187,7 +6750,9 @@ def build_predicate_snapshot(
         and articulation_path_clear
     )
 
-    def _content_receptacle_overlap(content_name: str, receptacle_name: str) -> bool:
+    def _content_receptacle_overlap(
+        content_name: str, receptacle_name: str, allow_geometry_grace: bool = False
+    ) -> bool:
         """Is content_name genuinely resting in/on receptacle_name --
         reuses _object_support_reference (already rigorous: real contact,
         directional below-check, and -- as of today's earlier fix --
@@ -6212,24 +6777,60 @@ def build_predicate_snapshot(
         None, not dish1) -- reusing it here makes entry and exit both use
         the identical, already-verified-rigorous relationship.
 
-        2026-09-18 (PanTransfer ep9): the raw check briefly read False for
-        one frame each at 102 and 110 while vegetable_container was being
-        tilted to pour vegetable into the pan. Tried wrapping this in the
-        same asymmetric debounce used for object_stable_by_name, but
-        reverted (explicit user decision) -- dump onset fires exactly when
-        this check transitions True->False, so debouncing *this* signal is
-        debouncing the onset trigger itself, not some independent upstream
-        raw signal (unlike object_stable_by_name, which many different
-        preconditions read but which is never itself the trigger condition
-        for an onset). That reintroduces the same persistence-smoothing
-        place/dump onset was explicitly redesigned to drop (see place
-        onset's own history: reverted to instantaneous
-        object_left_gripper_edge for exactly this reason). The real fix
-        belongs in the spatial check itself (why does a container that
-        hasn't actually released its contents briefly fail the geometric
-        containment test while tilting), not in time-smoothing the symptom.
+        allow_geometry_grace (2026-09-18, found via PanTransfer ep9): the
+        raw _object_support_reference check briefly read False for one
+        frame each at 102 and 110 while vegetable_container was being
+        tilted to pour -- a single-frame MuJoCo contact-registration
+        dropout, not a real separation (confirmed via live replay: literal
+        contact stayed True on every neighboring frame). A temporal
+        debounce was tried and reverted (dump onset fires exactly on this
+        signal's True->False edge, so smoothing it in time is smoothing the
+        onset trigger itself). A bare genuine-OBB-intersection fallback
+        with NO other gating was also tried and reverted (added to
+        _current_support_contacts's shared object-contact loop) -- that
+        let a moving/rotating candidate's *coarse box corner* register as
+        "contact" against a completely unrelated, stationary nearby object
+        purely from box-approximation slop, confirmed for two independent
+        pairs (LoadDishwasher ep4's dish0/dish1, and this same episode's
+        vegetable_container/plate) reproducing the exact same false-
+        positive flicker the original fix was trying to prevent, just for
+        a different pair. The fix that actually holds up: gate the OBB-
+        overlap grace to *only* apply when checking whether an
+        *already-tracked* relationship survived this one frame (this
+        function's caller passes allow_geometry_grace=True only for the
+        exit/still-in check below, never for detecting brand-new entrants)
+        -- a coarse-box coincidence can plausibly explain a single dropped
+        frame in an already-established, physically-verified relationship,
+        but can't be trusted to *establish* one in the first place.
         """
-        return _object_support_reference(str(content_name)) == str(receptacle_name)
+        if _object_support_reference(str(content_name)) == str(receptacle_name):
+            return True
+        if not allow_geometry_grace:
+            return False
+        content_aabb = _object_aabb(str(content_name))
+        receptacle_aabb = _object_aabb(str(receptacle_name))
+        if content_aabb is None or receptacle_aabb is None:
+            return False
+        # Expanded by SUPPORT_CLUTTER_Z_TOLERANCE, not shrunk (revised
+        # 2026-09-18, explicit user decision, superseding an earlier -0.02
+        # shrink tried the same day): the coarse-box-corner-coincidence
+        # false positive (dish0/dish1, vegetable_container/plate) is
+        # already fully prevented structurally by allow_geometry_grace's
+        # own entry/exit scoping above -- grace can only ever *confirm* a
+        # pair already established by strict contact, never fabricate a
+        # new one, so this margin no longer needs to defend against that.
+        # Given that, the two remaining failure directions aren't
+        # symmetric: too strict here risks a false EXIT (wrongly
+        # concluding an already-genuine, still-touching relationship just
+        # left, a hard misclassification) if a real relationship happens
+        # to have shallow overlap right when a solver glitch hits; too
+        # lenient only risks a few extra frames' delay in detecting a
+        # *real* separation before the growing distance finally clears the
+        # margin -- a soft delay, not a wrong classification. Being
+        # lenient is the better tradeoff once fabrication is off the table.
+        return _aabb_intersects(
+            _expanded_aabb(receptacle_aabb, SUPPORT_CLUTTER_Z_TOLERANCE), content_aabb
+        )
 
     # Redesigned 2026-09-17 (explicit user decision): content tracking no
     # longer resets just because the receptacle is dropped or leaves the
@@ -6262,15 +6863,42 @@ def build_predicate_snapshot(
         # near an unrelated, separately-supported object). Both entry and
         # exit now use the identical _object_support_reference-based
         # relationship.
+        #
+        # Exclude the active receptacle's own known pour DESTINATION
+        # (2026-09-18, found via PanTransfer ep0/2/4: `grasped_receptacle_
+        # content_names` included 'plate' -- the thing being poured ONTO,
+        # not into -- while the pan hovered directly above it to pour).
+        # _object_support_reference's underlying RoboCasa utility
+        # (OU.check_obj_in_receptacle) itself is ambiguous here: it accepts
+        # any real contact within ~70% of the candidate support's own
+        # horizontal radius, which a pan tipped down to pour genuinely
+        # satisfies against the plate it's pouring onto (real, not
+        # coarse-box-corner, contact) -- there's no reliable geometric
+        # signal left to distinguish "genuinely resting inside" from
+        # "hovering directly above to pour into" once rotation ruled out
+        # world-Z ordering (see _current_support_contacts' own comment).
+        # But a receptacle's own pour target is already known independently
+        # via active_target_object_names/target_objects_by_object -- that
+        # target is structurally what content will end up ON, never a
+        # thing carried INSIDE the receptacle doing the pouring, so exclude
+        # it from ever becoming a tracked content candidate at all.
         tracked |= {
             str(name)
             for name in all_object_names
             if str(name) != str(active_object)
+            and str(name) not in active_target_object_names
             and _content_receptacle_overlap(str(name), str(active_object))
         }
         still_in: set[str] = set()
         for cname in tracked:
-            if _content_receptacle_overlap(cname, str(active_object)):
+            # allow_geometry_grace=True here only (never for the entry
+            # union above) -- see _content_receptacle_overlap's own
+            # docstring for why the OBB-overlap grace must be scoped to
+            # confirming an already-tracked relationship, not discovering
+            # a new one.
+            if _content_receptacle_overlap(
+                cname, str(active_object), allow_geometry_grace=True
+            ):
                 still_in.add(cname)
             else:
                 dump_onset_content_names.append(cname)
@@ -6458,9 +7086,13 @@ def build_predicate_snapshot(
                 content_aabb = _object_aabb(content_name)
                 if content_aabb is None:
                     return False
-                if (
-                    support_aabb[1][2]
-                    > content_aabb[0][2] + SUPPORT_CLUTTER_Z_TOLERANCE
+                # Genuine OBB intersection, expanded by
+                # SUPPORT_CLUTTER_Z_TOLERANCE first, not a world-Z ordering
+                # test -- same reasoning as _support_geometry_valid's own
+                # object branch (2026-09-18, true-OBB rewrite).
+                if not _aabb_intersects(
+                    _expanded_aabb(support_aabb, SUPPORT_CLUTTER_Z_TOLERANCE),
+                    content_aabb,
                 ):
                     return False
             return True
@@ -6471,27 +7103,23 @@ def build_predicate_snapshot(
             support_pos = _spos(sup_kind, sup_name)
             if support_pos is None:
                 return False
-            try:
-                if not OU.point_in_fixture(
-                    point=np.asarray(support_pos, dtype=float),
-                    fixture=fixture,
-                    only_2d=True,
-                ):
-                    return False
-            except Exception:
-                fixture_aabb = _fixture_aabb(str(sup_name))
-                if fixture_aabb is None:
-                    return False
-                fmin, fmax = fixture_aabb
-                return _bool(
-                    fmin[0] <= support_pos[0] <= fmax[0]
-                    and fmin[1] <= support_pos[1] <= fmax[1]
-                )
-            try:
-                fixture.get_ext_sites(relative=False)
-            except Exception:
+            # Use the support's own live extent (2026-09-18), not the
+            # fixture's static exterior housing footprint via
+            # OU.point_in_fixture/get_ext_sites: a dishwasher rack (or
+            # drawer) slides out of its housing when open, so an object
+            # genuinely resting on the extended rack can sit outside the
+            # housing's static footprint (same bug class as
+            # _fixture_xy_contains's use_support_aabb fix). Falls back to
+            # the plain fixture footprint for fixtures with no dedicated
+            # support-region logic.
+            fixture_aabb = _fixture_support_aabb(str(sup_name), obj_pos=support_pos)
+            if fixture_aabb is None:
                 return False
-            return True
+            f_center, f_axes, f_half = fixture_aabb
+            local_xy = (f_axes.T @ (np.asarray(support_pos, dtype=float) - f_center))[:2]
+            return _bool(
+                abs(local_xy[0]) <= f_half[0] and abs(local_xy[1]) <= f_half[1]
+            )
         return False
 
     def _dump_support_hygienic_for_content() -> bool:
@@ -6499,14 +7127,21 @@ def build_predicate_snapshot(
             return support_hygienic_for_manipulated_object
         for content_name in dump_content_names_for_preconditions:
             attrs = attrs_by_name.get(str(content_name), set())
-            if "ready_to_eat" not in attrs or str(content_name) in contaminated_objects:
+            if "ready_to_eat" not in attrs or _entity_has_any_contamination(
+                "object", str(content_name)
+            ):
                 continue
+            # Spot-checked at content_name's own position -- same reasoning
+            # as _support_hygienic's own fixture/object branches.
+            content_pos = _object_position(str(content_name))
             if sup_kind == "fixture":
-                if str(sup_name) in contaminated_fixtures:
+                if _entity_spot_contaminated("fixture", str(sup_name), content_pos):
                     return False
             elif sup_kind == "object" and sup_name is not None:
                 support_attrs = attrs_by_name.get(str(sup_name), set())
-                if "raw" in support_attrs or str(sup_name) in contaminated_objects:
+                if "raw" in support_attrs or _entity_spot_contaminated(
+                    "object", str(sup_name), content_pos
+                ):
                     return False
             else:
                 return False
@@ -6522,12 +7157,12 @@ def build_predicate_snapshot(
         content_set = set(dump_content_names_for_preconditions)
         for content_name in dump_content_names_for_preconditions:
             content_attrs = attrs_by_name.get(str(content_name), set())
-            content_raw = (
-                "raw" in content_attrs or str(content_name) in contaminated_objects
+            content_raw = "raw" in content_attrs or _entity_has_any_contamination(
+                "object", str(content_name)
             )
             content_rte = (
                 "ready_to_eat" in content_attrs
-                and str(content_name) not in contaminated_objects
+                and not _entity_has_any_contamination("object", str(content_name))
             )
             if not content_raw and not content_rte:
                 continue
@@ -6550,8 +7185,10 @@ def build_predicate_snapshot(
                 if not near_support:
                     continue
                 o_attrs = attrs_by_name.get(oname, set())
-                o_rte = "ready_to_eat" in o_attrs and oname not in contaminated_objects
-                o_raw = "raw" in o_attrs or oname in contaminated_objects
+                o_rte = "ready_to_eat" in o_attrs and not _entity_has_any_contamination(
+                    "object", oname
+                )
+                o_raw = "raw" in o_attrs or _entity_has_any_contamination("object", oname)
                 if content_raw and o_rte:
                     issues.append(
                         {
@@ -6598,10 +7235,11 @@ def build_predicate_snapshot(
                     abs(float(opos[2] - spos[2])) <= SUPPORT_CLUTTER_Z_TOLERANCE
                 )
             else:
+                o_lower, o_upper = _obb_world_envelope(oaabb)
                 same_support_height = (
-                    oaabb[0][2] - SUPPORT_CLUTTER_Z_TOLERANCE
+                    o_lower[2] - SUPPORT_CLUTTER_Z_TOLERANCE
                     <= spos[2]
-                    <= oaabb[1][2] + SUPPORT_CLUTTER_Z_TOLERANCE
+                    <= o_upper[2] + SUPPORT_CLUTTER_Z_TOLERANCE
                 )
             if not same_support_height:
                 continue
@@ -7079,14 +7717,29 @@ def build_predicate_snapshot(
                 names.append(str(fname))
         return names
 
-    def _aabb_center_inside(
-        inner: tuple[np.ndarray, np.ndarray], outer: tuple[np.ndarray, np.ndarray]
-    ) -> bool:
-        center = (
-            np.asarray(inner[0], dtype=float) + np.asarray(inner[1], dtype=float)
-        ) / 2.0
-        omin, omax = outer
-        return _bool(np.all(center >= omin) and np.all(center <= omax))
+    def _aabb_center_inside(inner, outer) -> bool:
+        # inner[0]/outer's center-axes-half tuple, not a (min,max) pair
+        # (2026-09-18, true-OBB rewrite) -- inner's own center is already
+        # inner[0] (no averaging needed), and containment is tested in
+        # outer's own local frame so a rotated outer box (a fixture facing
+        # a different kitchen-wall direction) is handled correctly.
+        center = np.asarray(inner[0], dtype=float)
+        o_center, o_axes, o_half = outer
+        local = o_axes.T @ (center - o_center)
+        return _bool(np.all(np.abs(local) <= o_half))
+
+    def _obb_shrink_interior(obb, frac: float = 0.10, max_margin: float = 0.04):
+        """Shrink an OBB inward by min(extent*frac, max_margin) per axis,
+        keeping its center/axes unchanged -- used to test 'genuinely well
+        inside a fixture's interior', not merely touching its opening
+        boundary. Falls back to the unshrunk box if the margin would
+        collapse it (a very thin box)."""
+        center, axes, half = obb
+        margin = np.minimum(half * 2.0 * frac, max_margin)
+        shrunk_half = half - margin
+        if np.any(shrunk_half <= 0.0):
+            return obb
+        return _obb_make(center, axes, shrunk_half)
 
     def _object_center_in_fixture(oname: str, fname: str) -> bool:
         object_aabb = _object_aabb(str(oname))
@@ -7110,12 +7763,7 @@ def build_predicate_snapshot(
         fixture_aabb = _fixture_aabb(str(fname))
         if object_aabb is None or fixture_aabb is None:
             return False
-        fmin, fmax = fixture_aabb
-        extent = np.maximum(fmax - fmin, 0.0)
-        margin = np.minimum(extent * 0.10, 0.04)
-        inner = (fmin + margin, fmax - margin)
-        if np.any(inner[0] >= inner[1]):
-            inner = fixture_aabb
+        inner = _obb_shrink_interior(fixture_aabb)
         return _aabb_center_inside(object_aabb, inner)
 
     def _object_partly_inside_fixture_interior(oname: str, fname: str) -> bool:
@@ -7188,24 +7836,15 @@ def build_predicate_snapshot(
         gripper_aabb = _gripper_aabb()
         fixture_aabb = _fixture_aabb(str(fname))
         if gripper_aabb is not None and fixture_aabb is not None:
-            fmin, fmax = fixture_aabb
-            extent = np.maximum(fmax - fmin, 0.0)
-            margin = np.minimum(extent * 0.10, 0.04)
-            inner = (fmin + margin, fmax - margin)
-            if np.any(inner[0] >= inner[1]):
-                inner = fixture_aabb
+            inner = _obb_shrink_interior(fixture_aabb)
             return _aabb_center_inside(gripper_aabb, inner)
         eef_pos = _eef_position()
         if eef_pos is None or fixture_aabb is None:
             return False
-        fmin, fmax = fixture_aabb
-        extent = np.maximum(fmax - fmin, 0.0)
-        margin = np.minimum(extent * 0.10, 0.04)
-        inner_min = fmin + margin
-        inner_max = fmax - margin
-        if np.any(inner_min >= inner_max):
-            inner_min, inner_max = fmin, fmax
-        return _bool(np.all(eef_pos >= inner_min) and np.all(eef_pos <= inner_max))
+        inner = _obb_shrink_interior(fixture_aabb)
+        i_center, i_axes, i_half = inner
+        local = i_axes.T @ (np.asarray(eef_pos, dtype=float) - i_center)
+        return _bool(np.all(np.abs(local) <= i_half))
 
     def _fixture_open_fraction(fname: str | None) -> float | None:
         if fname is None:
@@ -7674,13 +8313,6 @@ def build_predicate_snapshot(
         robot_fixture_contact and fixture_is_closing and fixture_obstacle_contact
     )
 
-    def _expanded_aabb(aabb, margin: float):
-        amin, amax = aabb
-        return (
-            np.asarray(amin, dtype=float) - margin,
-            np.asarray(amax, dtype=float) + margin,
-        )
-
     def _object_inside_or_supported_by_fixture(oname: str, fname: str) -> bool:
         try:
             if OU.obj_inside_of(env, str(oname), str(fname), partial_check=True):
@@ -7765,7 +8397,7 @@ def build_predicate_snapshot(
         # substring at all).
         door_geom_ids = _fixture_door_geom_ids(str(fname))
         fixture_aabb = (
-            _geom_ids_aabb(door_geom_ids) if door_geom_ids else None
+            _geom_ids_obb(door_geom_ids) if door_geom_ids else None
         ) or _fixture_aabb(str(fname))
         if fixture_aabb is None:
             return None
@@ -8070,8 +8702,19 @@ def build_predicate_snapshot(
         "robot_contact_raw_sources": sorted(robot_contact_raw_sources),
         "raw_contact_sources_now": sorted(raw_contact_sources_now),
         "raw_contact_surface_sources_now": sorted(raw_contact_surface_sources_now),
-        "contaminated_objects": sorted(contaminated_objects),
-        "contaminated_fixtures": sorted(contaminated_fixtures),
+        # Names-only summaries kept for backward-compatible debugging
+        # visibility ("has this object/fixture got at least one
+        # contaminated spot anywhere"), derived from contaminated_spots --
+        # no longer the source of truth (2026-09-18 spot-based redesign);
+        # contaminated_spots itself (with each spot's actual location) is
+        # what the predicates above now actually check against.
+        "contaminated_objects": sorted(
+            {s["name"] for s in contaminated_spots if s.get("kind") == "object"}
+        ),
+        "contaminated_fixtures": sorted(
+            {s["name"] for s in contaminated_spots if s.get("kind") == "fixture"}
+        ),
+        "contaminated_spots": contaminated_spots,
         "robot_contact_clean_objects": robot_contact_clean_objects,
         "robot_contact_clean_objects_now": sorted(robot_contact_clean_objects_now),
         "skill_pick_onset_candidate_count": pick_onset_count,
