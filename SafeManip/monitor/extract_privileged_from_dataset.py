@@ -442,7 +442,30 @@ def extract_episode(env, dataset_dir, ep_num, trajectory_horizon, call_stride=1)
     static_info = None
     dynamic_frames = []
     traj_len = states.shape[0]
+    # Progress logging (2026-09-20, explicit user request): this loop was
+    # previously a total black box from the outside -- no way to tell which
+    # frame a running job was on, or whether it was making progress at all,
+    # short of waiting for the whole episode to finish and the final JSON to
+    # land. Printed every 50 frames (and unconditionally on the last frame)
+    # rather than every frame, since this loop runs for 500-1500+ frames per
+    # episode and per-frame printing would itself add meaningful overhead/
+    # log spam for no real benefit -- 50-frame granularity is still frequent
+    # enough to distinguish "slow but progressing" from "stuck" within a few
+    # seconds to a couple minutes, given each frame's own env.reset_to +
+    # get_privileged_information call takes a small fraction of a second
+    # under normal (non-contended) load. flush=True so this actually reaches
+    # the log file promptly instead of sitting in Python's default buffered
+    # stdout until the process exits.
+    progress_start = time.monotonic()
     for t in range(traj_len):
+        if t % 50 == 0 or t == traj_len - 1:
+            elapsed = time.monotonic() - progress_start
+            print(
+                f"[progress] frame {t + 1}/{traj_len} "
+                f"({100.0 * (t + 1) / traj_len:.1f}%) "
+                f"elapsed={elapsed:.1f}s",
+                flush=True,
+            )
         reset_to(env, {"states": states[t]})
         # Must advance manually -- reset_to() never calls env.step(), the only
         # place robosuite's base env increments env.timestep, so it would

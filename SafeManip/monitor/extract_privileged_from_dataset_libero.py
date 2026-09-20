@@ -135,7 +135,20 @@ def extract_episode(env, task_name, task_description, demo_group, ep_num, datase
     static_info = None
     dynamic_frames = []
     traj_len = states.shape[0]
+    # Progress logging (2026-09-20) -- mirrors the identical addition to
+    # RoboCasa's own extract_privileged_from_dataset.py's extract_episode
+    # (see that function's own comment for the full rationale: this loop
+    # was previously a total black box from the outside).
+    progress_start = time.monotonic()
     for t in range(traj_len):
+        if t % 50 == 0 or t == traj_len - 1:
+            elapsed = time.monotonic() - progress_start
+            print(
+                f"[progress] frame {t + 1}/{traj_len} "
+                f"({100.0 * (t + 1) / traj_len:.1f}%) "
+                f"elapsed={elapsed:.1f}s",
+                flush=True,
+            )
         env.sim.set_state_from_flattened(states[t])
         env.sim.forward()
         # Mirrors robocasa's extraction script's "CRITICAL FIX": build_predicate_snapshot's

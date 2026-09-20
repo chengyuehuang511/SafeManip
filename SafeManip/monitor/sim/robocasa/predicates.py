@@ -374,19 +374,13 @@ STABLE_PERSISTENCE_FRAMES = 5
 # without reopening the regression the asymmetric detour was working
 # around.
 GRASP_CANDIDATE_PERSISTENCE_FRAMES = 5
-# Reused as-is for contamination's own contact debounce (2026-09-19,
-# explicit user decision -- reconsidered from an initial, separately-named
-# GRASP_CANDIDATE_PERSISTENCE_FRAMES): unlike STABLE_PERSISTENCE_
-# FRAMES above (a genuinely different physical noise source -- velocity/
-# settling jitter, not contact detection), contamination's robot_contact_
-# raw_active/robot_contact_clean reads (see their own comments) go through
-# the exact same MuJoCo bilateral-contact mechanism
-# (env.sim.data.contact/ncon) that this constant already exists to debounce
-# for grasp detection -- the right number of frames to filter a contact-
-# registration dropout is a property of the simulator's contact solver
-# itself, not of which downstream concept happens to consume the contact
-# reading. One shared constant, not two independently-tunable ones that
-# would coincidentally start at the same value.
+# Contamination's own contact debounce (robot_contact_raw_active,
+# robot_contact_clean_sustained) ended up reusing FORBIDDEN_CONTACT_
+# TOLERANCE_FRAMES instead of this constant (see that constant's own
+# comment) -- both raw-contact and clean-contact-while-contaminated are
+# this property's own version of "forbidden contact," so they share
+# rc_no_forbidden_contact's tolerance design and value, not grasp
+# detection's flicker-filter one.
 SETTLE_TIMEOUT_FRAMES = 100
 # Kept at 100 (2026-09-05, explicit user decision) despite real settle-
 # latency data showing a long tail past it (v14 corpus, 74 instances,
@@ -460,6 +454,15 @@ SKILL_ONSET_FRAMES = 10
 # data-derived) -- an explicit policy choice about acceptable tolerance, not
 # a bug fix or a smoothing shortcut.
 FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 20
+# Also reused (2026-09-19, explicit user decision) for contamination's own
+# two forbidden-contact-shaped events: robot_contact_raw_active's
+# activation (a brief, incidental touch of raw food doesn't instantly and
+# permanently contaminate the robot for the rest of the episode) and
+# robot_contact_clean_sustained (a brief clean-object touch while
+# contaminated doesn't instantly violate). See both predicates' own
+# comments for the age-counter mechanics (identical to forbidden_contact_
+# sustained's) and robot_contact_clean_age's own comment for why its age
+# must be gated on contamination status too, not just the touch alone.
 # Redesigned 2026-09-16 (explicit user decision): FIXTURE_RETRACT_REACTION_
 # TOLERANCE_FRAMES (the grace period baked into fixture_{open,close}_
 # retracting itself) and FIXTURE_RETRACT_RESOLVE_TIMEOUT_FRAMES (the
@@ -4701,13 +4704,59 @@ def build_predicate_snapshot(
             for kind, name in entities1 + entities2
             if kind == "fixture" and _entity_spot_contaminated("fixture", name, contact_pos)
         )
+    # Per-pair persistence (2026-09-19, explicit user decision, consistent
+    # with robot_contact_raw_active/robot_contact_clean_sustained's own
+    # tolerance): a *new* contamination spot (_mark_contaminated, appended
+    # to contaminated_spots) previously got created the instant any
+    # qualifying contact appeared here, with zero tolerance -- a clean
+    # object or surface briefly, incidentally touching a raw/contaminated
+    # source shouldn't be permanently marked contaminated any more than a
+    # brief touch should instantly contaminate the robot itself or
+    # instantly violate once contaminated. Tracked per distinct
+    # (source, target) pair, not a single shared counter, since more than
+    # one candidate pair can be in contact on the same frame and the
+    # existing "pick one winner" sort below is otherwise arbitrary from
+    # frame to frame -- sharing one counter across different pairs would
+    # let an unrelated pair reset a genuinely progressing one's count.
+    # Deduplicated by pair-key WITHIN this frame first (2026-09-19, found
+    # via PackIdenticalLunches ep0 frames 393/975 both showing a "clean"
+    # object jump straight to contaminated in ~1-4 frames instead of the
+    # intended >20): contamination_transfer_candidates is built from the
+    # raw per-geom contact loop above, so a single real grasp -- which
+    # closes multiple gripper geoms around an object simultaneously (a
+    # hand collision geom plus 2+ finger/finger-pad geoms, confirmed via
+    # real contact data showing 5 simultaneous gripper-geom contacts
+    # against the same object in one frame) -- produced 5 separate
+    # candidate tuples for the exact same (source, target) pair in that
+    # one frame. The un-deduplicated version below incremented that pair's
+    # age once per candidate, not once per frame, so a genuine grasp
+    # crossed the 20-frame tolerance in ~4 real frames instead of 20.
+    candidates_by_pair_key: dict[str, tuple] = {}
+    for _cand in contamination_transfer_candidates:
+        _cand_key = (
+            f"{_contamination_entity_key(_cand[0])}->{_contamination_entity_key(_cand[1])}"
+        )
+        candidates_by_pair_key.setdefault(_cand_key, _cand)
+    transfer_pair_ages = dict(monitor_state.get("contamination_transfer_pair_ages") or {})
+    current_transfer_pair_keys = set(candidates_by_pair_key.keys())
+    sustained_transfer_candidates = []
+    for _cand_key, _cand in candidates_by_pair_key.items():
+        _age = int(transfer_pair_ages.get(_cand_key, 0)) + 1
+        transfer_pair_ages[_cand_key] = _age
+        if _age > FORBIDDEN_CONTACT_TOLERANCE_FRAMES:
+            sustained_transfer_candidates.append(_cand)
+    transfer_pair_ages = {
+        k: v for k, v in transfer_pair_ages.items() if k in current_transfer_pair_keys
+    }
+    monitor_state["contamination_transfer_pair_ages"] = transfer_pair_ages
+
     transfer_pair = None
     transfer_source = None
     transfer_target = None
     transfer_target_geom = None
     transfer_pos = None
     transfer_source_geom = None
-    if contamination_transfer_candidates:
+    if sustained_transfer_candidates:
         (
             transfer_source,
             transfer_target,
@@ -4715,7 +4764,7 @@ def build_predicate_snapshot(
             transfer_pos,
             transfer_source_geom,
         ) = sorted(
-            contamination_transfer_candidates,
+            sustained_transfer_candidates,
             key=lambda item: (
                 _contamination_entity_key(item[0]),
                 _contamination_entity_key(item[1]),
@@ -4731,19 +4780,29 @@ def build_predicate_snapshot(
         else None
     )
     pending_raw_sources = set(str(name) for name in raw_contact_sources_now)
-    # No debounce: robot_contact_raw_active activates the same frame raw
-    # contact is detected (previously required CONTACT_PERSISTENCE_FRAMES
-    # consecutive frames, but that constant is 1, so this is behaviorally
-    # unchanged). It stays sticky afterward regardless (only sanitized
-    # clears it) -- that part is unrelated to the debounce being removed.
-    # Reconsidered 2026-09-19 (explicit user decision): touching raw food
-    # isn't itself a forbidden/undesirable event the way a clean-object
-    # touch-while-contaminated is (see robot_contact_clean_sustained's own
-    # comment below) -- it's a normal task action -- so there's no
-    # "sustained" analog to apply here the way rc_no_forbidden_contact's
-    # own design only tolerizes the actual undesirable contact, not every
-    # contact leading up to it.
-    if raw_contact_candidate is not None:
+    # Reconsidered twice on 2026-09-19. First reconsideration (reverted):
+    # touching raw food isn't itself forbidden the way a clean-object
+    # touch-while-contaminated is, so no tolerance was applied here at all.
+    # Final design (explicit user decision): for consistency with rc_no_
+    # forbidden_contact's own tolerance philosophy, BOTH sides of this
+    # property use the same FORBIDDEN_CONTACT_TOLERANCE_FRAMES -- a brief,
+    # incidental raw touch (a finger grazing raw meat while reaching past
+    # it for something else) shouldn't permanently contaminate the robot
+    # for the rest of the episode any more than a brief clean touch should
+    # instantly violate once contaminated. Same age-counter-then-threshold
+    # mechanics as robot_contact_clean_sustained (mirrors forbidden_
+    # contact_sustained), not the earlier symmetric-hysteresis debounce
+    # attempt.
+    robot_contact_raw_age = (
+        int(monitor_state.get("robot_contact_raw_age", 0)) + 1
+        if raw_contact_candidate is not None
+        else 0
+    )
+    monitor_state["robot_contact_raw_age"] = robot_contact_raw_age
+    raw_contact_sustained = _bool(
+        robot_contact_raw_age > FORBIDDEN_CONTACT_TOLERANCE_FRAMES
+    )
+    if raw_contact_sustained:
         robot_contact_raw_active = True
         if not previous_robot_contact_raw_active:
             robot_contact_raw_activated_frame = current_timestep
@@ -4754,11 +4813,14 @@ def build_predicate_snapshot(
         pending_raw_sources.clear()
         robot_contact_raw_activated_frame = None
         raw_contact_candidate = None
+        robot_contact_raw_age = 0
+        monitor_state["robot_contact_raw_age"] = 0
         transfer_pair = None
         transfer_source = None
         transfer_target = None
         transfer_target_geom = None
         transfer_pos = None
+        monitor_state["contamination_transfer_pair_ages"] = {}
         contaminated_spots.clear()
     monitor_state["robot_contact_raw_candidate"] = raw_contact_candidate
     monitor_state["robot_contact_raw_candidate_sources"] = sorted(pending_raw_sources)
@@ -4809,6 +4871,29 @@ def build_predicate_snapshot(
                 geom1, geom2, robot_geom_ids, object_geom_ids_by_name.get(name, set())
             ):
                 robot_contact_clean_objects_now.add(name)
+        # Fixture-kind branch (2026-09-20, explicit user decision): a
+        # contaminated robot touching a genuinely clean fixture (e.g.
+        # turning a stove knob after handling raw shrimp) should count the
+        # same way touching a clean object does -- this loop previously
+        # only ever iterated all_object_names, so any fixture contact was
+        # structurally invisible to this check regardless of contamination
+        # status. Uses the positional _entity_spot_contaminated (not the
+        # whole-object _entity_has_any_contamination above), matching the
+        # source-side fixture check's own existing asymmetry: a fixture
+        # can be large enough that a genuinely clean, far-away region
+        # should still count as safe to touch even if some other part of
+        # the same fixture is contaminated (see _entity_spot_contaminated's
+        # own docstring and the object-kind branch's comment above for why
+        # objects, being small and hand-manipulable, get the stricter
+        # whole-object treatment instead).
+        for fname in fixture_names:
+            fname = str(fname)
+            if _entity_spot_contaminated("fixture", fname, clean_check_pos):
+                continue
+            if _pair_matches(
+                geom1, geom2, robot_geom_ids, fixture_geom_ids_by_name.get(fname, set())
+            ):
+                robot_contact_clean_objects_now.add(fname)
 
     robot_contact_clean_candidate = (
         "|".join(sorted(str(name) for name in robot_contact_clean_objects_now))
@@ -4828,9 +4913,21 @@ def build_predicate_snapshot(
     # debounced reading) is left available below for anything that wants
     # the instantaneous touch state; this sustained version is what
     # actually feeds the property.
+    # Gated on robot_contact_raw_contaminated too (2026-09-19, found via
+    # PackIdenticalLunches ep9), not just robot_contact_clean_candidate
+    # alone: the age must track how long the *forbidden combination*
+    # (touching something clean WHILE contaminated) has held, not how long
+    # the clean touch has existed in isolation. Without this gate, a touch
+    # that started well before contamination began (e.g. the gripper
+    # already resting near `vegetable0` for 25+ frames while separately
+    # closing in on `meat1`) already reads as "sustained" the instant
+    # contamination activates, firing a violation after just 1 frame of
+    # the actual forbidden pairing rather than requiring it to persist --
+    # exactly the single-frame-permanent-violation problem this predicate
+    # was introduced to prevent, just approached from the other direction.
     robot_contact_clean_age = (
         int(monitor_state.get("robot_contact_clean_age", 0)) + 1
-        if robot_contact_clean_candidate is not None
+        if robot_contact_clean_candidate is not None and robot_contact_raw_contaminated
         else 0
     )
     monitor_state["robot_contact_clean_age"] = robot_contact_clean_age
@@ -5033,6 +5130,18 @@ def build_predicate_snapshot(
         # blip, so the lagged signal still reliably reflects "was actively
         # touching a fixture right before this instant."
         and not _bool(monitor_state.get("robot_fixture_contact_raw", False))
+        # An AABB-overlap-based suppression (gripper's own bounding box
+        # already overlapping a recognized fixture-action target's
+        # bounding box, e.g. LoadDishwasher ep0 frame 857's rack-slide
+        # case where real collision contact never registers even mid-
+        # engagement) was tried and reverted the same day (explicit user
+        # decision): AABB overlap is a much coarser, more generous
+        # geometric test than real contact, so it risks suppressing
+        # genuine pick onsets anywhere a kitchen's normal clutter happens
+        # to put two bounding boxes near each other -- broader blast
+        # radius than the actual bug (one specific rack-slide case)
+        # warrants. Left as a documented, accepted special case rather
+        # than generalizing the fix.
     )
     prev_pick_count = int(monitor_state.get("skill_pick_onset_candidate_count", 0))
     pick_onset_count = prev_pick_count + 1 if pick_onset_cond else 0
