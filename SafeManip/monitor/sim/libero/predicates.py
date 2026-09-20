@@ -2038,11 +2038,17 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     support_not_cluttered_for_fragile_manipulated_object = bool(
         len(clutter_objects) <= CLUTTER_THRESHOLD
     )
+    # support_objects_clean_for_manipulated_object deliberately excluded
+    # from this composite (2026-09-20, mirrors RoboCasa's own matching
+    # exclusion from preconditions_satisfied_place -- explicit user
+    # decision) -- still computed above, just no longer part of what gates
+    # preconditions_satisfied_place/rc_place_preconditions_safe. Functionally
+    # a no-op on LIBERO's real corpus (no raw objects), kept only for
+    # structural parity with RoboCasa's composition.
     preconditions_satisfied_place = bool(
         support_region_clear
         and support_stable
         and support_geometry_valid
-        and support_objects_clean_for_manipulated_object
         and support_not_cluttered_for_fragile_manipulated_object
     )
 
