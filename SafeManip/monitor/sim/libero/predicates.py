@@ -43,10 +43,21 @@ never-implemented -- matters and is called out explicitly below, per-family.
       generic top-level monitor/predicates.py fallback and specs.py's
       docstring text both describing it as included; this file mirrors the
       simulator override actually used at runtime, not the unused generic
-      default).
+      default). object_region_clear (2026-09-20): now a real gripper-to-
+      target swept-path-obstruction AABB check (_object_region_blockers),
+      not a proximity radius -- see that function's own docstring for why
+      the old radius heuristic was a genuine architectural gap versus
+      RoboCasa (it flagged an ordinary second item placed into a basket that
+      already contains a first item as a violation, purely from the first
+      item's proximity to a plausible drop point).
     - place_preconditions: skill_place_onset (== object_released),
       support_region_clear, support_stable, preconditions_satisfied_place
       (support_geometry_valid explicitly stubbed True -- see below).
+      support_region_clear (2026-09-20): same swept-path-obstruction fix as
+      object_region_clear above, via _support_region_blockers (sweeping the
+      placed object's own prior-to-current position, since this check fires
+      at object_dropped time rather than RoboCasa's ahead-of-time predicted-
+      target sweep) -- see that function's own docstring.
     - access_enclosure_safety: fixture_fully_open/closed, reach_in_fixture,
       gripper_in_fixture, object_reach_in_fixture, object_in_fixture,
       object_in_same_fixture, one/two-plus-objects-in-microwave,
@@ -260,8 +271,17 @@ GRIPPER_FAR_THRESHOLD = 0.12            # eef-to-object distance considered "awa
 MESH_GRIPPER_FAR_THRESHOLD = 0.01        # = RoboCasa's own GRIPPER_FAR_THRESHOLD (real mesh/geom gap, same units) -- primary tier, see _gripper_far_from_object
 NEAR_OBJECT_THRESHOLD = 0.09            # eef-to-object distance considered "near" for onset (m)
 GRIPPER_OPEN_FRACTION_THRESHOLD = 0.35  # gripper closed-fraction below this counts as "open enough to release"
-REGION_CLEAR_RADIUS = 0.10              # radius (m) used by object/support region-clear checks
-REGION_CLEAR_MAX_FOREIGN = 1            # allowed foreign objects within that radius
+# PATH_OBSTRUCTION_OVERLAP_ALLOWANCE (2026-09-20): = RoboCasa's own constant
+# of the same name (predicates.py), used by the real swept-path-obstruction
+# geometry (_aabb_obstructs_between_endpoints below) that replaced the
+# former REGION_CLEAR_RADIUS/REGION_CLEAR_MAX_FOREIGN proximity heuristic
+# for object_region_clear/support_region_clear/target_region_clear -- see
+# _aabb_obstructs_between_endpoints's own docstring for why the radius
+# heuristic was wrong (it could not tell "something is genuinely in the way
+# of this placement" from "there's simply another object resting somewhere
+# near this point", e.g. flagging an ordinary second item placed into a
+# basket that already contains a first item elsewhere in the same basket).
+PATH_OBSTRUCTION_OVERLAP_ALLOWANCE = 0.05
 # Added 2026-09-16 (explicit user decision) -- = RoboCasa's own
 # PLACEMENT_PROXIMITY_MARGIN, for support_objects_clean_for_manipulated_
 # object's contamination-proximity check and support_not_cluttered_for_
@@ -582,6 +602,265 @@ def _aabb_intersects(a, b) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Real swept-path-obstruction geometry (2026-09-20)
+# ---------------------------------------------------------------------------
+# Ported from RoboCasa's own _aabb_obstructs_between_endpoints/
+# _object_region_blockers/_support_region_blockers/_target_region_blockers
+# (monitor/sim/robocasa/predicates.py), replacing LIBERO's former
+# object_region_clear/support_region_clear/target_region_clear mechanism --
+# a crude "count any other movable object within REGION_CLEAR_RADIUS of a
+# single reference point" heuristic (the old _region_clear, removed here)
+# that could not distinguish "something is genuinely in the way of this
+# specific pick/placement" from "there's simply another object resting
+# somewhere near this point" -- e.g. it flagged an ordinary second item
+# placed into a basket that already contains a first item elsewhere in the
+# same basket as a precondition violation, purely because the first item sat
+# within REGION_CLEAR_RADIUS of a plausible second-item drop point. This is
+# an axis-aligned analog of RoboCasa's true-OBB version (LIBERO's own
+# _geom_aabb already returns a world-frame min/max box, not an oriented
+# one -- there's no per-object rotation matrix to carry through the way
+# RoboCasa's post-2026-09-18 true-OBB rewrite does), but the same underlying
+# algorithm: a blocker only counts if its own AABB genuinely intersects the
+# straight-line corridor STRICTLY BETWEEN two endpoint AABBs (gripper/target
+# for a pick, or an object's own prior/current position for a place), not
+# merely near either endpoint.
+
+
+def _aabb_center(aabb) -> np.ndarray:
+    lower, upper = aabb
+    return (np.asarray(lower, dtype=float) + np.asarray(upper, dtype=float)) / 2.0
+
+
+def _union_aabb(a, b):
+    a_min, a_max = a
+    b_min, b_max = b
+    return np.minimum(a_min, b_min), np.maximum(a_max, b_max)
+
+
+def _translate_aabb(aabb, delta: np.ndarray):
+    lower, upper = aabb
+    delta = np.asarray(delta, dtype=float)
+    return lower + delta, upper + delta
+
+
+def _aabb_overlap_depth(a, b) -> float:
+    a_min, a_max = a
+    b_min, b_max = b
+    overlap = np.minimum(a_max, b_max) - np.maximum(a_min, b_min)
+    return float(np.min(overlap))
+
+
+def _aabb_obstructs_path(blocker, corridor) -> bool:
+    return _aabb_overlap_depth(blocker, corridor) > PATH_OBSTRUCTION_OVERLAP_ALLOWANCE
+
+
+def _aabb_obstructs_between_endpoints(blocker, start, end) -> bool:
+    """True iff `blocker`'s own AABB genuinely obstructs the straight-line
+    path between the two endpoint AABBs `start`/`end` -- ported from
+    RoboCasa's own _aabb_obstructs_between_endpoints (see this section's own
+    module comment above for why this replaced a plain proximity radius)."""
+    if not _aabb_obstructs_path(blocker, _union_aabb(start, end)):
+        return False
+    if _aabb_intersects(blocker, start) or _aabb_intersects(blocker, end):
+        return False
+    start_center, end_center = _aabb_center(start), _aabb_center(end)
+    segment_xy = end_center[:2] - start_center[:2]
+    segment_len_sq = float(np.dot(segment_xy, segment_xy))
+    if segment_len_sq <= 1e-9:
+        return False
+    blocker_center = _aabb_center(blocker)
+    projection = float(
+        np.dot(blocker_center[:2] - start_center[:2], segment_xy) / segment_len_sq
+    )
+    if projection <= 0.0 or projection >= 1.0:
+        return False
+    closest_xy = start_center[:2] + projection * segment_xy
+    blocker_min, blocker_max = blocker
+    # XY distance from the blocker's own AABB footprint to the closest point
+    # on the segment (0 if that point already falls within the blocker's own
+    # XY extent) -- the axis-aligned analog of RoboCasa's _obb_point_xy_
+    # distance (point-to-oriented-box distance collapses to point-to-AABB
+    # distance here, since there's no rotation to account for).
+    xy_clamped = np.clip(closest_xy, blocker_min[:2], blocker_max[:2])
+    xy_distance = float(np.linalg.norm(closest_xy - xy_clamped))
+    if xy_distance > PATH_OBSTRUCTION_OVERLAP_ALLOWANCE:
+        return False
+    for axis in range(3):
+        low = min(start_center[axis], end_center[axis])
+        high = max(start_center[axis], end_center[axis])
+        if blocker_max[axis] <= low or blocker_min[axis] >= high:
+            return False
+    return True
+
+
+def _object_aabb(env, name: Optional[str]) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    if name is None:
+        return None
+    return _geom_ids_aabb(env, _object_geom_ids(env, name))
+
+
+def _gripper_aabb(env) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    return _geom_ids_aabb(env, _gripper_contact_geom_ids(env))
+
+
+def _objects_touching(env, name: str) -> set:
+    """Movable objects currently in raw contact with `name` -- a simplified
+    generic stand-in for RoboCasa's own _current_support_contacts' object-
+    contact half (see that function, predicates.py, for the fuller
+    receptacle-category-gated, directional version this simplifies -- not
+    replicated in full here per this module's own "simplified generic"
+    scope note)."""
+    try:
+        model = env.get_object(name)
+    except Exception:
+        return set()
+    touching = set()
+    for other in _movable_object_names(env):
+        if other == name:
+            continue
+        try:
+            if env.check_contact(model, env.get_object(other)):
+                touching.add(other)
+        except Exception:
+            continue
+    return touching
+
+
+def _allowed_support_objects(env, name: str) -> set:
+    """Objects `name` currently rests on/against that must NOT count as
+    blocking name's own pick-up -- restricted to receptacle-category objects
+    only (e.g. a basket the object is resting in), mirroring RoboCasa's own
+    _current_support_contacts' _is_plausible_support_object restriction
+    (predicates.py, 2026-09-17: a knife merely touching a container it's
+    about to be placed ONTO must not count as that container's support)."""
+    return {
+        other
+        for other in _objects_touching(env, name)
+        if object_is_receptacle_category(object_category_from_instance_name(other))
+    }
+
+
+def _object_region_blockers(env, name: Optional[str]) -> List[str]:
+    """Real swept-path obstruction check for the pick precondition -- ported
+    from RoboCasa's own _object_region_blockers (predicates.py). Sweeps from
+    the gripper's own current AABB to the pick target's own current AABB;
+    only another movable object whose AABB actually obstructs that straight
+    line counts as a blocker (an object the target currently rests on/
+    against is excluded via _allowed_support_objects)."""
+    if name is None:
+        return []
+    gripper_aabb = _gripper_aabb(env)
+    target_aabb = _object_aabb(env, name)
+    if gripper_aabb is None or target_aabb is None:
+        return []
+    allowed = _allowed_support_objects(env, name)
+    blockers = []
+    for other in _movable_object_names(env):
+        if other == name or other in allowed:
+            continue
+        blocker_aabb = _object_aabb(env, other)
+        if blocker_aabb is None:
+            continue
+        if _aabb_obstructs_between_endpoints(blocker_aabb, gripper_aabb, target_aabb):
+            blockers.append(other)
+    return sorted(blockers)
+
+
+def _support_region_blockers(
+    env,
+    name: Optional[str],
+    current_pos: Optional[np.ndarray],
+    sweep_start_pos: Optional[np.ndarray],
+    carried_content_exclusions,
+) -> List[str]:
+    """Real swept-path obstruction check for the place precondition -- ported
+    from RoboCasa's own _support_region_blockers (predicates.py). RoboCasa
+    computes this continuously while an object is still being carried,
+    sweeping from its current (in-transit) position to a predicted future
+    support target it hasn't reached yet. LIBERO's place-precondition check
+    instead fires once, at object_dropped time, when the landing position is
+    already known -- so this sweeps from `sweep_start_pos` (the object's own
+    position at the moment its CURRENT grasp began -- see
+    build_predicate_snapshot's own carry_origin_pos tracking, right after
+    active_pos is computed) to its CURRENT (just-landed) position, the
+    direction being immaterial to _aabb_obstructs_between_endpoints. A full
+    pickup-to-drop sweep, not just one prior frame, is required: a controlled
+    test found that sweeping only one frame back made the segment length
+    comparable to an ordinary object's own footprint, so a genuinely
+    obstructing foreign object placed mid-descent got incorrectly excluded
+    by the very same "blocker already touches an endpoint" rule that
+    correctly excludes the real support surface underneath (see that
+    exclusion below) -- purely because the short segment's own two endpoint
+    boxes nearly filled the whole corridor. `current_pos`/`sweep_start_pos`
+    are passed in explicitly (rather than read from `state` inside this
+    function) because build_predicate_snapshot's own state["prev_positions"]
+    update loop runs BEFORE the place-preconditions section that calls this
+    -- reading state again here for a fallback prev-frame position would
+    silently return the just-overwritten CURRENT position instead of a real
+    prior one. `carried_content_exclusions` mirrors RoboCasa's own
+    carried_content_blocker_exclusions: if `name` is itself a receptacle that
+    was carrying pre-existing contents, those contents must not block the
+    receptacle's own placement."""
+    if name is None or current_pos is None or sweep_start_pos is None:
+        return []
+    current_aabb = _object_aabb(env, name)
+    if current_aabb is None:
+        return []
+    delta = np.asarray(sweep_start_pos, dtype=float) - np.asarray(current_pos, dtype=float)
+    if float(np.linalg.norm(delta)) <= 1e-9:
+        return []
+    start_aabb = current_aabb
+    end_aabb = _translate_aabb(current_aabb, delta)
+    exclusions = set(carried_content_exclusions or [])
+    blockers = []
+    for other in _movable_object_names(env):
+        if other == name or other in exclusions:
+            continue
+        blocker_aabb = _object_aabb(env, other)
+        if blocker_aabb is None:
+            continue
+        if _aabb_obstructs_between_endpoints(blocker_aabb, start_aabb, end_aabb):
+            blockers.append(other)
+    return sorted(blockers)
+
+
+def _target_region_blockers(env, object_states_dict, target_name: Optional[str]) -> List[str]:
+    """Real swept-path obstruction check for the press/turn/slide/twist/
+    open_close preconditions -- ported from RoboCasa's own
+    _target_region_blockers (predicates.py). LIBERO's fixture-skill targets
+    are always fixtures (see module docstring: twist is deliberately
+    fixture-only here, unlike RoboCasa's bottle/jar/can object targets), so
+    this only needs the fixture-target branch of RoboCasa's version: an
+    object already contained inside the target fixture (e.g. a dish already
+    in the microwave whose door is being opened) is excluded, the same way
+    RoboCasa excludes an object already inside a fixture target via
+    OU.obj_inside_of."""
+    if target_name is None:
+        return []
+    gripper_aabb = _gripper_aabb(env)
+    target_aabb = _object_aabb(env, target_name)
+    if gripper_aabb is None or target_aabb is None:
+        return []
+    fixture_state = (object_states_dict or {}).get(target_name)
+    blockers = []
+    for other in _movable_object_names(env):
+        if fixture_state is not None:
+            other_state = (object_states_dict or {}).get(other)
+            if other_state is not None:
+                try:
+                    if fixture_state.check_contact(other_state) and fixture_state.check_contain(other_state):
+                        continue
+                except Exception:
+                    pass
+        blocker_aabb = _object_aabb(env, other)
+        if blocker_aabb is None:
+            continue
+        if _aabb_obstructs_between_endpoints(blocker_aabb, gripper_aabb, target_aabb):
+            blockers.append(other)
+    return sorted(blockers)
+
+
+# ---------------------------------------------------------------------------
 # Contamination geometric spot/spread system (2026-09-20)
 # ---------------------------------------------------------------------------
 # Full port of RoboCasa's own contaminated_spots/_mark_contaminated/
@@ -884,21 +1163,6 @@ def _upright(quat: Optional[np.ndarray]) -> bool:
         return bool(z_axis[2] >= UPRIGHT_COS_THRESHOLD)
     except Exception:
         return True
-
-
-def _region_clear(env, center: Optional[np.ndarray], exclude: List[str]) -> bool:
-    if center is None:
-        return True
-    foreign = 0
-    for name in _movable_object_names(env):
-        if name in exclude:
-            continue
-        pos = _body_pos(env, name)
-        if pos is None:
-            continue
-        if np.linalg.norm(pos - center) < REGION_CLEAR_RADIUS:
-            foreign += 1
-    return foreign <= REGION_CLEAR_MAX_FOREIGN
 
 
 def _fixture_action_tags(env, name: str) -> set:
@@ -1309,9 +1573,57 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     prev_pos = state["prev_positions"].get(active) if active else None
     prev_quat = state["prev_quats"].get(active) if active else None
 
+    # carry_origin_pos (2026-09-20): the object's own position at the exact
+    # frame its CURRENT grasp began -- used by _support_region_blockers below
+    # as the real sweep-start endpoint, instead of just one frame back.
+    # RoboCasa's own _support_region_blockers runs continuously while an
+    # object is being carried, so its "current position" endpoint naturally
+    # spans the object's whole remaining carry distance to a not-yet-reached
+    # predicted target. LIBERO's version instead fires once, at
+    # object_dropped time, when the landing position is already known -- a
+    # single-prior-frame sweep is too short relative to a normal object's own
+    # footprint (confirmed via a controlled test: a foreign object placed
+    # genuinely mid-descent, directly between the previous and current frame,
+    # was incorrectly excluded as "touching an endpoint" purely because a
+    # ~6cm object and a ~6cm one-frame drop distance are comparable scales --
+    # the same exclusion rule that correctly avoids flagging the actual
+    # support surface as its own blocker also swallows a real obstruction
+    # when the segment is this short). Sweeping from the full pickup-to-drop
+    # carry distance instead avoids that false negative while keeping the
+    # original false-positive fix intact (see _support_region_blockers'
+    # own docstring).
+    if object_grasped and not state.get("prev_object_grasped_flag", False) and active_pos is not None:
+        state.setdefault("carry_origin_pos", {})[active] = np.array(active_pos, dtype=float)
+    state["prev_object_grasped_flag"] = object_grasped
+
     lin_delta = float(np.linalg.norm(active_pos - prev_pos)) if (active_pos is not None and prev_pos is not None) else 0.0
     ang_delta = _angle_between_quats(active_quat, prev_quat)
     object_stable = bool(lin_delta < STABLE_LINEAR_DELTA_THRESHOLD and ang_delta < STABLE_ANGULAR_DELTA_THRESHOLD)
+
+    # Track which other movable objects are currently "carried inside" the
+    # grasped object, if it's itself a receptacle -- mirrors RoboCasa's own
+    # grasped_receptacle_content_source/_names tracking (predicates.py),
+    # used below by _support_region_blockers so a receptacle's own
+    # pre-existing contents don't block the receptacle's OWN placement once
+    # it's set back down (as opposed to the separate, already-fixed case of
+    # placing a second unrelated item into a receptacle that already
+    # contains a first one). Simple AABB-intersection snapshot, refreshed
+    # every frame the receptacle is grasped, rather than RoboCasa's own
+    # positional-containment machinery -- adequate here since it's only
+    # queried immediately after the same object is set down.
+    if object_grasped and active is not None:
+        active_category = object_category_from_instance_name(active)
+        if object_is_receptacle_category(active_category):
+            active_aabb_now = _object_aabb(env, active)
+            if active_aabb_now is not None:
+                contained = [
+                    other
+                    for other in _movable_object_names(env)
+                    if other != active
+                    and _object_aabb(env, other) is not None
+                    and _aabb_intersects(active_aabb_now, _object_aabb(env, other))
+                ]
+                state.setdefault("carried_content_names", {})[active] = contained
 
     # object_sync (2026-09-09): ported RoboCasa's own grasp-slip pattern --
     # a dedicated reference (obj_pos - eef_pos) re-seeded fresh at the exact
@@ -1597,8 +1909,8 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
                 best, best_d = name, d
         focus_pick_object = best
 
-    focus_pos = _body_pos(env, focus_pick_object) if focus_pick_object else active_pos
-    object_region_clear = _region_clear(env, focus_pos, exclude=[focus_pick_object] if focus_pick_object else [])
+    object_region_blockers = _object_region_blockers(env, focus_pick_object)
+    object_region_clear = bool(focus_pick_object is not None and not object_region_blockers)
     object_upright_if_receptacle_default = True
     if focus_pick_object:
         category = object_category_from_instance_name(focus_pick_object)
@@ -1652,16 +1964,14 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     pick_precondition_escape = False
     if pick_onset_pending_object is not None:
         pending_stable = _object_stable_by_name(env, state, pick_onset_pending_object)
-        pending_region_clear = _region_clear(
-            env, _body_pos(env, pick_onset_pending_object), exclude=[pick_onset_pending_object]
-        )
+        pending_region_clear = not _object_region_blockers(env, pick_onset_pending_object)
         pick_precondition_escape = bool(pending_stable and pending_region_clear)
         if pick_precondition_escape:
             state["pick_onset_pending_object"] = None
 
     predicates["skill_pick_onset"] = _entry(any_pick_onset, "gripper approached an ungrasped object for the onset window")
     predicates["skill_pick_onset_end"] = _entry(any_pick_onset_end, "a previously-latched pick attempt concluded (grasped or gave up)")
-    predicates["object_region_clear"] = _entry(object_region_clear, "few foreign objects near the pick/focus object")
+    predicates["object_region_clear"] = _entry(object_region_clear, "no other object's AABB obstructs the gripper-to-pick-target swept path")
     # 2026-09-16 (explicit user decision): object_upright_if_receptacle_
     # default was already being computed above (real _upright() check
     # against the focus object's own quaternion, gated on it actually being
@@ -1683,7 +1993,17 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # requiring gripper-opening/settled evidence), so place preconditions
     # now get checked on accidental drops too, not just deliberate releases.
     skill_place_onset = object_dropped
-    support_region_clear = _region_clear(env, active_pos, exclude=[active] if active else [])
+    sweep_start_pos = (
+        state.get("carry_origin_pos", {}).get(active, prev_pos) if active else prev_pos
+    )
+    support_region_blockers = _support_region_blockers(
+        env,
+        active,
+        active_pos,
+        sweep_start_pos,
+        state.get("carried_content_names", {}).get(active, []) if active else [],
+    )
+    support_region_clear = bool(not support_region_blockers)
     support_stable = True  # LIBERO supports are static furniture/table in this v0 -- always stable
     support_geometry_valid = True  # not modeled in v0 -- see module docstring
 
@@ -1727,7 +2047,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     )
 
     predicates["skill_place_onset"] = _entry(skill_place_onset, "aliased to object_dropped")
-    predicates["support_region_clear"] = _entry(support_region_clear, "few foreign objects near the release point")
+    predicates["support_region_clear"] = _entry(support_region_clear, "no other object's AABB obstructs the placed object's own prior-to-current swept path")
     predicates["support_stable"] = _entry(support_stable, "stubbed True -- static support in v0")
     predicates["support_geometry_valid"] = _entry(support_geometry_valid, "stubbed True -- geometry not modeled in v0")
     predicates["support_objects_clean_for_manipulated_object"] = _entry(support_objects_clean_for_manipulated_object, "no raw/ready-to-eat conflicting object within PLACEMENT_PROXIMITY_MARGIN of the support")
@@ -2082,23 +2402,33 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # than one of them non-None for a given task (verified: each task's
     # fixtures_dict only ever contains fixtures relevant to that one task).
     target_name = next((target_by_action[a] for a in ("press", "turn", "slide", "twist", "open_close") if target_by_action[a]), None)
-    target_pos = _body_pos(env, target_name) if target_name else None
     # Always explicitly emitted, never left absent: monitor/predicates.py
     # defaults target_region_clear/slide_path_clear/articulation_path_clear
     # to False when missing, so omitting them once the corresponding onset
     # can actually fire would flip that spec from vacuously-satisfied to
     # almost-always-violated -- a regression, not an improvement.
-    target_region_clear = _region_clear(env, target_pos, exclude=[])
+    # 2026-09-20: real gripper-to-target swept-path obstruction check
+    # (_target_region_blockers), replacing the former proximity-radius
+    # _region_clear -- see that function's own docstring. Preserves the
+    # original "no target -> vacuously clear" fallback (target_pos/
+    # target_name is None) rather than RoboCasa's own per-action "no target
+    # -> False" convention, since LIBERO shares a single target across all 5
+    # action families here and this predicate is already relied on to stay
+    # vacuously True when no onset can fire at all (see comment above).
+    target_region_blockers = _target_region_blockers(env, object_states_dict, target_name)
+    target_region_clear = bool(target_name is None or not target_region_blockers)
     # LIBERO fixture root bodies don't translate (only their door/drawer/knob
     # joints articulate) -- root-body position stability holds by
     # construction, not by measurement; documented simplification, not a
     # stub-without-signal.
     target_stable = True
-    # Both path-clear predicates reuse the same "nothing foreign nearby"
-    # proxy as support_geometry_valid's note -- no swept-corridor geometry
-    # modeled in v0. fixture_ready_for_{press,turn,slide,twist,open_close}
-    # and target_receptacle_upright_if_has_contents are left absent --
-    # monitor/predicates.py already defaults all of them to True.
+    # Both path-clear predicates alias target_region_clear, now itself a
+    # real swept-path obstruction check rather than a "nothing foreign
+    # nearby" proxy -- see that predicate's own comment. Kept as plain
+    # aliases (not independently computed) since RoboCasa's own
+    # target_region_clear_slide/target_region_clear_open_close use the exact
+    # same _target_region_blockers primitive, just keyed to slide/open_close
+    # specifically instead of LIBERO's single shared target.
     slide_path_clear = target_region_clear
     articulation_path_clear = target_region_clear
 
@@ -2118,7 +2448,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     predicates["skill_twist_onset_end"] = _entry(onset_end_flags["twist"], "twist attempt concluded (no longer near target)")
     predicates["skill_open_close_onset"] = _entry(onset_flags["open_close"], "gripper approached an open_close-tagged (door) fixture for the onset window")
     predicates["skill_open_close_onset_end"] = _entry(onset_end_flags["open_close"], "open/close attempt concluded (no longer near target)")
-    predicates["target_region_clear"] = _entry(target_region_clear, "few foreign objects near the press/turn/slide/twist/open_close target")
+    predicates["target_region_clear"] = _entry(target_region_clear, "no other object's AABB obstructs the gripper-to-target swept path for the press/turn/slide/twist/open_close target")
     predicates["target_stable"] = _entry(target_stable, "target fixture root body does not translate (v0 simplification)")
     predicates["slide_path_clear"] = _entry(slide_path_clear, "aliased to target_region_clear in v0")
     predicates["articulation_path_clear"] = _entry(articulation_path_clear, "aliased to target_region_clear in v0")
