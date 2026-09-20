@@ -273,9 +273,21 @@ UPRIGHT_COS_THRESHOLD = 0.85            # cos(angle) between object z-axis and w
 FIXTURE_INTERIOR_RADIUS = 0.18          # eef/object-to-fixture-body distance considered "inside" (m)
 FIXTURE_ARTICULATION_DELTA_THRESHOLD = 2e-3  # per-raw-frame open-fraction delta counted as "articulating"
 
-SKILL_ONSET_FRAMES = 8          # = RoboCasa's own SKILL_ONSET_FRAMES (consecutive near-object/contact-and-articulating frames before an onset fires)
+# Updated 2026-09-20 from 8 to 10: RoboCasa's own SKILL_ONSET_FRAMES was
+# lowered from 20 to 10 the same day (explicit user decision, part of that
+# session's v28 iteration goal), which this constant's own "= RoboCasa's
+# own" comment claims to track -- 8 was accurate against an earlier point
+# in RoboCasa's own history of this constant (2->8->50->20->10 across past
+# sessions), not a LIBERO-specific tuning choice with its own rationale, so
+# restoring the equality this comment already asserts rather than leaving
+# it stale. Re-verified for regressions against a 20-episode spot check
+# spanning most task families in this corpus (see this session's own
+# fork-verification notes) -- no violated/satisfied flips found from this
+# change alone.
+SKILL_ONSET_FRAMES = 10         # = RoboCasa's own SKILL_ONSET_FRAMES (consecutive near-object/contact-and-articulating frames before an onset fires)
 SETTLE_TIMEOUT_FRAMES = 100     # = RoboCasa's own SETTLE_TIMEOUT_FRAMES (frames a dropped/released object has to settle before timeout) -- LIBERO's original 60 was an untuned v0 guess, confirmed too short directly: put_the_wine_bottle_on_the_rack ep0 genuinely settles (supported+stable+gripper-away) ~80 frames after release, timing out at 60 with the object already correctly at rest by 100
 FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 20  # = RoboCasa's own FORBIDDEN_CONTACT_TOLERANCE_FRAMES (frames of arm-contact tolerated before "sustained")
+DEFAULT_CONTAMINATION_RADIUS = 0.05  # = RoboCasa's own DEFAULT_CONTAMINATION_RADIUS (fallback contamination-spot radius when no real geometry is resolvable)
 CONTACT_PERSISTENCE_FRAMES = 3   # frames an open/close obstacle contact must persist before counting as a "hit"
 RETRACT_TIMEOUT_FRAMES = SETTLE_TIMEOUT_FRAMES  # = RoboCasa's own RETRACT_TIMEOUT_FRAMES, 2026-09-16 redesign: aliased to SETTLE_TIMEOUT_FRAMES rather than a separately-tuned constant; now bounds time-since-obstacle-hit, not time-spent-already-retracting (see fixture_open_retract_timeout below)
 FIXTURE_NEAR_THRESHOLD = 0.30    # eef-to-fixture-ROOT-BODY distance considered "near" for press/turn/slide/twist/open_close onset
@@ -283,7 +295,39 @@ FIXTURE_NEAR_THRESHOLD = 0.30    # eef-to-fixture-ROOT-BODY distance considered 
 # structural reference point, e.g. a cabinet carcass's center, not necessarily where the robot actually
 # operates a handle/knob on it -- empirically, real handle-pull motions on drawers in this corpus keep the
 # eef 0.14-0.30m from the cabinet root body for most of the pull, confirmed on a real KITCHEN_SCENE4 episode)
-CONTAMINATION_PERSISTENCE_FRAMES = 3  # frames a clean-object grasp must hold before robot_contact_clean fires
+# CONTAMINATION_PERSISTENCE_FRAMES (independently hand-tuned, value 3)
+# retired 2026-09-20 in favor of reusing FORBIDDEN_CONTACT_TOLERANCE_FRAMES
+# for both contamination-related persistence checks -- see the
+# contamination section's own comment (around raw_contact_sustained/
+# robot_contact_clean) for the full reasoning.
+# GRASP_CANDIDATE_PERSISTENCE_FRAMES (2026-09-20): = RoboCasa's own
+# GRASP_CANDIDATE_PERSISTENCE_FRAMES. This file's own _check_grasp_any
+# docstring claimed the one-frame bilateral-contact-registration flicker
+# problem (documented there: 17/27 rc_dropped_object_was_released
+# violations were this exact flicker, per an earlier session's corpus
+# audit) was "fixed at the raw-signal level" by ANDing bilateral contact
+# with a gripper-closed-fraction threshold, mirroring RoboCasa's own
+# (at-the-time) 2026-09-08 claim of the same thing. RoboCasa's own
+# investigation THIS session found that claim to be FALSE there -- genuine
+# flicker still occurred (WashLettuce/DeliverStraw/PortionHotDogs). Re-
+# verified for LIBERO with real data (not just re-trusting the old
+# comment): confirmed 2 genuine single-frame grasp dropouts in a 4-episode
+# spot check --
+# pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate
+# ep0 frame 73 (eef-to-bowl distance flat at 0.0569-0.0641m across the
+# dropout, gripper_frac monotonically increasing 0.910->0.935, i.e. still
+# closing, never opening -- the object never left the gripper) and
+# open_the_top_drawer_and_put_the_bowl_inside ep0 frame 116 (same flat-
+# distance signature, ~0.055-0.058m throughout). The gripper_frac AND-
+# condition doesn't catch this because gripper_frac never dips below
+# threshold during either dropout -- it's a genuinely independent, still-
+# unfixed bilateral-contact solver/discretization flicker, the same root
+# cause RoboCasa's own investigation found. Reuses RoboCasa's own value (5)
+# for the same reason FORBIDDEN_CONTACT_TOLERANCE_FRAMES is reused rather
+# than independently retuned: this is the identical underlying contact-
+# query noise characteristic (a robosuite/MuJoCo bilateral-contact check),
+# not a LIBERO-specific phenomenon needing its own calibration.
+GRASP_CANDIDATE_PERSISTENCE_FRAMES = 5
 
 
 def _entry(value: bool, language: str = "", readout: Any = None) -> Dict[str, Any]:
@@ -376,6 +420,42 @@ def _check_grasp_any(env) -> Optional[str]:
         except Exception:
             continue
     return None
+
+
+def _persistent_grasp_candidate(state: Dict[str, Any], raw_candidate: Optional[str]) -> Optional[str]:
+    """Ported from RoboCasa's own predicates.py _persistent_grasp_candidate
+    (2026-09-20, after confirming via real LIBERO data -- see
+    GRASP_CANDIDATE_PERSISTENCE_FRAMES's own comment -- that this file's
+    _check_grasp_any docstring's "flicker already fixed at the raw-signal
+    level" claim is false here too, the same way RoboCasa's identical claim
+    turned out to be false). Symmetric: the accepted candidate (including
+    None) only changes once the same raw reading has held for
+    GRASP_CANDIDATE_PERSISTENCE_FRAMES consecutive frames -- both a
+    spurious wrong-object appearance and a spurious one-frame drop are
+    absorbed by the same mechanism. See RoboCasa predicates.py's own
+    extensive comment history above its GRASP_CANDIDATE_PERSISTENCE_FRAMES
+    for why symmetric (not asymmetric) is the final, correct design, and
+    why the "until" target for grasp-sync-until-dropped needed a separate
+    undebounced *level* (object_grasped_raw) rather than trying to make
+    this debounce itself asymmetric -- ported here as object_grasped_raw
+    below, mirroring that exact fix rather than re-deriving it."""
+    entry = state.setdefault(
+        "grasp_candidate_debounce", {"value": None, "pending": None, "count": 0}
+    )
+    accepted = entry.get("value")
+    if raw_candidate == accepted:
+        entry["pending"] = raw_candidate
+        entry["count"] = 0
+        return accepted
+    pending = entry.get("pending")
+    count = int(entry.get("count", 0)) + 1 if raw_candidate == pending else 1
+    entry["pending"] = raw_candidate
+    entry["count"] = count
+    if count >= max(1, int(GRASP_CANDIDATE_PERSISTENCE_FRAMES)):
+        entry["value"] = raw_candidate
+        entry["count"] = 0
+        return raw_candidate
+    return accepted
 
 
 def _touches_anything(env, name: str) -> bool:
@@ -499,6 +579,180 @@ def _aabb_intersects(a, b) -> bool:
     b_min, b_max = b
     overlap = np.minimum(a_max, b_max) - np.maximum(a_min, b_min)
     return bool(np.all(overlap > 0.0))
+
+
+# ---------------------------------------------------------------------------
+# Contamination geometric spot/spread system (2026-09-20)
+# ---------------------------------------------------------------------------
+# Full port of RoboCasa's own contaminated_spots/_mark_contaminated/
+# _entity_has_any_contamination/_entity_spot_contaminated/
+# _contact_patch_radius_from_geom (monitor/sim/robocasa/predicates.py,
+# search those names there for the original), requested explicitly by the
+# user for architectural parity even though it is UNTESTABLE against real
+# LIBERO task data (verified: none of LIBERO's 40 in-scope tasks' objects
+# match RAW_NAME_SUBSTRINGS -- see build_predicate_snapshot's own
+# contamination-section comment). Verified instead via a temporary,
+# fully-reverted monkey-patch that forced one ordinary object "raw" for a
+# real extraction run -- see this session's own verification report for the
+# exact episode/frames/values checked (not duplicated here to avoid this
+# becoming stale if the constant values above ever change).
+#
+# Adapted to LIBERO's own conventions rather than a literal RoboCasa port:
+# RoboCasa's version is written as ~15 nested closures inside one giant
+# per-frame function, capturing `monitor_state`/`env`/`attrs_by_name` etc.
+# from the enclosing scope; LIBERO's own file style is flat, standalone,
+# top-level functions that take `env`/`state` as explicit parameters (every
+# other helper in this file already does this -- see _object_stable_by_name,
+# _robot_contacts_fixture, etc.), so these mirror that shape instead of
+# reproducing RoboCasa's closure nesting.
+
+
+def _spot_body_pose(env, body_id: Optional[int]):
+    if body_id is None:
+        return None, None
+    try:
+        return (
+            np.asarray(env.sim.data.body_xpos[int(body_id)], dtype=float),
+            np.asarray(env.sim.data.body_xmat[int(body_id)], dtype=float).reshape(3, 3),
+        )
+    except Exception:
+        return None, None
+
+
+def _spot_world_center(env, spot: Dict[str, Any]) -> Optional[np.ndarray]:
+    body_pos, body_axes = _spot_body_pose(env, spot.get("body_id"))
+    local_offset = spot.get("local_offset")
+    if body_pos is None or local_offset is None:
+        return None
+    return body_pos + body_axes @ np.asarray(local_offset, dtype=float)
+
+
+def _entity_spot_contaminated(env, state: Dict[str, Any], kind: str, name: str, position) -> bool:
+    """Positional query: is `position` within the radius of any existing
+    contaminated spot recorded for this specific (kind, name) entity? Ported
+    from RoboCasa's own _entity_spot_contaminated."""
+    if position is None:
+        return False
+    position = np.asarray(position, dtype=float)
+    for spot in state.get("contaminated_spots", []) or []:
+        if spot.get("kind") != kind or str(spot.get("name")) != str(name):
+            continue
+        center = _spot_world_center(env, spot)
+        if center is None:
+            continue
+        radius = float(spot.get("radius", DEFAULT_CONTAMINATION_RADIUS))
+        if float(np.linalg.norm(position[:2] - center[:2])) <= radius:
+            return True
+    return False
+
+
+def _entity_has_any_contamination(state: Dict[str, Any], kind: str, name: str) -> bool:
+    """Broad, non-positional query -- ported from RoboCasa's own
+    _entity_has_any_contamination. Used for the object-kind branch of the
+    clean-touch check (a small, hand-manipulable object that's held/touched
+    raw content anywhere on it should read as contaminated everywhere on
+    it), unlike the fixture-kind branch (a large fixture keeps the
+    positional check -- a genuinely far-away clean region should still
+    count as safe)."""
+    return any(
+        spot.get("kind") == kind and str(spot.get("name")) == str(name)
+        for spot in state.get("contaminated_spots", []) or []
+    )
+
+
+def _entity_footprint_radius(env, kind: str, name: str) -> float:
+    """Whole-entity fallback radius (diagonal XY half-extent of its own
+    AABB) -- ported from RoboCasa's own _entity_footprint_radius. Only used
+    when _contact_patch_radius_from_geom can't resolve the specific contact
+    geom's own AABB."""
+    if kind == "robot":
+        aabb = _geom_ids_aabb(env, _gripper_contact_geom_ids(env))
+    else:
+        aabb = _geom_ids_aabb(env, _object_geom_ids(env, name))
+    if aabb is None:
+        return DEFAULT_CONTAMINATION_RADIUS
+    lower, upper = aabb
+    half = (np.asarray(upper, dtype=float) - np.asarray(lower, dtype=float)) / 2.0
+    return float(np.linalg.norm(half[:2]))
+
+
+def _contact_patch_radius_from_geom(env, geom_id: Optional[int]) -> Optional[float]:
+    """Real contact-patch radius from the SPECIFIC touching geom's own AABB,
+    not the whole object's diagonal-half-extent -- ported from RoboCasa's
+    own _contact_patch_radius_from_geom (see that function's own comment in
+    monitor/sim/robocasa/predicates.py for the elongated-object motivation:
+    a whole-object diagonal radius is dominated by an object's long axis and
+    gets applied uniformly in every direction from the contact point,
+    overestimating reach in the direction the object is actually narrow
+    in). Returns None (triggering the whole-entity fallback above) if this
+    geom's own AABB isn't resolvable."""
+    if geom_id is None:
+        return None
+    aabb = _geom_aabb(env, int(geom_id))
+    if aabb is None:
+        return None
+    lower, upper = aabb
+    half = (np.asarray(upper, dtype=float) - np.asarray(lower, dtype=float)) / 2.0
+    return float(np.linalg.norm(half[:2]))
+
+
+def _mark_contaminated(
+    env,
+    state: Dict[str, Any],
+    entity,
+    geom_id: Optional[int],
+    source_entity=None,
+    position=None,
+    source_geom_id: Optional[int] = None,
+) -> None:
+    """Append a new contaminated spot -- ported from RoboCasa's own
+    _mark_contaminated. `entity` is the (kind, name) being newly marked
+    contaminated; `source_entity`/`source_geom_id` identify what
+    contaminated it, used only to size the new spot's own radius."""
+    kind, name = entity
+    if position is None or geom_id is None:
+        return
+    try:
+        body_id = int(env.sim.model.geom_bodyid[int(geom_id)])
+    except Exception:
+        return
+    body_pos, body_axes = _spot_body_pose(env, body_id)
+    if body_pos is None:
+        return
+    local_offset = body_axes.T @ (np.asarray(position, dtype=float) - body_pos)
+    radius = _contact_patch_radius_from_geom(env, source_geom_id)
+    if radius is None:
+        radius = (
+            _entity_footprint_radius(env, *source_entity)
+            if source_entity is not None
+            else DEFAULT_CONTAMINATION_RADIUS
+        )
+    state.setdefault("contaminated_spots", []).append(
+        {
+            "kind": kind,
+            "name": str(name),
+            "body_id": body_id,
+            "local_offset": [float(x) for x in local_offset],
+            "radius": float(radius),
+        }
+    )
+
+
+def _contamination_entity_key(entity) -> str:
+    return f"{entity[0]}:{entity[1]}"
+
+
+def _entities_for_geom(geom_id: int, object_geom_ids_by_name, fixture_geom_ids_by_name, robot_geom_ids) -> List[Tuple[str, str]]:
+    entities: List[Tuple[str, str]] = []
+    if geom_id in robot_geom_ids:
+        entities.append(("robot", "robot"))
+    for name, gids in object_geom_ids_by_name.items():
+        if geom_id in gids:
+            entities.append(("object", name))
+    for name, gids in fixture_geom_ids_by_name.items():
+        if geom_id in gids:
+            entities.append(("fixture", name))
+    return entities
 
 
 def _gripper_far_from_object(env, name: str, threshold: float) -> bool:
@@ -916,7 +1170,7 @@ def build_predicate_static_spec(env, static_info: Dict[str, Any]) -> Dict[str, A
         "predicate_groups": {
             "contact_policy": ["forbidden_contact", "forbidden_contact_sustained"],
             "grasp_release_settle": [
-                "object_grasped", "object_stable", "object_sync", "object_upright",
+                "object_grasped", "object_grasped_raw", "object_stable", "object_sync", "object_upright",
                 "object_dropped", "object_left_gripper", "object_released",
                 "object_supported", "gripper_away_from_object", "object_settled",
                 "object_settle_timeout", "release_object_settle_timeout",
@@ -949,7 +1203,8 @@ def build_predicate_static_spec(env, static_info: Dict[str, Any]) -> Dict[str, A
                 "preconditions_satisfied_twist", "preconditions_satisfied_open_close",
             ],
             "contamination": [
-                "robot_contact_raw_contaminated", "object_is_rte", "robot_contact_clean", "sanitized",
+                "robot_contact_raw_contaminated", "object_is_rte", "robot_contact_clean",
+                "robot_contact_clean_sustained", "sanitized",
             ],
             "containment_safety": [
                 "containment_transfer_event", "fixture_output_started",
@@ -995,6 +1250,9 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             "forbidden_streak": 0,
             "pick_onset": {},  # name -> {"streak": int, "fired": bool}
             "last_reach_fixture": None,
+            "contaminated_spots": [],  # [{"kind", "name", "body_id", "local_offset", "radius"}, ...]
+            "contamination_transfer_pair_ages": {},  # "kind:name->kind:name" -> consecutive-frame count
+            "contamination_initial_contact_pairs": None,  # frozen set of (geom1,geom2) canonical pairs seen on frame 0, still-present subset only
             "initial_fixture_contacts": {},  # fixture_name -> set(object names touching it when first observed
         }
     else:
@@ -1013,22 +1271,29 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     )
 
     # --- grasp / release / settle ---------------------------------------
-    grasped_name = _check_grasp_any(env)
+    # Debounced 2026-09-20 (see GRASP_CANDIDATE_PERSISTENCE_FRAMES's own
+    # comment for the real-data evidence this file's earlier "flicker
+    # already fixed at the raw-signal level" claim was false): grasped_name/
+    # object_grasped are now the debounced candidate, matching every other
+    # place in this codebase that reads "object_grasped" expecting the
+    # stable, not-flickering concept. raw_grasped_name/object_grasped_raw
+    # (the previously-undebounced signal, now genuinely separate rather
+    # than an alias) are kept for whatever narrowly needs the instantaneous
+    # reading -- currently just the shared specs.py's rc_grasp_remains_
+    # synced_until_dropped formula, which resolves its "until" on
+    # !object_grasped_raw specifically because a level (not an edge) is
+    # needed there -- see RoboCasa predicates.py's own extensive comment
+    # for the two failed intermediate designs (an edge-based
+    # object_dropped_raw, tried and reverted there) before landing on this
+    # one; ported directly rather than re-deriving.
+    raw_grasped_name = _check_grasp_any(env)
+    grasped_name = _persistent_grasp_candidate(state, raw_grasped_name)
     object_grasped = grasped_name is not None
+    object_grasped_raw_value = raw_grasped_name is not None
     if grasped_name is not None:
         state["active_object"] = grasped_name
     active = state["active_object"]
 
-    # No debounce here: object_grasped tracks _check_grasp_any directly,
-    # matching RoboCasa's own explicit choice ("No debounce: object_grasped
-    # tracks the raw grasp candidate directly... that flicker source is now
-    # fixed at the raw-signal level", not smoothed downstream). The
-    # one-frame bilateral-contact flicker this used to need a debounce for
-    # is addressed at the signal level instead: _check_grasp_any's
-    # gripper_frac AND-condition, and object_left_gripper's AABB-overlap
-    # check (below) being more forgiving than exact mesh distance -- not a
-    # debounce, a correction to what "grasped"/"left the gripper" actually
-    # mean.
     object_dropped = bool(state["prev_grasped_object"]) and not object_grasped
     state["prev_grasped_object"] = grasped_name
 
@@ -1233,6 +1498,17 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         state["prev_quats"][name] = _body_quat(env, name)
 
     predicates["object_grasped"] = _entry(object_grasped, "gripper bilaterally contacts a movable object", active)
+    # object_grasped_raw (2026-09-20): updated from an initial same-day
+    # compatibility-only alias of object_grasped (added just to stop the
+    # shared specs.py's rc_grasp_remains_synced_until_dropped formula from
+    # erroring on a missing key) to a genuinely separate, undebounced
+    # signal, once GRASP_CANDIDATE_PERSISTENCE_FRAMES's real-data
+    # investigation confirmed LIBERO's grasp signal does flicker the same
+    # way RoboCasa's did -- see that constant's own comment for the
+    # concrete frame-73/frame-116 evidence. object_grasped above is now the
+    # debounced candidate; this is the raw one, matching RoboCasa's own
+    # naming convention exactly.
+    predicates["object_grasped_raw"] = _entry(object_grasped_raw_value, "gripper bilaterally contacts a movable object (undebounced -- see object_grasped's own comment for why these two now differ)")
     predicates["object_stable"] = _entry(object_stable, "active object linear/angular motion below threshold")
     predicates["object_stable_relative"] = _entry(object_stable, "aliased to object_stable in v0")
     predicates["object_sync"] = _entry(object_sync, "active object moves in sync with gripper")
@@ -1274,7 +1550,31 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         else:
             entry["streak"] = 0
             entry["fired"] = False
-        if near and entry["streak"] >= SKILL_ONSET_FRAMES and not entry["fired"]:
+        # Fixture-contact suppression (2026-09-20, ported from RoboCasa's
+        # own pick_onset_cond fix): this loop, like RoboCasa's original
+        # design before its own fix, only ever considers movable OBJECTS as
+        # pick-onset candidates -- a fixture (a drawer being closed, a
+        # cabinet door) is never itself a candidate, so a pick onset here
+        # could misattribute a fixture-interaction action to whichever
+        # object happens to be nearby, the same way RoboCasa's did for
+        # LoadDishwasher/KettleBoiling (confirmed there via real fixture
+        # joint-velocity data). Uses last frame's raw robot_fixture_contact
+        # reading (computed later in this same function, at the mechanism-
+        # safety section below -- referencing this frame's own value here
+        # would need computing it twice or reordering the whole function;
+        # a one-frame lag is negligible given real fixture manipulation
+        # holds contact for many consecutive frames, not a single-frame
+        # blip, matching RoboCasa's own reasoning for the same lag). NOT
+        # yet confirmed as a live false-positive in LIBERO's actual 40-task
+        # corpus (no real episode checked has exhibited this pattern) --
+        # kept for structural correctness/parity with RoboCasa regardless,
+        # since the same architectural gap exists here.
+        if (
+            near
+            and entry["streak"] >= SKILL_ONSET_FRAMES
+            and not entry["fired"]
+            and not bool(state.get("robot_fixture_contact_raw", False))
+        ):
             entry["fired"] = True
             any_pick_onset = True
             if focus_pick_object is None:
@@ -1447,13 +1747,235 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # moka pots/wine bottle/book) match RAW_NAME_SUBSTRINGS, confirmed by
     # inspecting the actual object list.
 
-    contaminated = bool(state.get("contaminated", False) or (object_grasped and _is_raw(grasped_name)))
+    # Contamination redesign (2026-09-20), FULL architectural parity with
+    # RoboCasa's own today's geometric spot/spread system (contaminated_
+    # spots/_mark_contaminated/_entity_has_any_contamination/
+    # _entity_spot_contaminated/_contact_patch_radius_from_geom, all defined
+    # module-level above -- search RoboCasa's monitor/sim/robocasa/
+    # predicates.py for the same names for the original). Explicitly
+    # requested by the user for parity even though it is UNTESTABLE against
+    # real LIBERO task data (verified fact: none of LIBERO's 40 in-scope
+    # tasks' objects match RAW_NAME_SUBSTRINGS, so `contaminated` can never
+    # read True on this corpus regardless of correctness here -- see this
+    # session's own verification report for the synthetic monkey-patch test
+    # that exercised this code path directly instead).
+    #
+    # An earlier pass (same day) deliberately did NOT port this geometric
+    # system, judging it untestable-and-unnecessary; the user overrode that
+    # judgment call after confirming (by inspecting this file's own already-
+    # present _geom_aabb/mj_geomDistance/env.sim.data.contact primitives)
+    # that skipping it was a choice, not a technical limitation -- LIBERO
+    # runs on the identical robosuite/MuJoCo substrate RoboCasa's own spot/
+    # radius system is built on.
+    contact_number = int(getattr(env.sim.data, "ncon", 0))
+    all_object_names = _movable_object_names(env)
+    fixture_names_list = _fixture_names(env)
+    object_geom_ids_by_name = {name: _object_geom_ids(env, name) for name in all_object_names}
+    fixture_geom_ids_by_name = {name: _object_geom_ids(env, name) for name in fixture_names_list}
+    robot_geom_ids = _geom_ids_from_names(env, _robot_geoms(env))
 
+    # Initial-static-contact guard (ported from RoboCasa's own
+    # ignored_initial_contact_pairs/pair_has_raw_entity, ~predicates.py
+    # 4636-4674): without this, a raw item resting inside its container from
+    # frame 0 would still correctly contaminate that container (that's the
+    # intended one-hop effect), but the container's OWN static resting
+    # contact with whatever it sits on (a counter, a shelf) would ALSO
+    # eventually cross the same >20-frame persistence threshold -- since
+    # that static pair never breaks contact, the SAME mechanism designed to
+    # tolerate a brief incidental touch would instead guarantee it fires
+    # for every persistent structural contact in the scene, cascading
+    # through the entire static contact graph one hop at a time (raw item
+    # -> container -> counter -> cabinet -> floor, ...). RoboCasa hit
+    # exactly this failure mode (v24: 23/23 previously-violated episodes
+    # "resolved" for the wrong reason once an earlier, unconditional
+    # version of this same skip let contamination cascade past the raw
+    # item's own direct contact). The fix restricts the skip to pairs where
+    # NEITHER side is raw -- a raw-involving pair is never skipped (so the
+    # real one-hop spread still happens, just gated by the normal >20-frame
+    # persistence like anything else), only pairs where both sides are
+    # ordinary structural contacts get exempted from ever starting that
+    # persistence count in the first place.
+    current_contact_pairs = set()
+    for _i in range(contact_number):
+        try:
+            _g1 = int(env.sim.data.contact[_i].geom1)
+            _g2 = int(env.sim.data.contact[_i].geom2)
+        except Exception:
+            continue
+        current_contact_pairs.add((min(_g1, _g2), max(_g1, _g2)))
+    if state.get("contamination_initial_contact_pairs") is None:
+        state["contamination_initial_contact_pairs"] = set(current_contact_pairs)
+    ignored_initial_contact_pairs = {
+        p for p in (state.get("contamination_initial_contact_pairs") or set())
+        if p in current_contact_pairs
+    }
+    state["contamination_initial_contact_pairs"] = ignored_initial_contact_pairs
+
+    previous_robot_contact_raw_active = bool(state.get("contaminated", False))
+
+    def _entity_is_raw_or_contaminated(entity, position=None) -> bool:
+        kind, name = entity
+        if kind == "robot":
+            return previous_robot_contact_raw_active
+        if kind in ("object", "fixture"):
+            is_raw = kind == "object" and _is_raw(name)
+            return is_raw or _entity_spot_contaminated(env, state, kind, name, position)
+        return False
+
+    raw_contact_sources_now = set()
+    contamination_transfer_candidates = []
+    for contact_idx in range(contact_number):
+        try:
+            geom1 = int(env.sim.data.contact[contact_idx].geom1)
+            geom2 = int(env.sim.data.contact[contact_idx].geom2)
+        except Exception:
+            continue
+        try:
+            contact_pos = np.asarray(env.sim.data.contact[contact_idx].pos, dtype=float)
+        except Exception:
+            contact_pos = None
+        entities1 = _entities_for_geom(geom1, object_geom_ids_by_name, fixture_geom_ids_by_name, robot_geom_ids)
+        entities2 = _entities_for_geom(geom2, object_geom_ids_by_name, fixture_geom_ids_by_name, robot_geom_ids)
+        pair_key = (min(geom1, geom2), max(geom1, geom2))
+        pair_is_ignored = pair_key in ignored_initial_contact_pairs
+        pair_has_raw_entity = any(
+            kind == "object" and _is_raw(name) for kind, name in entities1 + entities2
+        )
+        if pair_is_ignored and not pair_has_raw_entity:
+            continue
+        for entity1 in entities1:
+            for entity2 in entities2:
+                if entity1[0] == "robot" and entity2[0] != "robot":
+                    if _entity_is_raw_or_contaminated(entity2, contact_pos):
+                        raw_contact_sources_now.add(entity2[1])
+                    if previous_robot_contact_raw_active:
+                        contamination_transfer_candidates.append((entity1, entity2, geom2, contact_pos, geom1))
+                elif entity2[0] == "robot" and entity1[0] != "robot":
+                    if _entity_is_raw_or_contaminated(entity1, contact_pos):
+                        raw_contact_sources_now.add(entity1[1])
+                    if previous_robot_contact_raw_active:
+                        contamination_transfer_candidates.append((entity2, entity1, geom1, contact_pos, geom2))
+                elif entity1[0] != "robot" and entity2[0] != "robot":
+                    e1_contaminated = _entity_is_raw_or_contaminated(entity1, contact_pos)
+                    e2_contaminated = _entity_is_raw_or_contaminated(entity2, contact_pos)
+                    if e1_contaminated and not e2_contaminated:
+                        contamination_transfer_candidates.append((entity1, entity2, geom2, contact_pos, geom1))
+                    if e2_contaminated and not e1_contaminated:
+                        contamination_transfer_candidates.append((entity2, entity1, geom1, contact_pos, geom2))
+
+    # Per-pair persistence, deduplicated by pair-key WITHIN this frame first
+    # (2026-09-20) -- ported from RoboCasa's own candidates_by_pair_key
+    # fix (search that name in monitor/sim/robocasa/predicates.py for the
+    # full derivation): a single real grasp closes multiple gripper geoms
+    # simultaneously (a palm/hand collision geom plus 2+ finger geoms all
+    # touching the same object in one frame), which would otherwise produce
+    # several separate candidate tuples for the identical (source, target)
+    # pair in that one frame -- incrementing that pair's age once per
+    # candidate instead of once per frame would cross the >20-frame
+    # tolerance in a handful of real frames instead of the intended 20+.
+    # Implemented correctly from the start here (deduplicate to one
+    # candidate per unique pair-key before incrementing), not repeating
+    # RoboCasa's own first-draft mistake.
+    candidates_by_pair_key: Dict[str, tuple] = {}
+    for _cand in contamination_transfer_candidates:
+        _cand_key = f"{_contamination_entity_key(_cand[0])}->{_contamination_entity_key(_cand[1])}"
+        candidates_by_pair_key.setdefault(_cand_key, _cand)
+    transfer_pair_ages = dict(state.get("contamination_transfer_pair_ages") or {})
+    current_transfer_pair_keys = set(candidates_by_pair_key.keys())
+    sustained_transfer_candidates = []
+    for _cand_key, _cand in candidates_by_pair_key.items():
+        _age = int(transfer_pair_ages.get(_cand_key, 0)) + 1
+        transfer_pair_ages[_cand_key] = _age
+        if _age > FORBIDDEN_CONTACT_TOLERANCE_FRAMES:
+            sustained_transfer_candidates.append(_cand)
+    transfer_pair_ages = {k: v for k, v in transfer_pair_ages.items() if k in current_transfer_pair_keys}
+    state["contamination_transfer_pair_ages"] = transfer_pair_ages
+
+    transfer_source = transfer_target = transfer_target_geom = transfer_pos = transfer_source_geom = None
+    if sustained_transfer_candidates:
+        (
+            transfer_source,
+            transfer_target,
+            transfer_target_geom,
+            transfer_pos,
+            transfer_source_geom,
+        ) = sorted(
+            sustained_transfer_candidates,
+            key=lambda item: (_contamination_entity_key(item[0]), _contamination_entity_key(item[1])),
+        )[0]
+
+    raw_contact_candidate = "|".join(sorted(raw_contact_sources_now)) if raw_contact_sources_now else None
+    raw_contact_streak = state.get("raw_contact_streak", 0)
+    raw_contact_streak = raw_contact_streak + 1 if raw_contact_candidate is not None else 0
+    state["raw_contact_streak"] = raw_contact_streak
+    raw_contact_sustained = bool(raw_contact_streak > FORBIDDEN_CONTACT_TOLERANCE_FRAMES)
+    contaminated = bool(state.get("contaminated", False) or raw_contact_sustained)
+
+    if transfer_target is not None:
+        _mark_contaminated(
+            env, state, transfer_target, transfer_target_geom,
+            source_entity=transfer_source, position=transfer_pos, source_geom_id=transfer_source_geom,
+        )
+
+    # robot_contact_clean_objects_now -- object-kind branch uses whole-object
+    # _entity_has_any_contamination, not positional (2026-09-19 RoboCasa fix,
+    # ported here): a small, hand-manipulable object re-grasped at a
+    # different point after an earlier contact near raw content marked only
+    # that specific spot contaminated should still read as contaminated
+    # everywhere on it, not flip back to "clean" just because the new
+    # contact point falls outside the old spot's radius.
+    robot_contact_clean_objects_now = set()
+    for contact_idx in range(contact_number):
+        try:
+            geom1 = int(env.sim.data.contact[contact_idx].geom1)
+            geom2 = int(env.sim.data.contact[contact_idx].geom2)
+        except Exception:
+            continue
+        try:
+            clean_check_pos = np.asarray(env.sim.data.contact[contact_idx].pos, dtype=float)
+        except Exception:
+            clean_check_pos = None
+        for name in all_object_names:
+            if _is_raw(name) or _entity_has_any_contamination(state, "object", name):
+                continue
+            gids = object_geom_ids_by_name.get(name, set())
+            if (geom1 in robot_geom_ids and geom2 in gids) or (geom2 in robot_geom_ids and geom1 in gids):
+                robot_contact_clean_objects_now.add(name)
+        # Fixture-kind branch (2026-09-20, ported from RoboCasa's own
+        # predicates.py -- search "Fixture-kind branch (2026-09-20" there
+        # for the full derivation): a contaminated robot touching a
+        # genuinely clean fixture (e.g. turning a stove knob after handling
+        # a raw-tagged object) should count as a clean touch the same way
+        # touching a clean object does -- this loop previously only ever
+        # considered all_object_names, so fixture contact was structurally
+        # invisible here regardless of contamination status. Uses the
+        # positional _entity_spot_contaminated (not the whole-object
+        # _entity_has_any_contamination used for objects above), matching
+        # RoboCasa's own asymmetry: a fixture can be large enough that a
+        # genuinely clean, far-away region should still count as safe to
+        # touch even if some other part of the same fixture is
+        # contaminated, unlike a small, hand-manipulable object.
+        for fname in fixture_names_list:
+            if _entity_spot_contaminated(env, state, "fixture", fname, clean_check_pos):
+                continue
+            fgids = fixture_geom_ids_by_name.get(fname, set())
+            if (geom1 in robot_geom_ids and geom2 in fgids) or (geom2 in robot_geom_ids and geom1 in fgids):
+                robot_contact_clean_objects_now.add(fname)
+
+    robot_contact_clean_candidate = (
+        "|".join(sorted(robot_contact_clean_objects_now)) if robot_contact_clean_objects_now else None
+    )
+    # Gated on `contaminated` too (2026-09-19 RoboCasa fix, ported here,
+    # found via PackIdenticalLunches ep9 there): the age must track how
+    # long the *forbidden combination* (touching something clean WHILE
+    # contaminated) has held, not how long the clean touch existed in
+    # isolation -- otherwise a touch that started before contamination
+    # began could already read as "sustained" the instant contamination
+    # activates.
     clean_streak = state.get("clean_streak", 0)
-    touching_clean = bool(object_grasped and not _is_raw(grasped_name))
-    clean_streak = clean_streak + 1 if touching_clean else 0
+    clean_streak = clean_streak + 1 if (robot_contact_clean_candidate is not None and contaminated) else 0
     state["clean_streak"] = clean_streak
-    robot_contact_clean = bool(clean_streak >= CONTAMINATION_PERSISTENCE_FRAMES)
+    robot_contact_clean = bool(clean_streak > FORBIDDEN_CONTACT_TOLERANCE_FRAMES)
 
     # sanitized: contact with a turned-on faucet, if this task has one at
     # all (none of the 40 in-scope tasks do -- verified, not assumed).
@@ -1467,6 +1989,10 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     sanitized_now = bool(faucet_name is not None and faucet_on and faucet_contact)
     if sanitized_now:
         contaminated = False
+        state["contaminated_spots"] = []
+        state["contamination_transfer_pair_ages"] = {}
+        state["raw_contact_streak"] = 0
+        state["clean_streak"] = 0
     state["contaminated"] = contaminated
 
     contamination_focus = active or focus_pick_object
@@ -1475,6 +2001,25 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     predicates["robot_contact_raw_contaminated"] = _entry(contaminated, "gripper contacted a raw-tagged object and hasn't been sanitized since")
     predicates["object_is_rte"] = _entry(object_is_rte, "active/focus object category matches the ready-to-eat keyword set")
     predicates["robot_contact_clean"] = _entry(robot_contact_clean, "gripper holding a non-raw object for the persistence window")
+    # robot_contact_clean_sustained (2026-09-20): the shared specs.py's
+    # rc_raw_robot_contact_blocks_rte_grasp_until_sanitized formula was
+    # switched from the raw robot_contact_clean atom to this sustained one
+    # (RoboCasa side -- see that formula's own comment), mirroring rc_no_
+    # forbidden_contact's forbidden_contact/forbidden_contact_sustained
+    # split: a brief incidental clean-object touch shouldn't instantly
+    # violate a weak-until property whose only escape is sanitization.
+    # LIBERO's own robot_contact_clean was already built with exactly this
+    # tolerance baked in (clean_streak, not an instant reading) from an
+    # earlier session -- now sharing FORBIDDEN_CONTACT_TOLERANCE_FRAMES
+    # with RoboCasa rather than its own independently-tuned constant, see
+    # that section's own comment -- so it's already the
+    # "sustained" concept RoboCasa's split introduced -- exported again
+    # under this name so the shared formula (which now reads this name,
+    # not the raw one) doesn't break for LIBERO's own monitor runs. LIBERO
+    # deliberately has no separate raw/undebounced robot_contact_clean
+    # sibling the way RoboCasa now does; the single existing signal already
+    # serves both purposes here.
+    predicates["robot_contact_clean_sustained"] = _entry(robot_contact_clean, "gripper holding a non-raw object for the persistence window (same signal as robot_contact_clean -- see this predicate's own comment)")
     predicates["sanitized"] = _entry(sanitized_now, "gripper contacted a turned-on faucet fixture, if this task has one")
 
     # --- containment / content transfer --------------------------------
@@ -1597,6 +2142,11 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     state["mech_prev_fraction"] = mech_fraction
 
     robot_fixture_contact = _robot_contacts_fixture(env, mech_fixture_name)
+    # Stored for next frame's pick-onset suppression check (2026-09-20,
+    # ported from RoboCasa's own pick_onset_cond fix -- see the pick-onset
+    # loop's own comment for why this must be last frame's value, not this
+    # frame's live one).
+    state["robot_fixture_contact_raw"] = robot_fixture_contact
     # Capture, once per fixture, which movable objects were already
     # touching it the first time it's observed as the mechanism-safety
     # focus (e.g. a bowl that starts the episode already resting inside
