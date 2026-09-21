@@ -2115,6 +2115,29 @@ def _fixture_action_tags(env, name: str) -> set:
         return set()
     category = object_category_from_instance_name(name)
     tags = {action for action, keywords in ACTION_COMPONENT_KEYWORDS.items() if any(kw in category for kw in keywords)}
+    # Fixed 2026-09-21 (dependency-tree audit): ACTION_COMPONENT_KEYWORDS is
+    # the wrong keyword set for press/turn CANDIDACY -- in RoboCasa it only
+    # picks out which geom *within* an already-candidate fixture is the
+    # pressable/turnable component (_fixture_component_geom_ids), never
+    # decides candidacy itself. RoboCasa's real candidacy test is
+    # `_fixture_attrs` (predicates.py ~5990-6024): class-based defaults
+    # (Microwave -> "pressable", Sink -> "turnable") plus its own narrow
+    # name-substring additions ("microwave" -> pressable, "faucet"/"sink"
+    # -> turnable). Ported here using the substring constants this file
+    # already has and already trusts elsewhere (MICROWAVE_FIXTURE_NAME_
+    # SUBSTRINGS at fixture_ready_for_press/microwave_empty's own _is_
+    # microwave, FAUCET_FIXTURE_NAME_SUBSTRINGS at fixture_ready_for_turn).
+    # Confirmed via the 400-episode baseline: skill_press_onset was 0/400
+    # before this fix even though this corpus's microwave fixture is a real
+    # RoboCasa-pressable class, purely because "microwave" was never in
+    # ACTION_COMPONENT_KEYWORDS["press"]. skill_turn_onset stays 0/400
+    # either way (no faucet/sink fixture exists in this corpus at all), so
+    # this branch is a correctness/future-proofing fix with no observable
+    # effect on the current corpus, not a live-bug fix like the press one.
+    if any(sub in category for sub in MICROWAVE_FIXTURE_NAME_SUBSTRINGS):
+        tags.add("press")
+    if any(sub in category for sub in FAUCET_FIXTURE_NAME_SUBSTRINGS):
+        tags.add("turn")
     jclass = _fixture_joint_class(env, name)
     if jclass == "slide":
         tags.add("slide")
@@ -2129,10 +2152,13 @@ def _fixture_action_tags(env, name: str) -> set:
 
 def _focus_fixture_for_action(env, action: str, eef_pos: Optional[np.ndarray]) -> Optional[str]:
     """Nearest fixture tagged with `action`, or None if this task has no such
-    fixture at all (a real, verified result for many (task, action) pairs in
-    this 40-task corpus -- e.g. no fixture is ever tagged "press" or "turn"
-    since none references a faucet or push-button, confirmed by inspecting
-    the actual fixture set)."""
+    fixture at all. Updated 2026-09-21 (dependency-tree audit, see
+    _fixture_action_tags' own comment): "press" IS now reachable in this
+    corpus (the microwave is a real RoboCasa-pressable class) -- the old
+    claim here that press/turn are both always empty was itself the bug
+    symptom, not a verified fact about the corpus. "turn" remains
+    genuinely, verifiably empty for all (task, action) pairs in this
+    40-task corpus, since no fixture references a faucet or sink at all."""
     best, best_d = None, None
     for name in getattr(env, "fixtures_dict", {}).keys():
         if action not in _fixture_action_tags(env, name):
