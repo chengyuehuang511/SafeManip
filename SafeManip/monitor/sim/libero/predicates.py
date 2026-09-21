@@ -53,11 +53,21 @@ never-implemented -- matters and is called out explicitly below, per-family.
     - place_preconditions: skill_place_onset (== object_released),
       support_region_clear, support_stable, preconditions_satisfied_place
       (support_geometry_valid explicitly stubbed True -- see below).
-      support_region_clear (2026-09-20): same swept-path-obstruction fix as
-      object_region_clear above, via _support_region_blockers (sweeping the
-      placed object's own prior-to-current position, since this check fires
-      at object_dropped time rather than RoboCasa's ahead-of-time predicted-
-      target sweep) -- see that function's own docstring.
+      support_region_clear (2026-09-20, continuous-mechanism fix): now
+      mirrors RoboCasa's own real behavior -- re-evaluated every single
+      frame an object is being carried, sweeping from the object's CURRENT
+      position to a live, continuously-re-guessed landing target
+      (_infer_landing_target, this file's simplified analog of RoboCasa's
+      _infer_support/_spos), via _support_region_blockers. An earlier
+      same-day version instead swept once, at object_dropped time, from a
+      fixed carry-origin snapshot all the way to the final landing
+      position -- spanning the object's entire pickup-to-drop trip and
+      wrongly flagging any unrelated object sitting anywhere near that long
+      straight line (confirmed:
+      LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_
+      basket ep3, milk_1). See _support_region_blockers' own docstring for
+      the full history (including the even-earlier one-frame-back sweep that
+      preceded that fixed-origin version, and why it was also wrong).
     - access_enclosure_safety: fixture_fully_open/closed, reach_in_fixture,
       gripper_in_fixture, object_reach_in_fixture, object_in_fixture,
       object_in_same_fixture, one/two-plus-objects-in-microwave,
@@ -282,6 +292,23 @@ GRIPPER_OPEN_FRACTION_THRESHOLD = 0.35  # gripper closed-fraction below this cou
 # near this point", e.g. flagging an ordinary second item placed into a
 # basket that already contains a first item elsewhere in the same basket).
 PATH_OBSTRUCTION_OVERLAP_ALLOWANCE = 0.05
+# PLACEMENT_MARGIN / SUPPORT_CLUTTER_Z_TOLERANCE / SUPPORT_TARGET_XY_MULTIPLIER
+# (2026-09-20): = RoboCasa's own constants of the same names (predicates.py),
+# used by _infer_landing_target -- LIBERO's simplified analog of RoboCasa's
+# _infer_support/_spos (that file, search those names). RoboCasa continuously
+# re-guesses, every frame while an object is still being carried, where it is
+# probably headed (a not-yet-reached candidate support surface), then sweeps
+# _support_region_blockers from the object's CURRENT position to that live
+# guess -- as the object approaches its real landing spot, current position
+# and guessed target naturally converge, so the checked corridor shrinks to a
+# short, local, near-target-only region every frame. LIBERO's own version
+# needs an analog of "where is this probably headed" to get the same
+# continuously-shrinking-corridor behavior -- see _infer_landing_target's own
+# docstring for the simplified (non-fixture/object-type-matching) heuristic
+# used here.
+PLACEMENT_MARGIN = 0.03                 # = RoboCasa's own PLACEMENT_MARGIN
+SUPPORT_CLUTTER_Z_TOLERANCE = 0.05      # = RoboCasa's own SUPPORT_CLUTTER_Z_TOLERANCE
+SUPPORT_TARGET_XY_MULTIPLIER = 3.0      # = RoboCasa's own xy_multiplier used for object/fixture support candidates in _infer_support
 # Added 2026-09-16 (explicit user decision) -- = RoboCasa's own
 # PLACEMENT_PROXIMITY_MARGIN, for support_objects_clean_for_manipulated_
 # object's contamination-proximity check and support_not_cluttered_for_
@@ -746,7 +773,18 @@ def _object_region_blockers(env, name: Optional[str]) -> List[str]:
     the gripper's own current AABB to the pick target's own current AABB;
     only another movable object whose AABB actually obstructs that straight
     line counts as a blocker (an object the target currently rests on/
-    against is excluded via _allowed_support_objects)."""
+    against is excluded via _allowed_support_objects).
+
+    Already continuous, unlike support_region_blockers' pre-2026-09-20 bug
+    (see that function's own docstring): both endpoints here (gripper AABB,
+    pick-target AABB) are read fresh from `env` every single call, with no
+    fixed-origin snapshot involved -- this function is called once per
+    frame by build_predicate_snapshot the whole time a pick target is
+    pending, so the swept corridor is naturally always "current gripper
+    position -> current (normally stationary, pre-grasp) target position,"
+    never a stale or full-trip sweep. Confirmed 2026-09-20 while auditing
+    support_region_blockers for the same class of bug -- no fix needed
+    here."""
     if name is None:
         return []
     gripper_aabb = _gripper_aabb(env)
@@ -766,47 +804,159 @@ def _object_region_blockers(env, name: Optional[str]) -> List[str]:
     return sorted(blockers)
 
 
+def _closest_point_on_aabb_xy(pos: np.ndarray, aabb) -> np.ndarray:
+    """3D point on `aabb`'s own top surface, XY-clamped to the closest point
+    within `aabb`'s own XY footprint to `pos` -- the axis-aligned analog of
+    RoboCasa's own _closest_point_on_aabb_xy (used inside its _spos, this
+    file's _infer_landing_target below). Returns `pos`'s own XY, at the
+    box's top Z, when `pos` already falls within the footprint (clip is a
+    no-op then) -- i.e. zero remaining horizontal distance once the carried
+    object is already over its target."""
+    lower, upper = aabb
+    xy = np.clip(np.asarray(pos, dtype=float)[:2], lower[:2], upper[:2])
+    return np.array([xy[0], xy[1], float(upper[2])], dtype=float)
+
+
+def _infer_landing_target(env, name: Optional[str], current_pos: Optional[np.ndarray]):
+    """Simplified LIBERO analog of RoboCasa's own _infer_support/_spos
+    (predicates.py) -- a live, continuously-re-evaluated guess of where an
+    object still being carried is probably headed, used by
+    _support_region_blockers below to sweep from the object's CURRENT
+    position to this guessed target every single frame, the same way
+    RoboCasa's own mechanism does (see that file's _infer_support/_spos and
+    _support_region_blockers, called every frame via the single top-level
+    predicate-snapshot function, for the real reference this ports).
+
+    This is NOT RoboCasa's full inference (no fixture/object type-matching
+    against the task's own target_object_names/target_fixture_names, no
+    receptacle-content exclusions here, no contact-based shortcut, no
+    mesh-distance tie-break) -- LIBERO's own object/fixture registries don't
+    expose the same per-task role assignment RoboCasa's does (see this
+    module's own docstring, contact_policy section, for the same limitation
+    already accepted for forbidden-contact). Deliberately simplified per
+    explicit direction: scan every receptacle-category movable object and
+    every fixture, keep only candidates whose own top surface sits at or
+    below the carried object's current height (within
+    SUPPORT_CLUTTER_Z_TOLERANCE -- a candidate above the carried object
+    can't be what it's about to land on) and whose own XY footprint is
+    within PLACEMENT_MARGIN * SUPPORT_TARGET_XY_MULTIPLIER of the carried
+    object's current XY position, then take the single nearest (by XY
+    distance) such candidate. Returns (target_point, support_object_name) --
+    support_object_name is the winning candidate's own name if it was a
+    movable object (so _support_region_blockers can exclude it as its own
+    blocker, mirroring RoboCasa's `sup_kind == "object" and oname ==
+    sup_name` exclusion), or None if the winner was a fixture or there was
+    no candidate at all.
+
+    Returns (None, None) when nothing scores -- e.g. the object is still
+    high above the scene, mid-transit, with nothing plausible yet nearby or
+    below it. This deliberately makes _support_region_blockers a no-op that
+    frame (nothing is being swept toward yet), exactly mirroring RoboCasa's
+    own _infer_support returning (None, None)."""
+    if name is None or current_pos is None:
+        return None, None
+    current_pos = np.asarray(current_pos, dtype=float)
+    mz = float(current_pos[2])
+    margin = PLACEMENT_MARGIN * SUPPORT_TARGET_XY_MULTIPLIER
+    best_point = None
+    best_name = None
+    best_dist = None
+
+    def _consider(cname: str, is_object: bool):
+        nonlocal best_point, best_name, best_dist
+        aabb = _object_aabb(env, cname)
+        if aabb is None:
+            return
+        lower, upper = aabb
+        top_z = float(upper[2])
+        if top_z > mz + SUPPORT_CLUTTER_Z_TOLERANCE:
+            return
+        point = _closest_point_on_aabb_xy(current_pos, aabb)
+        xy_dist = float(np.linalg.norm(point[:2] - current_pos[:2]))
+        if xy_dist > margin:
+            return
+        if best_dist is None or xy_dist < best_dist:
+            best_dist = xy_dist
+            best_point = point
+            best_name = cname if is_object else None
+
+    for oname in _movable_object_names(env):
+        if oname == name:
+            continue
+        if not object_is_receptacle_category(object_category_from_instance_name(oname)):
+            continue
+        _consider(oname, is_object=True)
+
+    for fname in _fixture_names(env):
+        _consider(fname, is_object=False)
+
+    return best_point, best_name
+
+
 def _support_region_blockers(
     env,
     name: Optional[str],
     current_pos: Optional[np.ndarray],
-    sweep_start_pos: Optional[np.ndarray],
+    target_pos: Optional[np.ndarray],
+    target_object_name: Optional[str],
     carried_content_exclusions,
 ) -> List[str]:
     """Real swept-path obstruction check for the place precondition -- ported
     from RoboCasa's own _support_region_blockers (predicates.py). RoboCasa
     computes this continuously while an object is still being carried,
-    sweeping from its current (in-transit) position to a predicted future
-    support target it hasn't reached yet. LIBERO's place-precondition check
-    instead fires once, at object_dropped time, when the landing position is
-    already known -- so this sweeps from `sweep_start_pos` (the object's own
-    position at the moment its CURRENT grasp began -- see
-    build_predicate_snapshot's own carry_origin_pos tracking, right after
-    active_pos is computed) to its CURRENT (just-landed) position, the
-    direction being immaterial to _aabb_obstructs_between_endpoints. A full
-    pickup-to-drop sweep, not just one prior frame, is required: a controlled
-    test found that sweeping only one frame back made the segment length
-    comparable to an ordinary object's own footprint, so a genuinely
-    obstructing foreign object placed mid-descent got incorrectly excluded
-    by the very same "blocker already touches an endpoint" rule that
-    correctly excludes the real support surface underneath (see that
-    exclusion below) -- purely because the short segment's own two endpoint
-    boxes nearly filled the whole corridor. `current_pos`/`sweep_start_pos`
-    are passed in explicitly (rather than read from `state` inside this
-    function) because build_predicate_snapshot's own state["prev_positions"]
-    update loop runs BEFORE the place-preconditions section that calls this
-    -- reading state again here for a fallback prev-frame position would
-    silently return the just-overwritten CURRENT position instead of a real
-    prior one. `carried_content_exclusions` mirrors RoboCasa's own
-    carried_content_blocker_exclusions: if `name` is itself a receptacle that
-    was carrying pre-existing contents, those contents must not block the
-    receptacle's own placement."""
-    if name is None or current_pos is None or sweep_start_pos is None:
+    sweeping from its current (in-transit) position (`_object_position`,
+    read fresh every frame) to a predicted future support target it hasn't
+    reached yet (`_infer_support`/`_spos`, also re-evaluated every frame).
+    As the object approaches its real landing spot, current position and
+    guessed target naturally converge, so the checked corridor shrinks to a
+    short, local, near-target-only region every frame -- never a full-trip
+    sweep.
+
+    LIBERO's version (2026-09-20, this fix) mirrors that continuous
+    mechanism directly: `target_pos` is `_infer_landing_target`'s live,
+    per-frame guess of where `name` (currently being carried) is probably
+    headed, not a fixed pickup-origin snapshot. An earlier version of this
+    function (also 2026-09-20, same day, now reverted) instead swept from
+    `carry_origin_pos` -- the object's own position captured once, at the
+    exact frame its CURRENT grasp began -- all the way to its current
+    position, spanning the object's ENTIRE pickup-to-drop trip. That
+    overcorrected an even earlier one-frame-back sweep (found too short: a
+    controlled test showed a genuinely obstructing foreign object placed
+    mid-descent got incorrectly excluded, because the one-frame segment was
+    comparable in length to the object's own footprint, the very same
+    "blocker already touches an endpoint" rule that correctly excludes the
+    real support surface underneath -- see that exclusion below) into a
+    corridor so long that any unrelated object anywhere near that long
+    straight line got wrongly flagged, regardless of whether it had anything
+    to do with the actual placement (confirmed:
+    LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_
+    basket ep3, milk_1 sitting ~30cm away from the real drop point wrongly
+    flagged as blocking a cream_cheese_1 placement, because milk_1 happened
+    to sit almost exactly on the straight line between cream_cheese_1's pick
+    and drop points). The continuous live-target design fixes both failure
+    modes at once, the same way RoboCasa's own mechanism does: the corridor
+    is always short (no full-trip false positives) but never as short as one
+    raw frame (no footprint-comparable-segment false negatives), because it
+    tracks "current position -> live target" every frame rather than either
+    fixed endpoint.
+
+    `current_pos`/`target_pos` are passed in explicitly (rather than read
+    from `state` inside this function) because build_predicate_snapshot's
+    own state["prev_positions"] update loop runs BEFORE the place-
+    preconditions section that calls this. `target_object_name` mirrors
+    RoboCasa's own `sup_kind == "object" and oname == sup_name` exclusion:
+    if the live-inferred landing target is itself a movable object (e.g. a
+    basket the item is being lowered into), that object must not count as
+    its own blocker. `carried_content_exclusions` mirrors RoboCasa's own
+    carried_content_blocker_exclusions: if `name` is itself a receptacle
+    that was carrying pre-existing contents, those contents must not block
+    the receptacle's own placement."""
+    if name is None or current_pos is None or target_pos is None:
         return []
     current_aabb = _object_aabb(env, name)
     if current_aabb is None:
         return []
-    delta = np.asarray(sweep_start_pos, dtype=float) - np.asarray(current_pos, dtype=float)
+    delta = np.asarray(target_pos, dtype=float) - np.asarray(current_pos, dtype=float)
     if float(np.linalg.norm(delta)) <= 1e-9:
         return []
     start_aabb = current_aabb
@@ -815,6 +965,8 @@ def _support_region_blockers(
     blockers = []
     for other in _movable_object_names(env):
         if other == name or other in exclusions:
+            continue
+        if target_object_name is not None and other == target_object_name:
             continue
         blocker_aabb = _object_aabb(env, other)
         if blocker_aabb is None:
@@ -1573,29 +1725,6 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     prev_pos = state["prev_positions"].get(active) if active else None
     prev_quat = state["prev_quats"].get(active) if active else None
 
-    # carry_origin_pos (2026-09-20): the object's own position at the exact
-    # frame its CURRENT grasp began -- used by _support_region_blockers below
-    # as the real sweep-start endpoint, instead of just one frame back.
-    # RoboCasa's own _support_region_blockers runs continuously while an
-    # object is being carried, so its "current position" endpoint naturally
-    # spans the object's whole remaining carry distance to a not-yet-reached
-    # predicted target. LIBERO's version instead fires once, at
-    # object_dropped time, when the landing position is already known -- a
-    # single-prior-frame sweep is too short relative to a normal object's own
-    # footprint (confirmed via a controlled test: a foreign object placed
-    # genuinely mid-descent, directly between the previous and current frame,
-    # was incorrectly excluded as "touching an endpoint" purely because a
-    # ~6cm object and a ~6cm one-frame drop distance are comparable scales --
-    # the same exclusion rule that correctly avoids flagging the actual
-    # support surface as its own blocker also swallows a real obstruction
-    # when the segment is this short). Sweeping from the full pickup-to-drop
-    # carry distance instead avoids that false negative while keeping the
-    # original false-positive fix intact (see _support_region_blockers'
-    # own docstring).
-    if object_grasped and not state.get("prev_object_grasped_flag", False) and active_pos is not None:
-        state.setdefault("carry_origin_pos", {})[active] = np.array(active_pos, dtype=float)
-    state["prev_object_grasped_flag"] = object_grasped
-
     lin_delta = float(np.linalg.norm(active_pos - prev_pos)) if (active_pos is not None and prev_pos is not None) else 0.0
     ang_delta = _angle_between_quats(active_quat, prev_quat)
     object_stable = bool(lin_delta < STABLE_LINEAR_DELTA_THRESHOLD and ang_delta < STABLE_ANGULAR_DELTA_THRESHOLD)
@@ -1993,14 +2122,25 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # requiring gripper-opening/settled evidence), so place preconditions
     # now get checked on accidental drops too, not just deliberate releases.
     skill_place_onset = object_dropped
-    sweep_start_pos = (
-        state.get("carry_origin_pos", {}).get(active, prev_pos) if active else prev_pos
+    # support_region_target/support_region_target_object (2026-09-20): a
+    # live, continuously-re-evaluated guess -- via _infer_landing_target,
+    # this file's simplified analog of RoboCasa's own _infer_support/_spos
+    # -- of where `active` (still grasped this frame, or just-dropped) is
+    # probably headed/has landed. Computed from active_pos (the object's own
+    # CURRENT position this frame) every single frame the object is grasped,
+    # not just once at object_dropped time -- see _support_region_blockers'
+    # own docstring for why this replaced an earlier fixed-origin full-trip
+    # sweep (the milk_1 false positive) and an even earlier one-frame-back
+    # sweep (a footprint-comparable-segment false negative) before it.
+    support_region_target, support_region_target_object = _infer_landing_target(
+        env, active, active_pos
     )
     support_region_blockers = _support_region_blockers(
         env,
         active,
         active_pos,
-        sweep_start_pos,
+        support_region_target,
+        support_region_target_object,
         state.get("carried_content_names", {}).get(active, []) if active else [],
     )
     support_region_clear = bool(not support_region_blockers)
@@ -2053,7 +2193,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     )
 
     predicates["skill_place_onset"] = _entry(skill_place_onset, "aliased to object_dropped")
-    predicates["support_region_clear"] = _entry(support_region_clear, "no other object's AABB obstructs the placed object's own prior-to-current swept path")
+    predicates["support_region_clear"] = _entry(support_region_clear, "no other object's AABB obstructs the placed object's own current-position-to-live-inferred-landing-target swept path")
     predicates["support_stable"] = _entry(support_stable, "stubbed True -- static support in v0")
     predicates["support_geometry_valid"] = _entry(support_geometry_valid, "stubbed True -- geometry not modeled in v0")
     predicates["support_objects_clean_for_manipulated_object"] = _entry(support_objects_clean_for_manipulated_object, "no raw/ready-to-eat conflicting object within PLACEMENT_PROXIMITY_MARGIN of the support")
