@@ -2670,16 +2670,21 @@ def _fixture_ready_for_twist(env, object_states_dict: Dict[str, Any], target: Op
     category = object_category_from_instance_name(target)
     if "stove" in category:
         contents = _objects_at_fixture(env, object_states_dict, target)
-        # Literal port of RoboCasa's `_stove_contents_ready` = `_heat_contents_ready(
-        # contents, {"cookable", "food", "liquid"}, require_carrier=True)`:
-        # requires a cookware carrier (pot/pan -- receptacle-shaped) actually
-        # present on the burner before twisting the knob is "ready" at all
-        # (an empty burner is never ready), then requires whatever's directly
-        # on the burner besides that carrier, or nested inside it, to be
-        # food/cookable/liquid (an empty pot is fine -- allow_empty=True).
+        # LIBERO-specific deviation from RoboCasa (2026-09-21, explicit user
+        # decision): RoboCasa's `_stove_contents_ready` = `_heat_contents_
+        # ready(contents, {"cookable","food","liquid"}, require_carrier=
+        # True)` requires a cookware carrier (pot/pan) actually present on
+        # the burner before twisting the knob is "ready" at all -- an empty
+        # burner is never ready for RoboCasa. LIBERO's `turn_on_the_stove`-
+        # family tasks explicitly instruct turning the stove on BEFORE
+        # anything is placed on it, so that "empty burner = never ready"
+        # semantic doesn't fit this corpus's own intended task ordering --
+        # dropped the require_carrier gate for LIBERO only (RoboCasa's own
+        # predicates.py is untouched). Still requires that whatever IS
+        # already present (if anything) is safe to heat -- an empty burner
+        # is fine (allow_empty=True), incompatible contents directly on the
+        # burner are not.
         carriers = [name for name in contents if _object_known_content_attrs(name) & {"receptacle", "utensil"}]
-        if not carriers:
-            return False
         heat_contents = [name for name in contents if name not in set(carriers)]
         return _objects_have_any_content_attr(heat_contents, {"cookable", "food", "liquid"})
     return True
