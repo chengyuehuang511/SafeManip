@@ -345,6 +345,49 @@ MESH_GRIPPER_FAR_THRESHOLD = 0.01        # = RoboCasa's own GRIPPER_FAR_THRESHOL
 REACH_THRESHOLD = 0.05
 NEAR_OBJECT_THRESHOLD = REACH_THRESHOLD  # eef/gripper-AABB-to-object distance considered "near" for onset (m) -- see REACH_THRESHOLD's own comment
 GRIPPER_OPEN_FRACTION_THRESHOLD = 0.35  # gripper closed-fraction below this counts as "open enough to release"
+# GRASP_GATE_MIN_FINGER_FRACTION_THRESHOLD (2026-09-21, corpus-wide
+# object_grasped-never-fires regression fix): _check_grasp_any's own
+# gripper-closed gate used to reuse GRIPPER_OPEN_FRACTION_THRESHOLD (0.35)
+# against _gripper_closed_fraction's MEAN-of-both-fingers reading -- fine for
+# a release gate (mean tracks overall opening/closing motion well) but wrong
+# for a grasp-acceptance gate on thin/off-center objects: confirmed via real
+# frame data (libero_object suite, tomato_sauce/milk/orange_juice
+# pick-and-place tasks) that bilateral finger-pad contact is genuinely
+# present (both fingers independently touching the object, contact solver
+# confirmed via env.sim.data.contact) throughout a real, sustained lift, yet
+# the MEAN closed-fraction across both fingers never exceeds ~0.21-0.33 the
+# entire time -- below the 0.35 gate -- because these objects are thin/
+# narrow enough (and often off-center between the fingers) that one finger
+# travels much further than the other before contact (e.g. tomato_sauce_1
+# ep0: 0.36 vs 0.06 at the same frame), dragging the mean down even though
+# real bilateral contact is happening. This silently zeroed out
+# object_grasped/object_grasped_raw for 100% of frames across all 3 affected
+# tasks' full 10-episode corpora (confirmed corpus-wide), cascading into
+# every predicate downstream of grasp state (pick/place onset,
+# object_dropped/released, settle-watch, contact-role taxonomy).
+# RoboCasa's own real analog (`OU.check_obj_grasped`,
+# robocasa/utils/object_utils.py) does NOT have this failure mode: it
+# requires EACH finger joint's raw qpos individually below
+# GRIPPER_CLOSED_THRESHOLD=0.0399 (out of a ~0.04 full-open joint range --
+# i.e. ~99.75% of the way to the fully-open limit), an almost-vacuous
+# per-finger AND gate whose only real job is excluding a literal wide-open
+# gripper -- bilateral contact itself is what actually discriminates a real
+# grasp. Ported that same intent here literally: MIN across fingers (not
+# mean -- mirrors RoboCasa's per-joint "each finger individually" AND
+# semantics) against a near-vacuous threshold, calibrated against real data
+# (worst-case min-finger fraction during a confirmed real bilateral-contact
+# window across 9 sampled tomato_sauce/milk/orange_juice episodes: as low as
+# 0.025 -- vs. a fully-open, no-contact baseline of ~0.006-0.15) -- 0.02
+# sits safely below every observed real-grasp minimum found and above the
+# fully-open baseline, while still doing essentially the same "not literally
+# wide open" job RoboCasa's own gate does. Deliberately does NOT touch
+# GRIPPER_OPEN_FRACTION_THRESHOLD/_gripper_closed_fraction's own mean
+# semantics -- that pairing is still correct and unchanged for its own
+# consumers (the release-side gripper_is_opening/gripper_is_closing motion
+# signals at build_predicate_snapshot's "grasp / release / settle" block,
+# which want a smooth, both-fingers-averaged continuous motion signal, not a
+# single-finger floor).
+GRASP_GATE_MIN_FINGER_FRACTION_THRESHOLD = 0.02
 # GRASP_BILATERAL_MIN_CONTACT_BODIES (2026-09-21): = RoboCasa's own constant
 # of the same name (predicates.py, value 2) -- how many distinct gripper
 # finger groups must independently contact the object for _check_grasp_any's
@@ -593,7 +636,11 @@ def _quat_angle(q: np.ndarray) -> float:
     return float(2.0 * np.arccos(w))
 
 
-def _gripper_closed_fraction(env) -> Optional[float]:
+def _gripper_finger_closed_fractions(env) -> Optional[list]:
+    """Per-joint closed-fraction list (0=fully open, 1=fully closed), one
+    entry per gripper finger joint. Factored out of `_gripper_closed_fraction`
+    (2026-09-21) so callers needing a per-finger (not averaged) reading --
+    see `_gripper_min_closed_fraction` -- don't have to recompute this."""
     try:
         gripper = env.robots[0].gripper
         fracs = []
@@ -603,9 +650,27 @@ def _gripper_closed_fraction(env) -> Optional[float]:
             qpos = float(env.sim.data.get_joint_qpos(jn))
             span = max(abs(lo), abs(hi)) or 1.0
             fracs.append(1.0 - min(1.0, abs(qpos) / span))
-        return float(np.mean(fracs)) if fracs else None
+        return fracs if fracs else None
     except Exception:
         return None
+
+
+def _gripper_closed_fraction(env) -> Optional[float]:
+    fracs = _gripper_finger_closed_fractions(env)
+    return float(np.mean(fracs)) if fracs else None
+
+
+def _gripper_min_closed_fraction(env) -> Optional[float]:
+    """MIN (not mean) across finger joints -- see
+    GRASP_GATE_MIN_FINGER_FRACTION_THRESHOLD's own comment for why
+    `_check_grasp_any`'s gripper-closed gate needs this instead of
+    `_gripper_closed_fraction`'s mean: a thin/off-center object can leave one
+    finger much less closed than the other, and it's specifically the
+    least-closed finger that must still be "not literally wide open" for a
+    real bilateral grasp, mirroring RoboCasa's own per-joint (not averaged)
+    `OU.check_obj_grasped` AND-gate."""
+    fracs = _gripper_finger_closed_fractions(env)
+    return float(min(fracs)) if fracs else None
 
 
 def _gripper_finger_geom_groups(env) -> Dict[str, set]:
@@ -724,10 +789,24 @@ def _check_grasp_any(env) -> Optional[str]:
     (`_object_gripper_bilateral_contact` -- both gripper fingers
     independently, distinctly touch the object, ported from RoboCasa's own
     `_object_gripper_bilateral_contact`) with the gripper being closed
-    enough (`GRIPPER_OPEN_FRACTION_THRESHOLD`, a pure joint-position/
-    finger-width signal, no contact dependency), mirroring RoboCasa's own
-    `_object_is_grasped` (predicates.py, `_object_gripper_bilateral_contact
-    and OU.check_obj_grasped(...)`) -- same rationale, adapted (2026-09-21).
+    enough (`GRASP_GATE_MIN_FINGER_FRACTION_THRESHOLD`, a pure
+    joint-position/finger-width signal, no contact dependency), mirroring
+    RoboCasa's own `_object_is_grasped` (predicates.py,
+    `_object_gripper_bilateral_contact and OU.check_obj_grasped(...)`) --
+    same rationale, adapted (2026-09-21).
+
+    Gripper-closed gate now uses `_gripper_min_closed_fraction` (MIN across
+    finger joints) against `GRASP_GATE_MIN_FINGER_FRACTION_THRESHOLD`, NOT
+    `_gripper_closed_fraction` (mean) against `GRIPPER_OPEN_FRACTION_
+    THRESHOLD` as originally written -- see
+    GRASP_GATE_MIN_FINGER_FRACTION_THRESHOLD's own comment (2026-09-21
+    regression fix): the mean-based gate silently zeroed out object_grasped
+    for 100% of frames on every episode of 3 real "pick up X" tasks
+    (thin/off-center objects -- tomato_sauce/milk/orange_juice -- never
+    raised the *mean* closed-fraction above ~0.21-0.33 despite genuine,
+    confirmed bilateral finger-pad contact throughout a real sustained
+    lift), because one finger travels much further than the other before
+    contacting an off-center/thin object and dragged the average down.
 
     Does NOT call robosuite's own `env._check_grasp` (an aggregate-contact
     utility -- "any" gripper geom touching "any" of the object's geoms,
@@ -756,8 +835,8 @@ def _check_grasp_any(env) -> Optional[str]:
     "drop") -- and that AND-with-closed-gripper reasoning still holds and is
     preserved here; only the contact half of the AND has changed, from
     aggregate any-geom contact to bilateral two-finger contact."""
-    gripper_frac = _gripper_closed_fraction(env)
-    if gripper_frac is not None and gripper_frac < GRIPPER_OPEN_FRACTION_THRESHOLD:
+    gripper_frac = _gripper_min_closed_fraction(env)
+    if gripper_frac is not None and gripper_frac < GRASP_GATE_MIN_FINGER_FRACTION_THRESHOLD:
         return None
     for name in _movable_object_names(env):
         try:
