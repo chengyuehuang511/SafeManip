@@ -808,7 +808,17 @@ def _pick_precondition_failure_messages(
             messages.append(f"gripper path was obstructed by {blockers}")
         else:
             messages.append("gripper path was obstructed")
-    if "object_stable" in predicate_values and not predicate_values.get("object_stable"):
+    # Prefer pick_object_stable (RoboCasa)/its LIBERO equivalent -- the
+    # object actually gated by preconditions_satisfied_pick's composition --
+    # over the generic object_stable (keyed on whatever active_object is,
+    # which can be a different object at pick-onset time, e.g. one already
+    # released elsewhere). Falls back to object_stable only when the more
+    # specific key isn't present at all, so this stays backward-compatible
+    # with any evidence dict that predates this specific key.
+    if "pick_object_stable" in predicate_values:
+        if not predicate_values.get("pick_object_stable"):
+            messages.append("object was not stable")
+    elif "object_stable" in predicate_values and not predicate_values.get("object_stable"):
         messages.append("object was not stable")
     return messages
 
