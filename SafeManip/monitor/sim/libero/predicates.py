@@ -4678,6 +4678,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # the mug itself had just become an occupant -- a guaranteed false
     # violation on every single-object microwave placement.
     empty_check_occupants = 0
+    inside_names: List[str] = []
     if fixture_name is not None and fixture_name in object_states_dict:
         fixture_state = object_states_dict[fixture_name]
         for name in _movable_object_names(env):
@@ -4710,8 +4711,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
                 inside = bool(region_inside)
             if inside:
                 occupants += 1
-                if not (object_grasped and name == active):
-                    empty_check_occupants += 1
+                inside_names.append(str(name))
                 # Gated on `active` alone -- matches RoboCasa's real
                 # object_in_fixture exactly (predicates.py ~8614-8637: keyed
                 # solely to active_object). Fixed 2026-09-21: the
@@ -4722,6 +4722,48 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
                 # `active` based on an unrelated object's containment.
                 if name == active:
                     object_in_fixture = True
+        # Payload exclusion for the empty-check count. Two conditions, not
+        # one -- verified against real data (KITCHEN_SCENE6_put_the_yellow_
+        # and_white_mug_in_the_microwave_and_close_it ep0/4/5) before adding
+        # the second:
+        #   1. object_grasped and name == active -- matches RoboCasa's own
+        #      microwave_entering_payload_exclusions literally (predicates.py
+        #      ~8487-8489).
+        #   2. name == active and it is the SOLE object currently detected
+        #      inside -- covers a real LIBERO-specific gap RoboCasa's own
+        #      corpus apparently never hits: _check_grasp_any's bilateral-
+        #      contact test can genuinely stop reading True for the rest of
+        #      a placement once the demo's policy transitions from a pinch
+        #      grasp to a push/slide for the final approach into the
+        #      fixture, not just flicker for 1-2 frames. Confirmed on ep0:
+        #      object_grasped_raw drops False at frame 150 and never reads
+        #      True again through the rest of the 330-frame episode, while
+        #      the mug's own tracked position stays a roughly-constant ~8cm
+        #      from the end-effector the whole time (not free fall -- z
+        #      drops only ~3.5cm over 60 frames, physically impossible under
+        #      gravity alone) -- i.e. the robot is still actively placing
+        #      the object at frame 210 when object_reach_in_microwave fires,
+        #      condition 1 alone just can't see that anymore. A bare
+        #      PERSISTENCE_FRAMES-style raw-key stability debounce (order
+        #      5 frames) was considered and rejected: the gap here is 60+
+        #      frames, an order of magnitude too long for that mechanism to
+        #      bridge, and the "occupied" reading is itself perfectly
+        #      stable/non-flickering for the entire gap, so a stability
+        #      debounce has nothing to smooth over here. Restricted to the
+        #      sole-occupant case specifically so a genuine two-object
+        #      violation is never erased: if a second, distinct object is
+        #      already inside when the active object also enters, this
+        #      condition is false for both (len(inside_names) != 1), and
+        #      the pre-existing occupant still counts.
+        solely_active_occupant = bool(
+            active is not None and inside_names == [str(active)]
+        )
+        for name in inside_names:
+            excluded = (object_grasped and name == active) or (
+                solely_active_occupant and name == active
+            )
+            if not excluded:
+                empty_check_occupants += 1
         if active:
             prev_active_in_fixture = state.get("prev_active_in_fixture", False)
             object_in_fixture_active = object_in_fixture
