@@ -2702,6 +2702,12 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     active = state["active_object"]
 
     object_dropped = bool(state["prev_grasped_object"]) and not object_grasped
+    # dropped_object_name (2026-09-21 fix, repeated-onset-during-a-single-
+    # continuous-interaction audit): which object object_dropped is
+    # actually about, captured before prev_grasped_object gets overwritten
+    # below -- needed by skill_place_onset's own per-object re-arm latch
+    # (see that predicate's own comment for the full rationale).
+    dropped_object_name = state["prev_grasped_object"] if object_dropped else None
     state["prev_grasped_object"] = grasped_name
 
     # --- contact policy: fine-grained contact-role taxonomy --------------
@@ -3248,6 +3254,39 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         if dist is not None:
             pick_onset_prev_dist[name] = dist
         entry = pick_onset_state.setdefault(name, {"streak": 0, "false_count": 0, "fired": False})
+        # genuinely_disengaged (2026-09-21 fix, repeated-onset-during-a-
+        # single-continuous-interaction audit): whether the object has
+        # actually left the near-object region, not merely "isn't currently
+        # getting closer". Confirmed via real data
+        # (push_the_plate_to_the_front_of_the_stove ep5, v31 corpus) that
+        # the old grace-period alone (false_count reaching SKILL_ONSET_FRAMES
+        # consecutive non-decreasing frames) is not sufficient evidence the
+        # interaction actually ended: during a sustained push the gripper and
+        # object move together at close to the same velocity, so
+        # eef-to-object distance stays flat (never < 0.03m the whole
+        # episode, i.e. always deep inside NEAR_OBJECT_THRESHOLD) for long
+        # stretches -- easily exceeding the grace period -- and the "fired"
+        # latch cleared even though the robot never actually backed off, let
+        # alone released/re-approached. Confirmed the same underlying
+        # pattern (fumbling near a single object across a wide distance
+        # plateau, never once climbing back out past NEAR_OBJECT_THRESHOLD,
+        # before the real grasp) also produces spurious extra pick onsets in
+        # KITCHEN_SCENE8_put_both_moka_pots_on_the_stove ep1 (onsets at
+        # frames 284 and 332 for moka_pot_1, both before its real grasp at
+        # 374 -- distance oscillates 0.075-0.12m the whole stretch, never
+        # genuinely disengaging). Gating the "fired" latch's own clear
+        # condition on real disengagement (dist >= NEAR_OBJECT_THRESHOLD, the
+        # same physically-motivated near/far boundary skill_pick_onset
+        # itself already uses for "near", not a new invented number) fixes
+        # both: the latch now only releases once the gripper has genuinely
+        # left the object's vicinity, distinguishing "still hovering nearby,
+        # mid-interaction" from "genuinely disengaged, this is a new
+        # attempt". The streak/false_count grace mechanic itself is
+        # unchanged (still lets a momentary non-decreasing blip pass without
+        # resetting streak-building progress) -- only whether "fired" is
+        # allowed to clear (and thus whether a NEW onset can fire) is
+        # additionally gated.
+        genuinely_disengaged = bool(dist is not None and dist >= NEAR_OBJECT_THRESHOLD)
         if moving_towards:
             entry["streak"] += 1
             entry["false_count"] = 0
@@ -3256,11 +3295,13 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             if entry["false_count"] >= SKILL_ONSET_FRAMES:
                 entry["streak"] = 0
                 entry["false_count"] = 0
-                entry["fired"] = False
+                if genuinely_disengaged:
+                    entry["fired"] = False
         else:
             entry["streak"] = 0
             entry["false_count"] = 0
-            entry["fired"] = False
+            if genuinely_disengaged:
+                entry["fired"] = False
         # Fixture-contact suppression (2026-09-20, ported from RoboCasa's
         # own pick_onset_cond fix): this loop, like RoboCasa's original
         # design before its own fix, only ever considers movable OBJECTS as
@@ -3407,7 +3448,81 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # any reason (object_released is a strict subset, additionally
     # requiring gripper-opening/settled evidence), so place preconditions
     # now get checked on accidental drops too, not just deliberate releases.
-    skill_place_onset = object_dropped
+    #
+    # Re-examined 2026-09-21 (repeated-onset-during-a-single-continuous-
+    # interaction audit): object_dropped inherits object_grasped's debounced-
+    # but-still-raw-contact-signal fragility -- GRASP_CANDIDATE_PERSISTENCE_
+    # FRAMES (5) consecutive frames of real bilateral contact is enough to
+    # accept a brief, non-deliberate contact blip as a "grasp", so a genuine
+    # grasp-then-release flip-flop can fire object_dropped (and thus
+    # skill_place_onset) more than once for what's really one continuous
+    # interaction. Confirmed via real data
+    # (KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_
+    # cabinet_and_close_it ep0, v31 corpus): object_grasped/object_dropped
+    # fire True->False->True->False at frames 159/169/174 while the
+    # eef-to-bowl distance stays flat at ~0.06-0.07m the entire window
+    # (never approaches, then never actually leaves, contact range) --
+    # object_dropped fires twice (159, 174) for this one non-event.
+    #
+    # First attempt (reverted same day): retarget skill_place_onset off
+    # object_dropped entirely, onto left_gripper_edge (the rising edge of
+    # the AABB-overlap-based object_left_gripper signal), mirroring
+    # RoboCasa's own predicates.py identical retarget from 2026-09-17
+    # (search "object_left_gripper_edge" there). This does fix the bowl
+    # case (left_gripper never separates across 159-180, one real edge at
+    # 180) -- but a corpus-wide check (all 291 real episodes in the v31
+    # corpus with a final release) found object_left_gripper never clears
+    # by episode end in 124/291 (42.6%) of them, because LIBERO's episodes
+    # -- unlike RoboCasa's -- typically end within single-digit frames of
+    # the final placement once task success is detected, giving the
+    # gripper's AABB no time to actually separate before the trace stops.
+    # Under the left_gripper_edge retarget, skill_place_onset would then
+    # NEVER fire at all for the single most important placement in
+    # ~43% of episodes -- a severe false-negative regression, not an
+    # acceptable trade against RoboCasa's own (longer-tailed-episode-
+    # validated) net improvement. Reverted; object_left_gripper/
+    # left_gripper itself is unaffected and still exported as before.
+    #
+    # Final fix: keep object_dropped as the trigger (preserving "catches
+    # accidental drops too" and "fires promptly, doesn't need the episode
+    # to keep running after the real event" from both the 2026-09-15 and
+    # the reverted attempt above), but gate a REPEATED firing for the SAME
+    # object behind the same genuinely_disengaged-style latch used for
+    # skill_pick_onset's identical bug (see that predicate's own 2026-09-21
+    # comment) -- once skill_place_onset has fired for a given dropped
+    # object, it won't fire again for that same object until the eef has
+    # genuinely left its vicinity (dist >= NEAR_OBJECT_THRESHOLD, the same
+    # existing near/far boundary, not a new invented number), distinguishing
+    # "still lingering near this object, same interaction" from "genuinely
+    # moved on, a new drop of this object is a new event." Verified against
+    # the bowl case above: dist never reaches 0.09 during 159-174, so the
+    # frame-159 latch blocks the frame-174 repeat, exactly as desired, and
+    # ALSO verified against a real accidental-drop-during-final-placement
+    # case (KITCHEN_SCENE8_put_both_moka_pots_on_the_stove ep1, moka_pot_1's
+    # final placement: object_dropped fires at both 418 and 432, eef-to-pot
+    # distance flat at 0.0723m the entire 400-438 window, i.e. the exact
+    # same non-disengaging pattern) -- collapses to one onset (418) instead
+    # of two, while the episode's *other* real, separate placement
+    # (moka_pot_2 at frame 189, a completely different object whose own
+    # latch is independent) is untouched.
+    place_onset_fired = state.setdefault("place_onset_fired", {})
+    skill_place_onset = False
+    if object_dropped and dropped_object_name is not None:
+        if not place_onset_fired.get(dropped_object_name, False):
+            skill_place_onset = True
+            place_onset_fired[dropped_object_name] = True
+    # Re-arm: clear any object's latch once the eef has genuinely left its
+    # vicinity, so a real later drop of the SAME object (after a genuine
+    # re-approach/re-grasp cycle) still fires its own new onset.
+    for _pon_name in list(place_onset_fired.keys()):
+        if not place_onset_fired[_pon_name]:
+            continue
+        _pon_pos = _body_pos(env, _pon_name)
+        if _pon_pos is None or eef_pos is None:
+            continue
+        _pon_dist = float(np.linalg.norm(eef_pos - _pon_pos))
+        if _pon_dist >= NEAR_OBJECT_THRESHOLD:
+            place_onset_fired[_pon_name] = False
     # support_region_target/support_region_target_object (2026-09-20): a
     # live, continuously-re-evaluated guess -- via _infer_landing_target,
     # this file's simplified analog of RoboCasa's own _infer_support/_spos
