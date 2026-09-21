@@ -2933,9 +2933,10 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
 
     object_supported = bool(active and _touches_anything(env, active))
 
-    # object_released (2026-09-09): ported RoboCasa's own two extra branches
-    # verbatim (predicates.py's object_released), on top of the original
-    # gripper-opening/closed-fraction check:
+    # object_released: ported RoboCasa's own exact 3-branch definition
+    # verbatim (predicates.py's object_released) -- gripper_is_opening OR
+    # prev_gripper_is_opening OR (active and object_supported). No other
+    # branch exists in RoboCasa's real implementation.
     #
     # - prev_gripper_is_opening: gripper_is_opening is a raw single-frame
     #   sign check (no debounce) that can dip False for exactly the one
@@ -2944,22 +2945,28 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     #
     # - `active and object_supported`: covers a release where the arm moves
     #   the gripper away (or simply stops actively gripping) without ever
-    #   opening the fingers past GRIPPER_OPEN_FRACTION_THRESHOLD, because
-    #   the object is already resting on solid support by the time contact
-    #   breaks -- confirmed on KITCHEN_SCENE3_turn_on_the_stove_and_put_
-    #   the_moka_pot_on_it: object_supported was already True *while still
-    #   grasped*, for several frames before release (the pot touches the
-    #   stove before the grasp ends), and gripper_frac never dips below
-    #   threshold at the drop frame (this demo's release motion doesn't
-    #   fully open the gripper immediately) -- a real, deliberate,
-    #   already-safe placement, not an accidental drop, that the original
-    #   gripper-only check couldn't recognize at all.
+    #   opening the fingers, because the object is already resting on solid
+    #   support by the time contact breaks -- confirmed on KITCHEN_SCENE3_
+    #   turn_on_the_stove_and_put_the_moka_pot_on_it: object_supported was
+    #   already True *while still grasped*, for several frames before
+    #   release (the pot touches the stove before the grasp ends) -- a
+    #   real, deliberate, already-safe placement, not an accidental drop,
+    #   that a gripper-opening-only check couldn't recognize at all.
+    #
+    # A 4th branch (`gripper_frac < GRIPPER_OPEN_FRACTION_THRESHOLD`) was
+    # removed 2026-09-21 (dependency-tree audit): it had no RoboCasa
+    # counterpart (GRIPPER_OPEN_FRACTION_THRESHOLD is not referenced
+    # anywhere in object_released there) and was strictly more permissive
+    # than RoboCasa's real definition -- it could classify a drop as a
+    # deliberate "release" purely because the gripper already happened to
+    # read below threshold at the drop frame, even with no opening motion
+    # and no support, which RoboCasa would instead leave to the LTL's own
+    # re-grasp fallback disjunct to adjudicate.
     object_released = bool(
         object_dropped
         and (
             gripper_is_opening
             or state.get("prev_gripper_is_opening", False)
-            or (gripper_frac is not None and gripper_frac < GRIPPER_OPEN_FRACTION_THRESHOLD)
             or (active is not None and object_supported)
         )
     )
@@ -3074,11 +3081,20 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         and gripper_away
     )
 
+    # Clears only on object_settled or the timeout itself (matches RoboCasa's
+    # own awaiting_settle clearing condition, predicates.py ~4434-4439:
+    # `if awaiting_settle and (object_settled or release_object_settle_timeout):`
+    # -- grepping all occurrences of awaiting_settle there confirms no branch
+    # clears the watch merely because the same object got re-grasped). A
+    # regrasp-clears-the-watch branch was removed here 2026-09-21
+    # (dependency-tree audit): it had no RoboCasa counterpart and silently
+    # zeroed the exported release_object_settle_timeout signal on regrasp,
+    # diverging from RoboCasa's real behavior of keeping the original watch
+    # running (and still able to report a timeout) even while the object is
+    # currently re-held.
     release_settle_timeout = False
     if watch is not None:
-        if object_grasped and grasped_name == watch["object"]:
-            state["settle_watch"] = None
-        elif object_settled:
+        if object_settled:
             state["settle_watch"] = None
         else:
             watch["age"] += 1
