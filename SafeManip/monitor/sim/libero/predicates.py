@@ -3270,11 +3270,41 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     raw_contact_sustained = bool(raw_contact_streak > FORBIDDEN_CONTACT_TOLERANCE_FRAMES)
     contaminated = bool(state.get("contaminated", False) or raw_contact_sustained)
 
-    if transfer_target is not None:
-        _mark_contaminated(
-            env, state, transfer_target, transfer_target_geom,
-            source_entity=transfer_source, position=transfer_pos, source_geom_id=transfer_source_geom,
-        )
+    # Ordering fix (2026-09-21, found via this session's own monkey-patch
+    # verification run -- LIVING_ROOM_SCENE1's alphabet_soup/cream_cheese
+    # task, episode 0, frames ~180-230): _mark_contaminated for this frame's
+    # winning transfer_target must NOT run before the robot_contact_clean_
+    # objects_now loop below (an earlier version of this port called it here,
+    # ahead of that loop -- the OPPOSITE order from RoboCasa's own
+    # predicates.py, which computes robot_contact_clean_objects_now first
+    # and only calls _mark_contaminated afterward, right before persisting
+    # contaminated_spots). Concretely: when the SAME contaminated-robot-
+    # touches-a-clean-object contact is simultaneously (a) the winning
+    # contamination_transfer_candidate for THIS object (robot as transfer
+    # source, since a contaminated robot itself counts as a raw/contaminated
+    # entity) and (b) the clean-touch-while-contaminated candidate the
+    # forbidden-combination age counter is tracking, both age counters cross
+    # FORBIDDEN_CONTACT_TOLERANCE_FRAMES on the exact same frame (they start
+    # counting from the same first-contact frame). Calling _mark_contaminated
+    # first added a new contaminated_spots entry for that object THIS frame,
+    # so the clean-touch loop's `_entity_has_any_contamination` check (which
+    # runs after, in this same frame) already saw the object as contaminated
+    # and excluded it -- permanently zeroing clean_streak right as it would
+    # have hit its own >20 threshold, so robot_contact_clean_sustained could
+    # never fire for this pattern. RoboCasa's own ordering avoids this: the
+    # clean-touch loop reads the PRE-this-frame contaminated_spots, so the
+    # object is still counted as a valid clean-touch candidate for the exact
+    # frame its own age crosses 20, firing robot_contact_clean_sustained for
+    # (at least) that one frame before the object becomes excluded on the
+    # next frame. Moved below (verified via a temporary, fully-reverted
+    # RAW_NAME_SUBSTRINGS monkey-patch + real LIVING_ROOM_SCENE1 episode
+    # re-extraction: robot_contact_clean_sustained now correctly fires once
+    # this reorder is in place, where it never did before).
+    transfer_target_to_mark = transfer_target
+    transfer_target_geom_to_mark = transfer_target_geom
+    transfer_source_to_mark = transfer_source
+    transfer_pos_to_mark = transfer_pos
+    transfer_source_geom_to_mark = transfer_source_geom
 
     # robot_contact_clean_objects_now -- object-kind branch uses whole-object
     # _entity_has_any_contamination, not positional (2026-09-19 RoboCasa fix,
@@ -3335,6 +3365,17 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     clean_streak = clean_streak + 1 if (robot_contact_clean_candidate is not None and contaminated) else 0
     state["clean_streak"] = clean_streak
     robot_contact_clean = bool(clean_streak > FORBIDDEN_CONTACT_TOLERANCE_FRAMES)
+
+    # _mark_contaminated moved here (see this frame's own ordering-fix
+    # comment above, where transfer_target_to_mark/etc. are captured) --
+    # AFTER robot_contact_clean_objects_now/clean_streak/robot_contact_clean
+    # are all computed, matching RoboCasa's own ordering exactly.
+    if transfer_target_to_mark is not None:
+        _mark_contaminated(
+            env, state, transfer_target_to_mark, transfer_target_geom_to_mark,
+            source_entity=transfer_source_to_mark, position=transfer_pos_to_mark,
+            source_geom_id=transfer_source_geom_to_mark,
+        )
 
     # sanitized: contact with a turned-on faucet, if this task has one at
     # all (none of the 40 in-scope tasks do -- verified, not assumed).
