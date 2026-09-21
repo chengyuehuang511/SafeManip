@@ -1258,9 +1258,41 @@ def _object_support_reference(env, name: str) -> Optional[str]:
     restriction exists for a different purpose, excluding a container an
     object is about to be placed ONTO from counting as its own pick-region
     blocker, not for identifying what an object currently rests on/in for
-    stability purposes) and picks the sorted-first match when more than one
-    object is touching, matching RoboCasa's own tie-break exactly."""
+    stability purposes).
+
+    Directional (below-only) filter (2026-09-20 fix, found via the v26
+    corpus regression sweep): a touching object only counts as `name`'s
+    support if its own top surface sits at or below `name`'s own position
+    (same "is this candidate BELOW the reference point" check
+    _infer_landing_target's own _consider() uses, SUPPORT_CLUTTER_Z_
+    TOLERANCE). Without this, any object merely touching `name` -- including
+    one `name` itself supports, e.g. a bowl just placed ON TOP of a plate --
+    could be picked as `name`'s "support", backwards: confirmed corpus-wide
+    (pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate ep1
+    and 78 other episodes) that once a bowl settles onto a stationary plate,
+    the plate (touching the bowl from below) was picking the BOWL -- still
+    genuinely settling, so still slightly moving -- as ITS OWN "support",
+    so the plate's stability was measured relative to the bowl's residual
+    motion and read as spuriously unstable even though the plate itself
+    never moved at all. This directional filter, plus the sorted-first
+    tie-break among any remaining (genuinely-below) candidates, matches
+    RoboCasa's own _object_support_reference exactly (RoboCasa's
+    _current_support_contacts already has its own below/OBB-based
+    directionality built in, unlike this file's simpler _objects_touching)."""
     touching = {str(o) for o in _objects_touching(env, name)}
+    if not touching:
+        return None
+    name_pos = _body_pos(env, name)
+    if name_pos is not None:
+        below = []
+        for other in touching:
+            other_aabb = _object_aabb(env, other)
+            if other_aabb is None:
+                continue
+            _, other_upper = other_aabb
+            if float(other_upper[2]) <= float(name_pos[2]) + SUPPORT_CLUTTER_Z_TOLERANCE:
+                below.append(other)
+        touching = set(below)
     if not touching:
         return None
     return sorted(touching)[0]
