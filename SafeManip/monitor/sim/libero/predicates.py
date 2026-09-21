@@ -4871,7 +4871,56 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         # onset is gone, and the real slide onsets (opening/closing the
         # drawer while empty-handed) still fire correctly at frames
         # 184/231.
-        near = near and not object_grasped and not any_pick_onset and not skill_place_onset
+        #
+        # pick_onset_state["fired_object"] also gated on (2026-09-21,
+        # open_the_top_drawer_and_put_the_bowl_inside ep0 audit): `any_pick_
+        # onset` is a single-frame PULSE, not a latch -- it's reset to False
+        # at the top of this same function every frame and only ever True on
+        # the exact frame a pick onset's own streak first crosses
+        # SKILL_ONSET_FRAMES (see its own assignment above), unlike this
+        # comment's original wording ("not skill_pick_onset") suggested.
+        # Confirmed via real frame data on this episode: a genuine pick
+        # onset fired on wine_bottle_1 at frame 78 (skill_pick_onset=True
+        # that one frame only), and pick_onset_state["fired_object"] stayed
+        # latched to wine_bottle_1 for many frames afterward (gripper still
+        # actively closing in on/holding near it, confirmed still latched
+        # past frame 99) -- but `any_pick_onset` itself was already back to
+        # False by frame 79, so it did nothing to protect the rest of that
+        # same still-ongoing pick approach: skill_slide_onset spuriously
+        # fired at frame 88 even though the robot was never near the drawer
+        # at all (still reaching for wine_bottle_1), because the fixture's
+        # own near-streak got reset to 0 for exactly the one frame
+        # `any_pick_onset` pulsed True (frame 78) and then freely
+        # re-accumulated to SKILL_ONSET_FRAMES again 10 frames later while
+        # the gripper coincidentally remained within FIXTURE_NEAR_THRESHOLD
+        # of the drawer/cabinet region the whole time (the bowl/bottle sit
+        # right next to it). `pick_onset_state["fired_object"]` is the
+        # correct signal instead: unlike the one-shot pulse, it stays
+        # latched for the entire genuine pick interaction (not just its
+        # first frame) and only clears once that object is actually grasped
+        # or has genuinely moved out of range (see genuinely_disengaged
+        # above), so gating on it suppresses fixture-onset accumulation for
+        # the interaction's full duration, not just its first frame.
+        #
+        # Deliberately NOT also gating on `pick_onset_state["candidate"]`
+        # (the raw, not-yet-latched streak-in-progress signal, count > 0):
+        # tried first, but real frame data on this same episode showed it's
+        # too noisy -- brief, never-latching bystander-candidate blips
+        # (a few frames each, common while scanning past several movable
+        # objects near a fixture) repeatedly toggled `near` off and on,
+        # which _generic_fixture_onset treats as "the interaction ended and
+        # a new one started," producing spurious REPEAT skill_slide_onset
+        # pulses (confirmed: frame 48 fired as a pure artifact of two such
+        # blips at frames 23-28/36-38, while the fixture's own raw physical
+        # near-distance never once went out of range for the entire
+        # frame 4-99 span). `fired_object` alone avoids this: it's already
+        # debounced by the SKILL_ONSET_FRAMES persistence gate before it's
+        # ever set, and confirmed against real data above to fix the
+        # target bug (frame 88 spurious onset gone) without reintroducing
+        # this repeat-firing artifact (slide fires exactly once, at frame
+        # 13, for this episode's one genuine drawer-opening interaction).
+        pick_attempt_active = bool(pick_onset_state.get("fired_object") is not None)
+        near = near and not object_grasped and not pick_attempt_active and not skill_place_onset
         onset_flags[action], onset_end_flags[action] = _generic_fixture_onset(state, f"{action}_onset", near)
 
     # Shared "target" across all 5 families -- this corpus never has more
