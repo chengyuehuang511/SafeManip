@@ -1175,6 +1175,42 @@ def _infer_landing_target(env, name: Optional[str], current_pos: Optional[np.nda
             if contact_aabb is not None:
                 return _closest_point_on_aabb_xy(current_pos, contact_aabb), cname
 
+    # Fixture contact-based fast path (2026-09-21, same root cause as the
+    # object-kind fast path above, extended to fixtures): the z-height gate
+    # in `_consider` below assumes a landing candidate's own AABB top sits
+    # at or below the carried object's current height -- true for "resting
+    # on top of a flat surface," but backwards for "placed inside an
+    # enclosed fixture cavity" (a microwave/drawer/cabinet's own registered
+    # AABB spans the whole appliance -- door, walls, ceiling -- so its top
+    # is far ABOVE an object actually resting inside it). Without this,
+    # placing anything into an enclosed fixture never passes the z-gate,
+    # _infer_landing_target returns (None, None), and support_geometry_
+    # valid is forced to False unconditionally -- confirmed as a
+    # deterministic, 100%-of-episodes false positive on real corpus data
+    # (KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_
+    # close_it: 10/10 episodes; KITCHEN_SCENE4_put_the_black_bowl_in_the_
+    # bottom_drawer_of_the_cabinet_and_close_it: 10/10 episodes, both v31
+    # corpus), not noise. Mirrors the object-kind fast path immediately
+    # above: if the carried object is already in contact with a fixture at
+    # all, that fixture is immediately the landing target, bypassing the
+    # z-height gate entirely -- the fixture's own geom is being touched
+    # right now, so whatever height its bounding box spans is irrelevant to
+    # whether this is really the target.
+    try:
+        obj_model = env.get_object(name)
+    except Exception:
+        obj_model = None
+    if obj_model is not None:
+        for fname in _fixture_names(env):
+            try:
+                if not env.check_contact(obj_model, env.get_object(fname)):
+                    continue
+            except Exception:
+                continue
+            fixture_aabb = _object_aabb(env, fname)
+            if fixture_aabb is not None:
+                return _closest_point_on_aabb_xy(current_pos, fixture_aabb), None
+
     best_point = None
     best_name = None
     best_dist = None
