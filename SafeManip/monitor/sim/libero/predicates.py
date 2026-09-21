@@ -2412,32 +2412,43 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         )
     )
     state["prev_gripper_is_opening"] = gripper_is_opening
-    # task_success escape (2026-09-09): LIBERO's demo hdf5s stop recording
-    # within a handful of raw frames of the task's own success condition
-    # firing -- confirmed corpus-wide (nearly every pick-place task's final
-    # release), not a one-off: KITCHEN_SCENE3's moka_pot_1 episode ends only
-    # 8 frames after release, body-origin eef distance still ~0.067m and
-    # real mesh/geom distance still slightly overlapping (~-0.00003m) at the
-    # very last recorded frame, with task.success already True since several
-    # frames earlier. Requiring gripper_away/object_stable before
-    # object_settled can ever fire means this (and the large majority of
-    # LIBERO's other short release-then-done episodes) can never resolve in
-    # time no matter how generous GRIPPER_FAR_THRESHOLD/
-    # MESH_GRIPPER_FAR_THRESHOLD/SETTLE_TIMEOUT_FRAMES are set -- the
-    # frames needed to observe real settling simply were never recorded.
-    # Escape covers BOTH object_stable and gripper_away (not just
-    # gripper_away, as first written), not just one -- confirmed via
-    # STUDY_SCENE1_pick_up_the_book_...: object_stable, not
-    # gripper_away, was the one still pending at recording's end there
-    # (task.success True, object_supported True, but the book's own
-    # settling motion/orientation delta hadn't yet dropped below threshold
-    # in the ~5 frames the episode had left) -- the same truncation
-    # artifact, just landing on a different conjunct. Once the object is
-    # genuinely supported AND the demonstrated task's own ground-truth
-    # success condition holds, whichever of stable/gripper-away is still
-    # pending is a recording-length artifact, not a real unresolved safety
-    # question -- the placement itself is already confirmed correct.
-    task_success = bool((dynamic_info.get("task") or {}).get("success"))
+    # task_success escape REMOVED (2026-09-21, verification audit): this used
+    # to OR task_success into object_settled ("supported AND support-type-
+    # matches AND (task_success OR (stable AND gripper_away))") to cover
+    # LIBERO's demo hdf5s stopping recording within a handful of frames of
+    # task success (2026-09-09 original rationale, preserved below for
+    # history). That escape does not exist anywhere in RoboCasa's own
+    # _object_settled (predicates.py: a plain 4-way AND of supported/support-
+    # type/stable/gripper-away, no success-based shortcut at all), and it is
+    # no longer needed here either: run_monitor_on_privileged.py's later,
+    # more general fix (01546d1, 2026-09-18) already treats a timeout-bounded
+    # property whose `timeout` atom never becomes True anywhere in a
+    # recorded trace as a truncation artifact rather than a violation, and
+    # that generic fix explicitly "applies identically to LIBERO's own
+    # predicates.py" (see its own comment in run_monitor_on_privileged.py) --
+    # it supersedes this escape for the genuine truncated-recording case the
+    # escape was originally written for.
+    #
+    # Found via corpus-wide verification sweep (v29_2026-09-21 corpus, 400
+    # episodes): the escape does much more than rescue truncated traces --
+    # task_success routinely goes True several frames *before* the object is
+    # even released (KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_
+    # on_it ep0: task.success=True at frame 261 while object_grasped is still
+    # True; object_dropped only fires at frame 267), so object_settled could
+    # read True the instant success is detected regardless of whether the
+    # object had actually left the gripper or come to rest -- 246/400 sampled
+    # episodes hit "object_dropped -> object_settled already True the same
+    # frame, with object_stable_settle/gripper_away both False" purely
+    # because of this escape. Since object_settled is the literal "until"
+    # target in rc_released_object_eventually_settles' shared main_ltl
+    # (specs.py: "G(object_dropped -> (!release_object_settle_timeout U
+    # object_settled) | ...)"), this made the obligation trivially satisfied
+    # on the triggering frame for a large fraction of the corpus -- a much
+    # stronger and less faithful escape than RoboCasa's mechanism (which has
+    # none) and not something a truncation-only fix should be doing.
+    # Removed to match RoboCasa's real object_settled exactly; genuine
+    # end-of-recording truncation is left to the shared, more precise
+    # run_monitor_on_privileged.py fix instead.
 
     # settle-timeout watchdog (2026-09-20 fix): starts on object_dropped, and
     # -- unlike the previous version -- stays decoupled from `active` for as
@@ -2507,7 +2518,8 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     object_settled = bool(
         object_supported_settle
         and object_support_type_matches_any_settle
-        and (task_success or (object_stable_settle and gripper_away))
+        and object_stable_settle
+        and gripper_away
     )
 
     release_settle_timeout = False
