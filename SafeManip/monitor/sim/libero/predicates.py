@@ -2831,6 +2831,24 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         target_by_action[action] = target
         target_pos_a = _body_pos(env, target) if target else None
         near = bool(target_pos_a is not None and eef_pos is not None and float(np.linalg.norm(eef_pos - target_pos_a)) < FIXTURE_NEAR_THRESHOLD)
+        # 2026-09-21 (comprehensive-mirror audit): RoboCasa's shared
+        # _skill_target_onset() (robocasa/predicates.py ~6564) requires
+        # `not skill_pick_onset and not skill_place_onset and not
+        # object_grasped` in its onset condition -- the exact same class of
+        # gate as bug #5 fixed today in skill_pick_onset itself (commit
+        # 09c0190). Without it, carrying a grasped object past a cabinet or
+        # drawer on the way to place it (very common in this corpus's
+        # put-X-in-drawer/cabinet tasks) satisfies the proximity-persistence
+        # streak and fires a spurious skill_open_close_onset/skill_slide_onset
+        # even though the robot is not attempting to open/close anything.
+        # Confirmed via KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_
+        # drawer_of_the_cabinet_and_close_it ep0: pre-fix, frame 149 fired
+        # skill_slide_onset=True while object_grasped=True (bowl being
+        # carried toward the already-open drawer); post-fix that spurious
+        # onset is gone, and the real slide onsets (opening/closing the
+        # drawer while empty-handed) still fire correctly at frames
+        # 184/231.
+        near = near and not object_grasped and not any_pick_onset and not skill_place_onset
         onset_flags[action], onset_end_flags[action] = _generic_fixture_onset(state, f"{action}_onset", near)
 
     # Shared "target" across all 5 families -- this corpus never has more
