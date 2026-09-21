@@ -321,7 +321,29 @@ SYNC_RELATIVE_DELTA_THRESHOLD = 0.03    # = RoboCasa's GRASP_SLIP_LINEAR_THRESHO
 SYNC_ANGULAR_DELTA_THRESHOLD = 0.3
 GRIPPER_FAR_THRESHOLD = 0.12            # eef-to-object distance considered "away" (m) -- fallback tier only, see MESH_GRIPPER_FAR_THRESHOLD
 MESH_GRIPPER_FAR_THRESHOLD = 0.01        # = RoboCasa's own GRIPPER_FAR_THRESHOLD (real mesh/geom gap, same units) -- primary tier, see _gripper_far_from_object
-NEAR_OBJECT_THRESHOLD = 0.09            # eef-to-object distance considered "near" for onset (m)
+# REACH_THRESHOLD (2026-09-21, distance-basis audit): = RoboCasa's own single
+# REACH_THRESHOLD (predicates.py:482, 0.05) -- confirmed by reading RoboCasa's
+# actual code that it uses this ONE constant for BOTH pick-onset proximity
+# (gripper_near_object) AND all 5 fixture-skill-onset proximities
+# (gripper_near_target_by_action), never two separate numbers, and that in
+# both cases the compared distance is a genuine gripper-bounding-box-to-target
+# distance (_gripper_object_distances/_target_distances: gripper OBB to
+# target's own OBB when both are available, degrading to gripper-OBB-to-
+# target-center-point, then finally to a raw point/point fallback only when
+# no AABB is resolvable at all) -- never a bare eef-point-to-object-center-
+# point distance. NEAR_OBJECT_THRESHOLD/FIXTURE_NEAR_THRESHOLD below were
+# previously two independently-tuned numbers (0.09, 0.30) compared against
+# raw eef-point-to-body-origin distance with no size/extent awareness --
+# replaced with a real gripper-AABB-to-target distance (see
+# _gripper_target_distance below, LIBERO's axis-aligned analog of RoboCasa's
+# OBB-based functions -- LIBERO's own geometry infra is axis-aligned-only,
+# see _geom_aabb's own docstring) and unified onto this single shared
+# threshold, matching RoboCasa having exactly one constant/one distance basis
+# for this purpose. Both names are kept (not renamed) to avoid a disruptive
+# rename across their many existing call sites/comments; both are now simply
+# aliased to this one canonical value.
+REACH_THRESHOLD = 0.05
+NEAR_OBJECT_THRESHOLD = REACH_THRESHOLD  # eef/gripper-AABB-to-object distance considered "near" for onset (m) -- see REACH_THRESHOLD's own comment
 GRIPPER_OPEN_FRACTION_THRESHOLD = 0.35  # gripper closed-fraction below this counts as "open enough to release"
 # PATH_OBSTRUCTION_OVERLAP_ALLOWANCE (2026-09-20): = RoboCasa's own constant
 # of the same name (predicates.py), used by the real swept-path-obstruction
@@ -388,11 +410,21 @@ FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 20  # = RoboCasa's own FORBIDDEN_CONTACT_TO
 DEFAULT_CONTAMINATION_RADIUS = 0.05  # = RoboCasa's own DEFAULT_CONTAMINATION_RADIUS (fallback contamination-spot radius when no real geometry is resolvable)
 CONTACT_PERSISTENCE_FRAMES = 3   # frames an open/close obstacle contact must persist before counting as a "hit"
 RETRACT_TIMEOUT_FRAMES = SETTLE_TIMEOUT_FRAMES  # = RoboCasa's own RETRACT_TIMEOUT_FRAMES, 2026-09-16 redesign: aliased to SETTLE_TIMEOUT_FRAMES rather than a separately-tuned constant; now bounds time-since-obstacle-hit, not time-spent-already-retracting (see fixture_open_retract_timeout below)
-FIXTURE_NEAR_THRESHOLD = 0.30    # eef-to-fixture-ROOT-BODY distance considered "near" for press/turn/slide/twist/open_close onset
-# (larger than object-proximity thresholds elsewhere in this file: a fixture's root body origin is its
-# structural reference point, e.g. a cabinet carcass's center, not necessarily where the robot actually
-# operates a handle/knob on it -- empirically, real handle-pull motions on drawers in this corpus keep the
-# eef 0.14-0.30m from the cabinet root body for most of the pull, confirmed on a real KITCHEN_SCENE4 episode)
+# FIXTURE_NEAR_THRESHOLD (2026-09-21, distance-basis audit): was 0.30,
+# deliberately larger than object-proximity thresholds elsewhere in this file
+# ONLY because it was compared against the fixture's raw root-body ORIGIN
+# (e.g. a cabinet carcass's structural center), never the fixture's own
+# physical extent -- a real handle-pull keeps the eef 0.14-0.30m from that
+# origin point for most of the pull (confirmed on a real KITCHEN_SCENE4
+# episode) even while the eef is genuinely flush against the handle's own
+# surface. Now that the near-check below compares against the fixture's own
+# body AABB (_gripper_target_distance, gripper AABB to fixture-body AABB) --
+# the same "compare against actual extent, not a body-origin point" fix
+# _gripper_object_geom_min_distance/_object_aabb already made for objects --
+# the origin-offset justification for a larger number no longer applies, so
+# this is unified onto the same REACH_THRESHOLD as everything else (see that
+# constant's own comment).
+FIXTURE_NEAR_THRESHOLD = REACH_THRESHOLD    # gripper-AABB-to-fixture-body-AABB distance considered "near" for press/turn/slide/twist/open_close onset
 # CONTAMINATION_PERSISTENCE_FRAMES (independently hand-tuned, value 3)
 # retired 2026-09-20 in favor of reusing FORBIDDEN_CONTACT_TOLERANCE_FRAMES
 # for both contamination-related persistence checks -- see the
@@ -1005,6 +1037,69 @@ def _aabb_xy_edge_distance(aabb_a, aabb_b) -> float:
     dx = max(0.0, max(float(lower_a[0] - upper_b[0]), float(lower_b[0] - upper_a[0])))
     dy = max(0.0, max(float(lower_a[1] - upper_b[1]), float(lower_b[1] - upper_a[1])))
     return float(np.hypot(dx, dy))
+
+
+def _aabb_point_distance(aabb, point: np.ndarray) -> float:
+    """Exact 3D distance from an axis-aligned box to a point (0 if the point
+    is inside/on the box) -- the axis-aligned analog of RoboCasa's own
+    _obb_point_distance (predicates.py), used below in place of the previous
+    raw eef-to-body-origin point/point distance for onset proximity."""
+    lower, upper = aabb
+    point = np.asarray(point, dtype=float).reshape(3)
+    clamped = np.clip(point, lower, upper)
+    return float(np.linalg.norm(point - clamped))
+
+
+def _aabb_aabb_distance(a, b) -> float:
+    """Exact 3D distance between two axis-aligned boxes (0 if they overlap on
+    every axis) -- the axis-aligned analog of RoboCasa's own _obb_distance
+    (predicates.py); unlike RoboCasa's OBB version (a corner-sampling
+    approximation, since exact convex-convex distance between two rotated
+    boxes needs real GJK), this is exact for the no-rotation case: per-axis
+    gap is 0 wherever the boxes' extents overlap on that axis, and the
+    remaining gaps compose into a genuine 3D distance via Euclidean norm."""
+    a_lower, a_upper = a
+    b_lower, b_upper = b
+    gap = np.maximum(0.0, np.maximum(np.asarray(b_lower) - np.asarray(a_upper), np.asarray(a_lower) - np.asarray(b_upper)))
+    return float(np.linalg.norm(gap))
+
+
+def _gripper_target_distance(env, eef_pos: Optional[np.ndarray], gripper_aabb, target_pos: Optional[np.ndarray], target_aabb) -> Optional[float]:
+    """Gripper-to-target distance for onset proximity checks (skill_pick_
+    onset's per-object streak, the place-onset re-arm latch, and the 5
+    fixture-skill onsets) -- ported from RoboCasa's own _gripper_object_
+    distances/_target_distances degradation order (predicates.py ~4982-5003,
+    ~6236-6272), confirmed there to use the SAME distance basis for both
+    objects and fixture targets: gripper AABB to target's own AABB when both
+    are resolvable (_aabb_aabb_distance here, RoboCasa's _aabb_distance/
+    _obb_distance there), degrading to gripper AABB to target's own center
+    point when only the gripper's AABB resolves (_aabb_point_distance here,
+    RoboCasa's _obb_point_distance there), and only falling all the way back
+    to raw eef-point-to-target-point when neither AABB is available (matching
+    RoboCasa's own final fallback). Replaces this file's previous universal
+    raw point/point distance, which had no size/extent awareness at all --
+    see NEAR_OBJECT_THRESHOLD/FIXTURE_NEAR_THRESHOLD's own comments for why
+    that was a real gap, not a style choice.
+
+    `target_aabb` may be a fixture's own whole-body AABB (this file's
+    _object_aabb is generic over object/fixture names alike, see
+    fixture_geom_ids_by_name's own construction) rather than RoboCasa's
+    per-component (handle/knob/button) AABB -- a documented simplification
+    consistent with this module's existing whole-fixture-body treatment
+    elsewhere (_focus_fixture_for_action, robot_fixture_contact), not a new
+    one introduced here; LIBERO's fixture registry exposes no per-component
+    geom subset the way RoboCasa's _fixture_component_aabb does."""
+    if target_aabb is not None and gripper_aabb is not None:
+        return _aabb_aabb_distance(gripper_aabb, target_aabb)
+    if target_aabb is not None and eef_pos is not None:
+        return _aabb_point_distance(target_aabb, eef_pos)
+    if target_pos is None:
+        return None
+    if gripper_aabb is not None:
+        return _aabb_point_distance(gripper_aabb, target_pos)
+    if eef_pos is not None:
+        return float(np.linalg.norm(np.asarray(eef_pos, dtype=float) - np.asarray(target_pos, dtype=float)))
+    return None
 
 
 def _infer_landing_target(env, name: Optional[str], current_pos: Optional[np.ndarray]):
@@ -2767,6 +2862,17 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
 
     eef_pos = _eef_pos(env)
     eef_quat = _eef_quat(env)
+    # gripper_reach_aabb (2026-09-21, distance-basis audit): the gripper's own
+    # current bounding box, computed once here and reused by every onset-
+    # proximity check below (pick-onset streak, place-onset re-arm latch, the
+    # 5 fixture-skill onsets) via _gripper_target_distance, matching
+    # RoboCasa's own _gripper_aabb() being called once per relevant section
+    # and reused the same way (predicates.py ~4984/6240). Named distinctly
+    # from the pre-existing local `gripper_aabb` used a few sections above
+    # for object_region_blockers/support_region_blockers (those are
+    # independently recomputed, narrower-scoped locals; this one spans the
+    # rest of the function).
+    gripper_reach_aabb = _gripper_aabb(env)
     gripper_frac = _gripper_closed_fraction(env)
     prev_frac = state["prev_gripper_frac"]
     gripper_is_opening = bool(prev_frac is not None and gripper_frac is not None and gripper_frac < prev_frac - 1e-4)
@@ -3273,7 +3379,15 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             pick_onset_prev_dist.pop(name, None)
             continue
         pos = _body_pos(env, name)
-        dist = float(np.linalg.norm(eef_pos - pos)) if (eef_pos is not None and pos is not None) else None
+        # dist (2026-09-21, distance-basis audit): gripper-AABB-to-object
+        # distance (_gripper_target_distance, degrading to gripper-AABB-to-
+        # object-center-point, then raw point/point only if no AABB resolves
+        # at all) replacing the previous raw eef-point-to-body-origin-point
+        # distance -- see NEAR_OBJECT_THRESHOLD's own comment for why the
+        # old basis systematically overestimated the true gap for any object
+        # with real physical extent.
+        object_reach_aabb = _object_aabb(env, name)
+        dist = _gripper_target_distance(env, eef_pos, gripper_reach_aabb, pos, object_reach_aabb)
         near = bool(dist is not None and dist < NEAR_OBJECT_THRESHOLD)
         prev_dist = pick_onset_prev_dist.get(name)
         moving_towards = bool(dist is not None and prev_dist is not None and dist < prev_dist - 1e-4)
@@ -3544,9 +3658,18 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         if not place_onset_fired[_pon_name]:
             continue
         _pon_pos = _body_pos(env, _pon_name)
-        if _pon_pos is None or eef_pos is None:
+        # _pon_dist (2026-09-21, distance-basis audit): same gripper-AABB-to-
+        # object distance basis as the pick-onset streak above (dist/
+        # object_reach_aabb), replacing the previous raw point/point
+        # distance -- this latch's re-arm condition must use the exact same
+        # near/far boundary skill_pick_onset itself uses (both compared
+        # against NEAR_OBJECT_THRESHOLD, the same physically-motivated
+        # boundary), so its distance basis has to match too, not just its
+        # threshold value.
+        _pon_aabb = _object_aabb(env, _pon_name)
+        _pon_dist = _gripper_target_distance(env, eef_pos, gripper_reach_aabb, _pon_pos, _pon_aabb)
+        if _pon_dist is None:
             continue
-        _pon_dist = float(np.linalg.norm(eef_pos - _pon_pos))
         if _pon_dist >= NEAR_OBJECT_THRESHOLD:
             place_onset_fired[_pon_name] = False
     # support_region_target/support_region_target_object (2026-09-20): a
@@ -4190,7 +4313,17 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         target = _focus_fixture_for_action(env, action, eef_pos)
         target_by_action[action] = target
         target_pos_a = _body_pos(env, target) if target else None
-        near = bool(target_pos_a is not None and eef_pos is not None and float(np.linalg.norm(eef_pos - target_pos_a)) < FIXTURE_NEAR_THRESHOLD)
+        # target_dist_a (2026-09-21, distance-basis audit): gripper-AABB-to-
+        # fixture-body-AABB distance (_gripper_target_distance, degrading to
+        # gripper-AABB-to-body-origin-point only if the fixture's own AABB
+        # doesn't resolve), replacing the previous raw eef-point-to-fixture-
+        # root-body-origin-point distance -- see FIXTURE_NEAR_THRESHOLD's own
+        # comment for why the old basis needed a much larger (0.30m) number
+        # to compensate for comparing against a structural reference point
+        # far from the fixture's actual physical surface.
+        target_aabb_a = _object_aabb(env, target) if target else None
+        target_dist_a = _gripper_target_distance(env, eef_pos, gripper_reach_aabb, target_pos_a, target_aabb_a)
+        near = bool(target_dist_a is not None and target_dist_a < FIXTURE_NEAR_THRESHOLD)
         # 2026-09-21 (comprehensive-mirror audit): RoboCasa's shared
         # _skill_target_onset() (robocasa/predicates.py ~6564) requires
         # `not skill_pick_onset and not skill_place_onset and not
