@@ -345,6 +345,15 @@ MESH_GRIPPER_FAR_THRESHOLD = 0.01        # = RoboCasa's own GRIPPER_FAR_THRESHOL
 REACH_THRESHOLD = 0.05
 NEAR_OBJECT_THRESHOLD = REACH_THRESHOLD  # eef/gripper-AABB-to-object distance considered "near" for onset (m) -- see REACH_THRESHOLD's own comment
 GRIPPER_OPEN_FRACTION_THRESHOLD = 0.35  # gripper closed-fraction below this counts as "open enough to release"
+# GRASP_BILATERAL_MIN_CONTACT_BODIES (2026-09-21): = RoboCasa's own constant
+# of the same name (predicates.py, value 2) -- how many distinct gripper
+# finger groups must independently contact the object for _check_grasp_any's
+# new manual bilateral-contact scan (replacing robosuite's own env._check_grasp
+# aggregate-contact utility) to count it as grasped. See
+# _gripper_finger_geom_groups's own docstring for why LIBERO's version groups
+# by robosuite's important_geoms left_finger/right_finger keys rather than
+# RoboCasa's raw-MuJoCo-body-id grouping.
+GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
 # PATH_OBSTRUCTION_OVERLAP_ALLOWANCE (2026-09-20): = RoboCasa's own constant
 # of the same name (predicates.py), used by the real swept-path-obstruction
 # geometry (_aabb_obstructs_between_endpoints below) that replaced the
@@ -599,32 +608,160 @@ def _gripper_closed_fraction(env) -> Optional[float]:
         return None
 
 
+def _gripper_finger_geom_groups(env) -> Dict[str, set]:
+    """Group the gripper's own contact geoms into distinct-finger buckets.
+
+    Adapted from RoboCasa's own `_gripper_finger_body_contact_map`
+    (predicates.py, 2026-09-21 port) for LIBERO's Panda gripper. RoboCasa's
+    version groups by raw MuJoCo body id, which does NOT port verbatim here:
+    LIBERO/robosuite's `panda_gripper.xml` nests each fingertip pad geom
+    (`finger1_pad_collision`/`finger2_pad_collision`) on its own separate
+    child body (`finger_joint{1,2}_tip`) below its parent finger body
+    (`leftfinger`/`rightfinger`), and the palm itself (`hand_collision`) is
+    a contact-enabled body of its own too -- confirmed directly against the
+    installed robosuite package's gripper XML and `contact_geoms`/
+    `important_geoms` output. Raw body-id grouping would therefore see 5
+    independently-contactable bodies (palm + 2 finger-collision bodies + 2
+    fingertip-pad bodies), any 2 of which -- including the palm plus a
+    single finger -- would satisfy a ">=2 distinct bodies" bilateral test,
+    defeating the actual "two distinct fingers touch the object"
+    antipodal-contact intent this check exists for.
+
+    Uses robosuite's own `important_geoms` mapping instead (`left_finger`/
+    `right_finger` keys -- each already spans that finger's own collision
+    geom AND its pad geom, with no palm geom in either) to build the
+    canonical two-finger split directly. This is robust to whatever
+    body-nesting a given gripper's XML happens to use, and degrades cleanly
+    (an empty/short dict, triggering `_object_gripper_bilateral_contact`'s
+    own fallback to the aggregate any-contact check) for any gripper that
+    isn't a standard two-finger parallel-jaw design.
+    """
+    try:
+        gripper = env.robots[0].gripper
+        important = getattr(gripper, "important_geoms", None) or {}
+    except Exception:
+        return {}
+    groups: Dict[str, set] = {}
+    for key in ("left_finger", "right_finger"):
+        names = important.get(key)
+        if not names:
+            continue
+        ids = _geom_ids_from_names(env, names)
+        if ids:
+            groups[key] = ids
+    return groups
+
+
+def _object_gripper_contact_any(env, name: str) -> bool:
+    """Fallback aggregate contact check (any gripper geom vs. object geom).
+
+    Ported from RoboCasa's own `_object_gripper_contact_any` (predicates.py).
+    Only used by `_object_gripper_bilateral_contact` when the gripper's
+    contact geoms can't be split into >=2 distinct finger groups at all
+    (non two-finger end effector) -- LIBERO's Panda gripper always has both
+    groups, so this path is not expected to trigger in practice, but is
+    ported anyway for robustness/fidelity with RoboCasa's design.
+    """
+    object_geom_ids = _object_geom_ids(env, name)
+    gripper_geom_ids = _gripper_contact_geom_ids(env)
+    if not object_geom_ids or not gripper_geom_ids:
+        return False
+    contact_number = int(getattr(env.sim.data, "ncon", 0))
+    for contact_idx in range(contact_number):
+        try:
+            geom1 = int(env.sim.data.contact[contact_idx].geom1)
+            geom2 = int(env.sim.data.contact[contact_idx].geom2)
+        except Exception:
+            continue
+        if (geom1 in gripper_geom_ids and geom2 in object_geom_ids) or (
+            geom2 in gripper_geom_ids and geom1 in object_geom_ids
+        ):
+            return True
+    return False
+
+
+def _object_gripper_bilateral_contact(env, name: str) -> bool:
+    """Require independent contact from at least
+    GRASP_BILATERAL_MIN_CONTACT_BODIES distinct gripper finger groups
+    simultaneously (an antipodal-contact precondition), instead of
+    aggregate any-geom contact.
+
+    Ported from RoboCasa's own `_object_gripper_bilateral_contact`
+    (predicates.py, 2026-09-21), adapted to use
+    `_gripper_finger_geom_groups`'s important_geoms-based split (see that
+    function's own docstring for why raw MuJoCo body id doesn't port
+    verbatim for LIBERO's Panda gripper). Falls back to the aggregate
+    any-geom check if the gripper's contact geoms can't be split into >=2
+    distinct finger groups.
+    """
+    object_geom_ids = _object_geom_ids(env, name)
+    if not object_geom_ids:
+        return False
+    finger_groups = _gripper_finger_geom_groups(env)
+    if len(finger_groups) < 2:
+        return _object_gripper_contact_any(env, name)
+    contacted_fingers: set = set()
+    contact_number = int(getattr(env.sim.data, "ncon", 0))
+    for contact_idx in range(contact_number):
+        try:
+            geom1 = int(env.sim.data.contact[contact_idx].geom1)
+            geom2 = int(env.sim.data.contact[contact_idx].geom2)
+        except Exception:
+            continue
+        for label, geom_ids in finger_groups.items():
+            if label in contacted_fingers:
+                continue
+            if (geom1 in geom_ids and geom2 in object_geom_ids) or (
+                geom2 in geom_ids and geom1 in object_geom_ids
+            ):
+                contacted_fingers.add(label)
+    return len(contacted_fingers) >= max(1, int(GRASP_BILATERAL_MIN_CONTACT_BODIES))
+
+
 def _check_grasp_any(env) -> Optional[str]:
     """Returns the name of a movable object the gripper is bilaterally
-    grasping, or None. ANDs robosuite's own `_check_grasp` (left+right
-    fingerpad contact) with the gripper being closed enough
-    (`GRIPPER_OPEN_FRACTION_THRESHOLD`), mirroring RoboCasa's own
+    grasping, or None. ANDs a manual, direct bilateral-contact scan
+    (`_object_gripper_bilateral_contact` -- both gripper fingers
+    independently, distinctly touch the object, ported from RoboCasa's own
+    `_object_gripper_bilateral_contact`) with the gripper being closed
+    enough (`GRIPPER_OPEN_FRACTION_THRESHOLD`, a pure joint-position/
+    finger-width signal, no contact dependency), mirroring RoboCasa's own
     `_object_is_grasped` (predicates.py, `_object_gripper_bilateral_contact
-    and OU.check_obj_grasped(...)`) -- same rationale, ported exactly
-    (2026-09-09): bilateral contact alone is a single raw MuJoCo contact
-    query, which can drop out for exactly one raw frame from solver/
-    discretization noise even when the object never actually moved or left
-    the gripper (confirmed corpus-wide: 17/27 rc_dropped_object_was_
-    released violations were this exact one-frame flicker, gripper still
-    recorded as actively closing at the "drop"). RoboCasa fixed this at the
-    raw-signal level with a second, independent AND-condition instead of a
-    downstream debounce (its own predicates.py explicitly documents
-    removing an earlier debounce once this fix landed, "that flicker
-    source is now fixed at the raw-signal level") -- same fix here, not a
-    debounce."""
-    gripper = env.robots[0].gripper
+    and OU.check_obj_grasped(...)`) -- same rationale, adapted (2026-09-21).
+
+    Does NOT call robosuite's own `env._check_grasp` (an aggregate-contact
+    utility -- "any" gripper geom touching "any" of the object's geoms,
+    with no per-finger distinction) for the contact half of this check:
+    confirmed on `open_the_top_drawer_and_put_the_bowl_inside` ep4 that
+    `env._check_grasp` never returned True for an entire real lift-and-drop
+    (bowl visibly rising then falling, frames ~109-148) -- present in a v22
+    baseline extraction weeks earlier too, so not a new regression. Also
+    deliberately does NOT route the closed-gripper half through RoboCasa's
+    own `OU.check_obj_grasped` -- despite RoboCasa's own code nominally
+    calling it, that utility's real implementation
+    (`robocasa/utils/object_utils.py`) is itself
+    `env.check_contact(gripper, obj) and gripper_closed`, i.e. it ALSO
+    depends on an aggregate-contact check of the same "trash" flavor as
+    `env._check_grasp` -- porting it here would just reintroduce the same
+    unreliable contact dependency through a different name. Gripper
+    closedness is instead computed purely from joint position/finger width
+    via `_gripper_closed_fraction`, which already has no contact
+    dependency at all.
+
+    Originally (2026-09-09) this function ANDed `env._check_grasp` with the
+    same closed-gripper check for a different reason -- absorbing a single-
+    frame solver/discretization contact-drop flicker (confirmed corpus-wide:
+    17/27 rc_dropped_object_was_released violations were this exact
+    one-frame flicker, gripper still recorded as actively closing at the
+    "drop") -- and that AND-with-closed-gripper reasoning still holds and is
+    preserved here; only the contact half of the AND has changed, from
+    aggregate any-geom contact to bilateral two-finger contact."""
     gripper_frac = _gripper_closed_fraction(env)
     if gripper_frac is not None and gripper_frac < GRIPPER_OPEN_FRACTION_THRESHOLD:
         return None
     for name in _movable_object_names(env):
         try:
-            model = env.get_object(name)
-            if env._check_grasp(gripper=gripper, object_geoms=model):
+            if _object_gripper_bilateral_contact(env, name):
                 return name
         except Exception:
             continue
