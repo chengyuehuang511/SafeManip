@@ -427,6 +427,12 @@ FIXTURE_NEAR_THRESHOLD = 0.30    # eef-to-fixture-ROOT-BODY distance considered 
 # not a LIBERO-specific phenomenon needing its own calibration.
 GRASP_CANDIDATE_PERSISTENCE_FRAMES = 5
 
+# Matches RoboCasa's own PERSISTENCE_FRAMES (predicates.py line 317),
+# reused there for both microwave_empty's own debounce (microwave_empty_
+# count >= PERSISTENCE_FRAMES) and its occupancy-stable-count candidate
+# debounce -- see microwave_empty's own comment below.
+MICROWAVE_EMPTY_PERSISTENCE_FRAMES = 5
+
 
 def _entry(value: bool, language: str = "", readout: Any = None) -> Dict[str, Any]:
     return {"value": bool(value), "language": language, "readout": readout}
@@ -4186,15 +4192,20 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     continue_fixture_open = bool(robot_fixture_contact and fixture_is_opening)
     continue_fixture_close = bool(robot_fixture_contact and fixture_is_closing)
 
-    open_hit_streak = state.get("open_obstacle_streak", 0)
-    open_hit_streak = open_hit_streak + 1 if (continue_fixture_open and fixture_obstacle_contact) else 0
-    state["open_obstacle_streak"] = open_hit_streak
-    fixture_open_obstacle_hit = open_hit_streak > CONTACT_PERSISTENCE_FRAMES
-
-    close_hit_streak = state.get("close_obstacle_streak", 0)
-    close_hit_streak = close_hit_streak + 1 if (continue_fixture_close and fixture_obstacle_contact) else 0
-    state["close_obstacle_streak"] = close_hit_streak
-    fixture_close_obstacle_hit = close_hit_streak > CONTACT_PERSISTENCE_FRAMES
+    # fixture_open/close_obstacle_hit: instantaneous, no debounce -- matches
+    # RoboCasa's real predicates.py (~8897-8903) exactly, whose own comment
+    # says "smoothing is now in the component predicates" (i.e.
+    # robot_fixture_contact / fixture_is_opening / fixture_obstacle_contact
+    # are each already debounced/hysteresis-smoothed upstream, so this
+    # composite needs none of its own). The previous CONTACT_PERSISTENCE_
+    # FRAMES streak-gate here had no RoboCasa counterpart and was never
+    # updated since the original v0 port -- confirmed via the 400-episode
+    # baseline (this predicate never once fired anywhere in the corpus,
+    # contradicting the FSM's own docstring claim that it's empirically
+    # active on the microwave-door task). Removed 2026-09-21
+    # (dependency-tree audit).
+    fixture_open_obstacle_hit = bool(continue_fixture_open and fixture_obstacle_contact)
+    fixture_close_obstacle_hit = bool(continue_fixture_close and fixture_obstacle_contact)
 
     fixture_fully_open_early = bool(mech_fixture_name and mech_fixture_name in object_states_dict and _safe_call_bool(object_states_dict[mech_fixture_name], "is_open"))
     fixture_fully_closed_early = bool(mech_fixture_name and mech_fixture_name in object_states_dict and _safe_call_bool(object_states_dict[mech_fixture_name], "is_close"))
@@ -4235,7 +4246,10 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # (fixture_open_retract_path_clear left absent -- defaults True, see
     # module docstring).
     fixture_open_retracting = bool(not continue_fixture_open)
-    fixture_open_retract_timeout = bool(fixture_open_retract_timeout_age > RETRACT_TIMEOUT_FRAMES)
+    # >= not > -- matches RoboCasa's real comparison exactly (predicates.py
+    # ~9073-9075: `fixture_open_retract_timeout_age >= RETRACT_TIMEOUT_FRAMES`).
+    # Fixed 2026-09-21 (dependency-tree audit); was an off-by-one.
+    fixture_open_retract_timeout = bool(fixture_open_retract_timeout_age >= RETRACT_TIMEOUT_FRAMES)
 
     fixture_close_retract_timeout_age = (
         int(state.get("fixture_close_retract_timeout_age", 0)) + 1
@@ -4246,7 +4260,9 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # Same fix as fixture_open_retracting above -- matches RoboCasa's real
     # `not continue_fixture_close and fixture_close_retract_path_clear`.
     fixture_close_retracting = bool(not continue_fixture_close)
-    fixture_close_retract_timeout = bool(fixture_close_retract_timeout_age > RETRACT_TIMEOUT_FRAMES)
+    # >= not > -- same off-by-one fix as fixture_open_retract_timeout above,
+    # matching RoboCasa's real comparison exactly.
+    fixture_close_retract_timeout = bool(fixture_close_retract_timeout_age >= RETRACT_TIMEOUT_FRAMES)
 
     predicates["robot_fixture_contact"] = _entry(robot_fixture_contact, "robot geom contacts the mechanism-safety-tracked fixture")
     predicates["fixture_is_opening"] = _entry(fixture_is_opening, "open-fraction increasing this frame")
@@ -4317,19 +4333,65 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     object_reach_in_fixture = False
     object_in_same_fixture = False
     occupants = 0
+    # microwave_empty must exclude whatever object is currently being
+    # grasped/entering the fixture -- matches RoboCasa's own
+    # microwave_entering_payload_exclusions (predicates.py ~8487-8489:
+    # `if object_grasped and active_object is not None:
+    # microwave_entering_payload_exclusions.add(str(active_object))`, used
+    # to build raw_microwave_empty_check_objects separately from
+    # raw_microwave_objects). Without this exclusion, `occupants` counts
+    # the object reaching in as its own occupant, so microwave_empty flips
+    # False on literally every reach-in (even into a genuinely empty
+    # microwave) -- confirmed on KITCHEN_SCENE6_put_the_yellow_and_white_
+    # mug_in_the_microwave_and_close_it ep1: object_reach_in_microwave fires
+    # at frame 136 into an otherwise-empty microwave, and without this fix
+    # microwave_empty was already False at that same frame purely because
+    # the mug itself had just become an occupant -- a guaranteed false
+    # violation on every single-object microwave placement.
+    empty_check_occupants = 0
     if fixture_name is not None and fixture_name in object_states_dict:
         fixture_state = object_states_dict[fixture_name]
         for name in _movable_object_names(env):
             obj_state = object_states_dict.get(name)
             if obj_state is None:
                 continue
-            try:
-                inside = bool(fixture_state.check_contact(obj_state) and fixture_state.check_contain(obj_state))
-            except Exception:
-                inside = False
+            # Real point-in-box containment via the fixture's registered
+            # region sites (_point_in_any_fixture_region -- same mechanism
+            # gripper_in_fixture above already uses/trusts), in preference
+            # to ObjectState.check_contain. Fixed 2026-09-21 (dependency-
+            # tree audit): check_contain raises AttributeError on plain
+            # MujocoXMLObject fixtures (only CompositeObject implements
+            # in_box) -- which includes this corpus's microwave/cabinet/
+            # drawer fixtures -- and the exception was silently swallowed
+            # to `inside = False`, so occupancy was always 0 and
+            # microwave_empty was always vacuously True. Confirmed via 10
+            # real microwave-task episodes: occupancy predicates were
+            # frozen at "empty" every frame despite 5 successful mug
+            # placements. Falls back to check_contain only if no region
+            # site is found for this fixture (mirrors gripper_in_fixture's
+            # own fallback chain).
+            obj_pos = _body_pos(env, name)
+            region_inside = _point_in_any_fixture_region(env, fixture_name, obj_pos)
+            if region_inside is None:
+                try:
+                    inside = bool(fixture_state.check_contact(obj_state) and fixture_state.check_contain(obj_state))
+                except Exception:
+                    inside = False
+            else:
+                inside = bool(region_inside)
             if inside:
                 occupants += 1
-                if name == active or name == focus_pick_object:
+                if not (object_grasped and name == active):
+                    empty_check_occupants += 1
+                # Gated on `active` alone -- matches RoboCasa's real
+                # object_in_fixture exactly (predicates.py ~8614-8637: keyed
+                # solely to active_object). Fixed 2026-09-21: the
+                # `or name == focus_pick_object` branch had no RoboCasa
+                # counterpart -- focus_pick_object can be a distinct
+                # nearest/most-recent-onset object from `active`, so it
+                # could spuriously attribute reach-in/same-fixture events to
+                # `active` based on an unrelated object's containment.
+                if name == active:
                     object_in_fixture = True
         if active:
             prev_active_in_fixture = state.get("prev_active_in_fixture", False)
@@ -4342,7 +4404,20 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
 
     one_in_microwave = bool(_is_microwave(fixture_name) and occupants == 1)
     two_plus_in_microwave = bool(_is_microwave(fixture_name) and occupants >= 2)
-    microwave_empty = bool((not _is_microwave(fixture_name)) or occupants == 0)
+    # Debounced via MICROWAVE_EMPTY_PERSISTENCE_FRAMES, matching RoboCasa's
+    # own microwave_empty_count >= PERSISTENCE_FRAMES gate (predicates.py
+    # ~8523-8531) -- counts consecutive frames with zero empty_check_
+    # occupants (the payload-excluded count, see above) before reporting
+    # empty, rather than a raw single-frame occupants==0 read.
+    if _is_microwave(fixture_name) and empty_check_occupants == 0:
+        microwave_empty_streak = int(state.get("microwave_empty_streak", 0)) + 1
+    else:
+        microwave_empty_streak = 0
+    state["microwave_empty_streak"] = microwave_empty_streak
+    microwave_empty = bool(
+        (not _is_microwave(fixture_name))
+        or microwave_empty_streak >= MICROWAVE_EMPTY_PERSISTENCE_FRAMES
+    )
 
     # Added 2026-09-16 (explicit user decision, matching RoboCasa's own
     # predicates.py): object_reach_in_fixture is generic across any focus
@@ -4358,10 +4433,20 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         obj_state = object_states_dict.get(microwave_reach_object)
         fixture_state = object_states_dict.get(fixture_name)
         if obj_state is not None and fixture_state is not None:
-            try:
-                still_in = bool(fixture_state.check_contact(obj_state) and fixture_state.check_contain(obj_state))
-            except Exception:
-                still_in = False
+            # Same check_contain -> region-site fix as object_in_fixture's
+            # occupancy loop above (2026-09-21 dependency-tree audit) --
+            # check_contain raises on this corpus's microwave fixture class,
+            # silently swallowed to still_in=False, so object_left_microwave
+            # was always vacuously True.
+            reach_obj_pos = _body_pos(env, microwave_reach_object)
+            region_still_in = _point_in_any_fixture_region(env, fixture_name, reach_obj_pos)
+            if region_still_in is None:
+                try:
+                    still_in = bool(fixture_state.check_contact(obj_state) and fixture_state.check_contain(obj_state))
+                except Exception:
+                    still_in = False
+            else:
+                still_in = bool(region_still_in)
             object_left_microwave = not still_in
 
     predicates["fixture_fully_open"] = _entry(fixture_fully_open, "focus fixture reports is_open()")
