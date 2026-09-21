@@ -5172,8 +5172,31 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         #      already inside when the active object also enters, this
         #      condition is false for both (len(inside_names) != 1), and
         #      the pre-existing occupant still counts.
+        # active_settled (2026-09-21 fix, real-data regression found post-
+        # 6b22648): the sole-active-occupant exemption above was gated only
+        # on `active`'s identity, which `state["active_object"]` never
+        # clears once set -- so once the carried object became the sole
+        # microwave occupant, it stayed exempted from empty_check_occupants
+        # for the REST OF THE EPISODE, even long after being placed down,
+        # released, and settled (confirmed on KITCHEN_SCENE6_put_the_yellow_
+        # and_white_mug_in_the_microwave_and_close_it ep0: microwave_empty
+        # read True at every single frame 0-329, including frames 220-329
+        # where object_in_fixture/one_object_in_microwave both correctly
+        # read True the whole time -- a permanent false-negative, not just
+        # the transient-placement false-positive 6b22648 was fixing).
+        # object_settled (computed earlier this same frame, scoped to
+        # settle_obj_name) is the natural boundary: the exemption should
+        # only cover the genuine "still being placed" window (still
+        # grasped, or dropped but not yet come to rest with the gripper
+        # away), not indefinitely afterward. Requires settle_obj_name to
+        # actually BE active for object_settled to count as "active is
+        # settled" -- if a different, earlier-watched object's settle
+        # state is what's currently computed (settle_obj_name != active),
+        # conservatively treat active as not-yet-settled rather than
+        # trusting an unrelated object's settle reading.
+        active_settled = bool(active is not None and settle_obj_name == active and object_settled)
         solely_active_occupant = bool(
-            active is not None and inside_names == [str(active)]
+            active is not None and inside_names == [str(active)] and not active_settled
         )
         for name in inside_names:
             excluded = (object_grasped and name == active) or (
