@@ -972,6 +972,38 @@ def _infer_landing_target(env, name: Optional[str], current_pos: Optional[np.nda
     current_pos = np.asarray(current_pos, dtype=float)
     mz = float(current_pos[2])
     margin = PLACEMENT_MARGIN * SUPPORT_TARGET_XY_MULTIPLIER
+
+    # Contact-based fast path (2026-09-21 fix, verification pass): mirrors
+    # RoboCasa's own priority-0 shortcut in _infer_support (predicates.py
+    # ~5512-5513: `for oname in sorted(target_support_names &
+    # support_object_contacts): return "object", oname`) -- when `name` is
+    # ALREADY in contact with a receptacle-category object, that object is
+    # immediately the landing target, bypassing the z-height gate below
+    # entirely. Closes a real, confirmed false positive in the z-gated
+    # scoring below (`top_z <= mz + SUPPORT_CLUTTER_Z_TOLERANCE`), which
+    # implicitly assumes a landing target's own top sits AT OR BELOW the
+    # carried object -- true for "resting on top of a flat surface," but
+    # backwards for "nested inside an open-top container" (a basket/bowl's
+    # own rim/walls are typically ABOVE an item once it's actually inside),
+    # so a genuinely-contained item was excluded as its own basket's
+    # candidate the instant it settled below the basket's rim height.
+    # Confirmed via LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_
+    # the_butter_in_the_basket ep3, frame 139 (v29 corpus,
+    # privileged_information_3_monitor.json): cream_cheese_1 resting inside
+    # basket_1 (basket_1's rim well above cream_cheese_1's own position)
+    # registered support_geometry_valid=False and
+    # support_type_matches_object=False -- a spurious
+    # rc_place_preconditions_safe violation -- purely from the z-gate
+    # excluding basket_1 as a candidate at all, despite cream_cheese_1 being
+    # in direct contact with it. This was already flagged in this module's
+    # own docstring above as "no contact-based shortcut" ported; this closes
+    # that documented gap for the specific case real data showed it matters.
+    for cname in sorted(_objects_touching(env, name)):
+        if object_is_receptacle_category(object_category_from_instance_name(cname)):
+            contact_aabb = _object_aabb(env, cname)
+            if contact_aabb is not None:
+                return _closest_point_on_aabb_xy(current_pos, contact_aabb), cname
+
     best_point = None
     best_name = None
     best_dist = None
