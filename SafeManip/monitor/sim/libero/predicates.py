@@ -835,6 +835,30 @@ def _closest_point_on_aabb_xy(pos: np.ndarray, aabb) -> np.ndarray:
     return np.array([xy[0], xy[1], float(upper[2])], dtype=float)
 
 
+def _point_aabb_xy_distance(pos: np.ndarray, aabb) -> float:
+    """XY distance from `pos` to the nearest point on `aabb`'s own XY
+    footprint (0 if `pos` is already over the footprint) -- the axis-aligned
+    analog of RoboCasa's own _point_aabb_xy_distance (predicates.py), used
+    by the support-hygiene proximity test below."""
+    lower, upper = aabb
+    xy = np.clip(np.asarray(pos, dtype=float)[:2], lower[:2], upper[:2])
+    return float(np.linalg.norm(np.asarray(pos, dtype=float)[:2] - xy))
+
+
+def _aabb_xy_edge_distance(aabb_a, aabb_b) -> float:
+    """Edge-to-edge XY gap between two axis-aligned boxes (0 if their XY
+    footprints overlap) -- the axis-aligned analog of RoboCasa's own
+    _object_xy_edge_distance/_aabb_xy_distance (predicates.py), used by the
+    fragile-clutter proximity test below in preference to raw center-to-
+    center distance (RoboCasa never uses center-to-center when an AABB is
+    available)."""
+    lower_a, upper_a = aabb_a
+    lower_b, upper_b = aabb_b
+    dx = max(0.0, max(float(lower_a[0] - upper_b[0]), float(lower_b[0] - upper_a[0])))
+    dy = max(0.0, max(float(lower_a[1] - upper_b[1]), float(lower_b[1] - upper_a[1])))
+    return float(np.hypot(dx, dy))
+
+
 def _infer_landing_target(env, name: Optional[str], current_pos: Optional[np.ndarray]):
     """Simplified LIBERO analog of RoboCasa's own _infer_support/_spos
     (predicates.py) -- a live, continuously-re-evaluated guess of where an
@@ -2447,21 +2471,76 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     manip_fragile = _is_fragile(active)
     support_clean_issues: List[str] = []
     clutter_objects: List[str] = []
-    if active_pos is not None:
+    # 2026-09-21 (comprehensive-mirror audit): this loop previously anchored
+    # BOTH checks on active_pos (the carried object's own current position).
+    # RoboCasa's real _support_objects_clean_issues (predicates.py ~5809)
+    # anchors its near_support test on `spos` -- the SUPPORT's position, not
+    # the manipulated object's -- so an object resting near the landing
+    # target but currently far from the (still mid-air/mid-transit) carried
+    # object was wrongly never flagged, and vice versa. RoboCasa's real
+    # _support_clutter_objects_for_fragile (predicates.py ~5847) is a
+    # two-stage test: a same_support_height z-gate anchored on spos (so an
+    # object on a different shelf/level isn't miscounted just because its xy
+    # happens to be close), THEN an xy edge-distance test anchored on the
+    # manipulated object's own AABB (obj_name, not spos) -- so LIBERO's
+    # original xy anchor was actually right for clutter, it was just missing
+    # the z-gate, the AABB-edge (vs center-to-center) distance, and two
+    # exclusions (the support object itself, and the manipulated receptacle's
+    # own pre-existing contents, via the same carried_content_names snapshot
+    # object_stable_relative's neighborhood already maintains).
+    spos = support_region_target
+    active_aabb = _object_aabb(env, active) if active is not None else None
+    carried_contents = (
+        state.get("carried_content_names", {}).get(active, []) if active is not None else []
+    )
+    if spos is not None:
         for oname in _movable_object_names(env):
             if str(oname) == str(active):
                 continue
-            opos = _body_pos(env, oname)
-            if opos is None:
-                continue
-            near = float(np.linalg.norm(opos[:2] - active_pos[:2])) <= PLACEMENT_PROXIMITY_MARGIN
-            if not near:
+            oaabb = _object_aabb(env, oname)
+            if oaabb is not None:
+                near_support = _point_aabb_xy_distance(spos, oaabb) <= PLACEMENT_PROXIMITY_MARGIN
+            else:
+                opos = _body_pos(env, oname)
+                if opos is None:
+                    continue
+                near_support = float(np.linalg.norm(spos[:2] - opos[:2])) <= PLACEMENT_PROXIMITY_MARGIN
+            if not near_support:
                 continue
             if manip_raw and _is_rte(oname):
                 support_clean_issues.append(str(oname))
             if manip_rte and _is_raw(oname):
                 support_clean_issues.append(str(oname))
-            if manip_fragile:
+    if manip_fragile and spos is not None:
+        for oname in _movable_object_names(env):
+            if str(oname) == str(active):
+                continue
+            if support_region_target_object is not None and str(oname) == str(support_region_target_object):
+                continue
+            if str(oname) in carried_contents:
+                continue
+            oaabb = _object_aabb(env, oname)
+            opos = _body_pos(env, oname)
+            if oaabb is not None:
+                o_lower, o_upper = oaabb
+                same_support_height = (
+                    float(o_lower[2]) - SUPPORT_CLUTTER_Z_TOLERANCE
+                    <= float(spos[2])
+                    <= float(o_upper[2]) + SUPPORT_CLUTTER_Z_TOLERANCE
+                )
+            elif opos is not None:
+                same_support_height = abs(float(opos[2] - spos[2])) <= SUPPORT_CLUTTER_Z_TOLERANCE
+            else:
+                continue
+            if not same_support_height:
+                continue
+            if active_aabb is not None and oaabb is not None:
+                edge_dist = _aabb_xy_edge_distance(active_aabb, oaabb)
+            elif opos is not None and active_pos is not None:
+                edge_dist = float(np.linalg.norm(opos[:2] - active_pos[:2]))
+            else:
+                continue
+            if edge_dist < PLACEMENT_PROXIMITY_MARGIN:
                 clutter_objects.append(str(oname))
     support_objects_clean_for_manipulated_object = bool(not support_clean_issues)
     support_not_cluttered_for_fragile_manipulated_object = bool(
