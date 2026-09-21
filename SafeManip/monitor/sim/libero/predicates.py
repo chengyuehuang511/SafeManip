@@ -2594,9 +2594,57 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     )
     grasp_blocks_pick_onset = object_grasped or prev_object_grasped_for_pick_onset
     focus_pick_object = active if object_grasped else None
+    # pick_onset_prev_dist (2026-09-21 fix, verification pass): per-object
+    # previous-frame eef-to-object distance, ported from RoboCasa's own
+    # pick_onset_cond mechanism (predicates.py ~4980-5088:
+    # raw_gripper_moving_towards_object requires the NEAREST object's own
+    # distance to be strictly decreasing frame-over-frame -- a SEPARATE,
+    # independently-tracked condition from gripper_near_object, both ANDed
+    # together only at pick_onset_cond's own top level). This loop
+    # previously baked only the raw-proximity half (`near` held for
+    # SKILL_ONSET_FRAMES consecutive frames) into its streak, with no
+    # decreasing-distance requirement at all -- confirmed as a real, live
+    # false-positive via pick_up_the_black_bowl_on_the_wooden_cabinet_and_
+    # place_it_on_the_plate ep9 (v29 corpus): akita_black_bowl_1 is
+    # released at frame 160 (object_grasped True -> False), then the
+    # gripper retracts STRAIGHT AWAY from it (eef-to-bowl distance climbs
+    # monotonically 0.0535 -> 0.089 m over frames 160-170) -- despite
+    # moving away the whole time, the distance stays under
+    # NEAR_OBJECT_THRESHOLD (0.09) for exactly SKILL_ONSET_FRAMES (10)
+    # consecutive frames, so `any_pick_onset` fires a spurious pick onset
+    # for the bowl it just placed at frame 170, purely from lingering
+    # proximity during retraction, never from any actual re-approach.
+    #
+    # A first version of this fix required `near and moving_towards` on
+    # EVERY frame of the streak with a hard reset on any single failure --
+    # reverted the same session after it broke genuine onsets: real
+    # approaches are not monotonically decreasing every single raw frame
+    # (confirmed via this same episode's real *initial* pick, frames 20-49:
+    # distance decreases cleanly 0.221 -> 0.0277 through frame 43, then
+    # ticks back up 0.0293/0.0316/... from frame 44 on as the gripper's
+    # final pre-contact adjustment overshoots slightly -- a strict
+    # zero-tolerance version reset the streak right there and the onset
+    # that legitimately fired at frame 46 in the old code never fired at
+    # all under the strict version). RoboCasa's own mechanism already
+    # anticipates exactly this: `pick_approach_false_count`, a grace period
+    # that tolerates up to `approach_persistence_frames`
+    # (=max(1, SKILL_ONSET_FRAMES)) consecutive non-decreasing frames
+    # WITHOUT resetting the streak, but only once the streak has already
+    # reached that same threshold once -- ported verbatim below via
+    # `false_count`, per-object instead of RoboCasa's single nearest-
+    # candidate slot (same per-object generalization already used
+    # throughout this loop, see the `grasp_blocks_pick_onset` branch's own
+    # comment for why per-object beats a single shared candidate here).
+    # `near` is intentionally NOT part of the streak itself (matching
+    # RoboCasa: `near` only gates the final firing condition below), so a
+    # long decreasing-distance approach from far away still builds
+    # streak/grace correctly even before it first crosses into "near"
+    # range.
+    pick_onset_prev_dist = state.setdefault("pick_onset_prev_dist", {})
     for name in _movable_object_names(env):
         if name == grasped_name:
             pick_onset_state.pop(name, None)
+            pick_onset_prev_dist.pop(name, None)
             continue
         if grasp_blocks_pick_onset:
             # Unlike RoboCasa's single "nearest object" candidate (which in
@@ -2616,14 +2664,28 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             # object" hold here the same way it holds in RoboCasa, despite
             # the different per-object-vs-single-candidate state shape.
             pick_onset_state.pop(name, None)
+            pick_onset_prev_dist.pop(name, None)
             continue
         pos = _body_pos(env, name)
-        near = bool(eef_pos is not None and pos is not None and float(np.linalg.norm(eef_pos - pos)) < NEAR_OBJECT_THRESHOLD)
-        entry = pick_onset_state.setdefault(name, {"streak": 0, "fired": False})
-        if near:
+        dist = float(np.linalg.norm(eef_pos - pos)) if (eef_pos is not None and pos is not None) else None
+        near = bool(dist is not None and dist < NEAR_OBJECT_THRESHOLD)
+        prev_dist = pick_onset_prev_dist.get(name)
+        moving_towards = bool(dist is not None and prev_dist is not None and dist < prev_dist - 1e-4)
+        if dist is not None:
+            pick_onset_prev_dist[name] = dist
+        entry = pick_onset_state.setdefault(name, {"streak": 0, "false_count": 0, "fired": False})
+        if moving_towards:
             entry["streak"] += 1
+            entry["false_count"] = 0
+        elif entry["streak"] >= SKILL_ONSET_FRAMES:
+            entry["false_count"] += 1
+            if entry["false_count"] >= SKILL_ONSET_FRAMES:
+                entry["streak"] = 0
+                entry["false_count"] = 0
+                entry["fired"] = False
         else:
             entry["streak"] = 0
+            entry["false_count"] = 0
             entry["fired"] = False
         # Fixture-contact suppression (2026-09-20, ported from RoboCasa's
         # own pick_onset_cond fix): this loop, like RoboCasa's original
