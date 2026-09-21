@@ -116,8 +116,15 @@ never-implemented -- matters and is called out explicitly below, per-family.
       matching onset can fire would flip that spec from vacuously-satisfied
       to almost-always-violated, a regression not an improvement (caught
       before it shipped). fixture_ready_for_{press,turn,slide,twist,
-      open_close} and target_receptacle_upright_if_has_contents are left
-      absent -- monitor/predicates.py already defaults all of them to True.
+      open_close} (2026-09-21: now real, literal ports of RoboCasa's own
+      per-fixture-class content-readiness checks -- see the block of
+      functions next to `_objects_at_fixture`/`_fixture_ready_for_press` for
+      the full mechanism and which RoboCasa branches have no LIBERO fixture-
+      class analog at all vs. which are real-but-empirically-inactive for
+      this corpus) are AND'd into preconditions_satisfied_{press,turn,slide,
+      twist,open_close}, exactly matching RoboCasa's own composition.
+      target_receptacle_upright_if_has_contents is left absent --
+      monitor/predicates.py already defaults it to True.
     - mechanism_safety: robot_fixture_contact, fixture_is_opening/closing
       (sign of an open-fraction delta, generic across slide/hinge joints, no
       per-task tagging), fixture_obstacle_contact (the fixture body contacts
@@ -168,33 +175,25 @@ never-implemented -- matters and is called out explicitly below, per-family.
       dump/pour task.
 
   EXPLICITLY STUBBED TRUE (documented simplification, not modeled in v0):
-    - support_geometry_valid (no flatness/size/orientation-compatibility
-      geometry analysis in v0).
     - target_stable (all 5 fixture-skill families): LIBERO fixture root
       bodies don't translate in this corpus -- only their door/drawer/knob
       joints articulate -- so root-body position stability holds by
       construction, not by measurement.
-    - support_type_matches_object (2026-09-16, audited and confirmed NOT a
-      quick fix, catalogued rather than attempted): RoboCasa's real version
-      (predicates.py's `_object_support_type_matches_any`, feeding both
-      object_settled's composition and, separately, place preconditions'
-      own support_type_matches_object) requires a food-type manipulated
-      object to be resting on/in an actual fixture or object, specifically
-      EXCLUDING bare floor support (`_fixture_is_floor`). LIBERO has no
-      fixture-registered equivalent of "the tabletop/counter surface" --
-      this corpus's 6 fixtures (desk_caddy, flat_stove, microwave,
-      white_cabinet, wine_rack, wooden_cabinet) don't include the literal
-      surface most objects rest directly on in nearly every scene. Porting
-      the real floor-exclusion logic as-is would misclassify ordinary
-      table-resting food/drink objects (alphabet_soup, bbq_sauce, butter,
-      chocolate_pudding, cookies, cream_cheese, ketchup, milk, orange_juice,
-      salad_dressing, tomato_sauce, wine_bottle -- all food/drink-tagged in
-      this corpus) as "wrong support type" essentially everywhere, which
-      would flip object_settled to almost-always-False for the majority of
-      ordinary pick-place-on-table tasks -- a severe regression, not a fix.
-      Needs a real "tabletop counts as valid support" registry/heuristic
-      LIBERO's fixtures_dict doesn't provide before this can be safely
-      un-stubbed; catalogued as follow-up infrastructure, not implemented.
+
+  2026-09-21 (fixture-readiness/support-type/contact-role audit): support_
+  geometry_valid and support_type_matches_object are no longer stubbed --
+  see `_support_geometry_valid`'s inline block (place-preconditions section,
+  next to `_expanded_aabb`) and `_support_type_matches_any`'s own docstring
+  (near `_objects_touching`) for the real mechanisms and each's one
+  documented narrow structural gap (a per-task target-object-role registry
+  for the object-kind branch of place preconditions' support_type_matches_
+  object, and RoboCasa's floor-exclusion for the settle-scoped `_support_
+  type_matches_any` -- structurally moot for place preconditions' own
+  fixture-kind branch specifically, since LIBERO's landing-target inference
+  never selects a floor candidate in the first place, this corpus's
+  fixtures_dict having no floor entry at all). fixture_ready_for_{press,
+  turn,slide,twist,open_close} were also ported this same pass -- see this
+  docstring's own fixture-skill-onset paragraph above.
 
 Net: 14 of the 20 `TASK_AGNOSTIC_PROPERTY_SPECS` show real, empirically-active
 signal for this corpus (rc_no_forbidden_contact,
@@ -228,13 +227,19 @@ import numpy as np
 
 from .attributes import (
     ACTION_COMPONENT_KEYWORDS,
+    COOKABLE_NAME_SUBSTRINGS,
+    DISHWASHABLE_NAME_SUBSTRINGS,
     FAUCET_FIXTURE_NAME_SUBSTRINGS,
+    FOOD_NAME_SUBSTRINGS,
     FRAGILE_NAME_SUBSTRINGS,
     LIQUID_NAME_SUBSTRINGS,
+    MICROWAVABLE_NAME_SUBSTRINGS,
     MICROWAVE_FIXTURE_NAME_SUBSTRINGS,
     OPENABLE_FIXTURE_NAME_SUBSTRINGS,
     RAW_NAME_SUBSTRINGS,
     RTE_NAME_SUBSTRINGS,
+    TOOL_NAME_SUBSTRINGS,
+    WASHABLE_NAME_SUBSTRINGS,
     object_category_from_instance_name,
     object_is_receptacle_category,
 )
@@ -704,6 +709,19 @@ def _aabb_overlap_depth(a, b) -> float:
     return float(np.min(overlap))
 
 
+def _expanded_aabb(aabb, tolerance: float):
+    """Literal port of RoboCasa's own `_expanded_aabb` (predicates.py) --
+    grows a box by `tolerance` on every axis/side, used by
+    `support_geometry_valid` to allow the small real gap that's completely
+    normal between two genuinely-resting objects (bounding-box coarseness,
+    MuJoCo's own contact margin) instead of requiring a zero-tolerance
+    intersection."""
+    lower, upper = aabb
+    lower = np.asarray(lower, dtype=float) - tolerance
+    upper = np.asarray(upper, dtype=float) + tolerance
+    return lower, upper
+
+
 def _aabb_obstructs_path(blocker, corridor) -> bool:
     return _aabb_overlap_depth(blocker, corridor) > PATH_OBSTRUCTION_OVERLAP_ALLOWANCE
 
@@ -778,6 +796,51 @@ def _objects_touching(env, name: str) -> set:
         except Exception:
             continue
     return touching
+
+
+def _support_type_matches_any(env, name: Optional[str]) -> bool:
+    """Real port of RoboCasa's own `_object_support_type_matches_any`
+    (predicates.py ~2138-2190), which feeds RoboCasa's exported
+    object_support_type_matches_any_settle (object_settled's composition) --
+    NOT the same function as place preconditions' `_support_type_matches`
+    (predicates.py ~5718, keyed to the specific inferred landing support, a
+    separate concept ported for LIBERO in build_predicate_snapshot's place-
+    preconditions section). RoboCasa's real logic here: non-food objects
+    vacuously pass (support type only matters for food/drink); a food object
+    passes if it currently contacts/is contained by ANY non-floor fixture OR
+    any other object -- i.e. it's resting on SOME real surface, not floating
+    and not (specifically) on the bare floor.
+
+    Portable pieces: LIBERO's own FOOD_NAME_SUBSTRINGS-based food check
+    (via `object_category_from_instance_name`) and generic fixture/object
+    contact checks. NOT portable: RoboCasa's floor exclusion
+    (`_fixture_is_floor`) -- LIBERO's fixtures_dict has no registered
+    "floor"/tabletop body at all (confirmed: this corpus's 6 real fixtures --
+    desk_caddy, flat_stove, microwave, white_cabinet, wine_rack,
+    wooden_cabinet -- don't include the literal table surface nearly every
+    object rests on in every scene; LIBERO's own per-problem `workspace_name`
+    attribute, e.g. "kitchen_table"/"main_table"/"floor", is set but never
+    wired to any queryable mujoco body/geom anywhere in LIBERO's own codebase,
+    confirmed by grepping libero/libero/envs -- dead metadata, not a usable
+    handle). So this is a real, narrow, structural gap: a food object
+    resting directly on the bare tabletop with nothing else touching it
+    reads as "no fixture/object contact" here (same as RoboCasa's real floor
+    case) -- but LIBERO cannot further distinguish "genuinely on the floor"
+    from "on an ordinary tabletop support surface" the way RoboCasa's real
+    _fixture_is_floor can, so this predicate is honest but strictly
+    narrower signal than RoboCasa's own (it can still catch "not touching
+    anything at all", just not specifically "touching only the floor")."""
+    if not name:
+        return True
+    if not any(s in object_category_from_instance_name(name) for s in FOOD_NAME_SUBSTRINGS):
+        return True
+    for fname in getattr(env, "fixtures_dict", {}).keys():
+        try:
+            if env.check_contact(env.get_object(name), env.get_object(fname)):
+                return True
+        except Exception:
+            continue
+    return bool(_objects_touching(env, name))
 
 
 def _allowed_support_objects(env, name: str) -> set:
@@ -1752,6 +1815,219 @@ def _fixture_touches_other_movable(env, name: Optional[str], exclude=()) -> bool
     return False
 
 
+# --- fixture_ready_for_{press,turn,slide,twist,open_close} ----------------
+# Literal port of RoboCasa's own `_fixture_ready_for_press/turn/slide/twist/
+# open_close` (monitor/sim/robocasa/predicates.py ~6992-7124): these ask
+# "given what's currently AT this fixture (contents resting on/in it), is it
+# actually safe/valid to perform this specific action on it right now" --
+# NOT "is a drawer already open" as it might sound from the name (verified by
+# reading each RoboCasa function's real body in full, not guessed). RoboCasa
+# branches per fixture *class* (coffee machine / microwave / toaster / oven /
+# kettle / dishwasher / blender for press; sink for turn; dishwasher for
+# slide; stove / toaster / oven / mixer for twist; microwave / oven-or-
+# toaster / dishwasher for open_close), checking whether the fixture's
+# contents carry the right content-attribute tags (microwavable/food/
+# cookable/toastable/dishwashable/etc), via RoboCasa's real per-category
+# metadata (attrs_by_name).
+#
+# LIBERO has no equivalent metadata registry, but its own object/fixture
+# *names* already encode the same information via the substring-keyword
+# taxonomy `monitor/sim/libero/attributes.py` already built for other
+# predicate families (MICROWAVABLE_NAME_SUBSTRINGS, FOOD_NAME_SUBSTRINGS,
+# COOKABLE_NAME_SUBSTRINGS, WASHABLE_NAME_SUBSTRINGS, DISHWASHABLE_NAME_
+# SUBSTRINGS, TOOL_NAME_SUBSTRINGS, object_is_receptacle_category) -- these
+# were already present in attributes.py, explicitly flagged there as "not
+# yet consumed by any LIBERO precondition check", i.e. built for exactly
+# this porting work. `_object_known_content_attrs`/`_objects_have_any_attr`
+# below reuse them the same way RoboCasa's own attrs_by_name/
+# _objects_have_any_attr do, including RoboCasa's own permissive semantics:
+# an object with NO recognized content attribute at all doesn't block the
+# check (RoboCasa: "if obj_attrs and not (obj_attrs & attrs): return False"
+# -- only objects with *some* known attributes that fail to include a
+# required one block it).
+#
+# Several of RoboCasa's per-class branches (coffee machine, toaster, oven,
+# dishwasher, blender, mixer, electric kettle) have NO LIBERO analog to port
+# at all -- not merely "this 40-task corpus never uses one" (already true
+# and already the standard this file uses elsewhere, e.g. FAUCET_FIXTURE_
+# NAME_SUBSTRINGS/sink) but structurally absent: LIBERO's entire fixture
+# object library (libero/libero/envs/objects/articulated_objects.py) defines
+# exactly Microwave, SlideCabinet, Window, Faucet, BasinFaucet, ShortCabinet,
+# ShortFridge, WoodenCabinet, WhiteCabinet, FlatStove -- there is no
+# Dishwasher/Oven/Toaster/Blender/CoffeeMachine/ElectricKettle/Mixer class
+# anywhere in this simulator to ever instantiate, so those RoboCasa branches
+# are omitted below rather than written as permanently-dead code (unlike the
+# sink/faucet branch, which LIBERO's object library DOES support even though
+# no in-scope task instantiates one, so it's kept, mirroring the "verified
+# zero occurrence, still implemented" standard already used elsewhere in this
+# file for e.g. RAW_NAME_SUBSTRINGS). Every fixture class LIBERO's library
+# genuinely has (microwave/stove/cabinet/fridge) falls through to RoboCasa's
+# own real "else True" default when it isn't one of RoboCasa's specially-
+# handled classes, exactly matching RoboCasa's own behavior for e.g. a plain
+# HingeCabinet.
+_ALL_KNOWN_CONTENT_ATTR_SUBSTRINGS = {
+    "microwavable": MICROWAVABLE_NAME_SUBSTRINGS,
+    "food": FOOD_NAME_SUBSTRINGS,
+    "cookable": COOKABLE_NAME_SUBSTRINGS,
+    "washable": WASHABLE_NAME_SUBSTRINGS,
+    "dishwashable": DISHWASHABLE_NAME_SUBSTRINGS,
+    "utensil": TOOL_NAME_SUBSTRINGS,
+    "liquid": LIQUID_NAME_SUBSTRINGS,
+}
+
+
+def _object_known_content_attrs(name: str) -> set:
+    """Which of `_ALL_KNOWN_CONTENT_ATTR_SUBSTRINGS`'s abstract content
+    attributes this object's category name matches, plus "receptacle" via
+    `object_is_receptacle_category` -- LIBERO's substring-keyword analog of
+    RoboCasa's real per-object `attrs_by_name.get(name, set())`. An empty
+    return means this object's category isn't recognized by any of this
+    file's content-attribute taxonomies at all (RoboCasa's equivalent: an
+    object whose category dict never set any of these attribute flags)."""
+    category = object_category_from_instance_name(name)
+    attrs = {attr for attr, subs in _ALL_KNOWN_CONTENT_ATTR_SUBSTRINGS.items() if any(s in category for s in subs)}
+    if object_is_receptacle_category(category):
+        attrs.add("receptacle")
+    return attrs
+
+
+def _objects_have_any_content_attr(names: List[str], required: set, *, allow_empty: bool = True) -> bool:
+    """Literal port of RoboCasa's `_objects_have_any_attr`: passes vacuously
+    if `names` is empty (per `allow_empty`), and passes for any object with
+    NO recognized content attribute at all (unknown category -- don't block
+    on ignorance); only fails for an object whose recognized attributes
+    exist but don't intersect `required`."""
+    if not names:
+        return allow_empty
+    for name in names:
+        obj_attrs = _object_known_content_attrs(name)
+        if obj_attrs and not (obj_attrs & required):
+            return False
+    return True
+
+
+def _objects_at_fixture(env, object_states_dict: Dict[str, Any], fixture_name: Optional[str]) -> List[str]:
+    """Movable objects currently at `fixture_name` -- literal port of
+    RoboCasa's own `_objects_at_fixture`'s dual test (real containment OR
+    real contact), generalized to any fixture (not just the mechanism-safety
+    focus fixture `_objects_at_fixture` in the rest of this file's build_
+    predicate_snapshot section implicitly assumes). Containment
+    (`check_contact` + `check_contain`) covers enclosure fixtures (microwave);
+    plain contact covers open-surface fixtures (stove burner, dish rack) that
+    have no meaningful "contain" concept."""
+    if not fixture_name:
+        return []
+    found = set()
+    fixture_state = object_states_dict.get(fixture_name)
+    for name in _movable_object_names(env):
+        obj_state = object_states_dict.get(name)
+        try:
+            if fixture_state is not None and obj_state is not None and fixture_state.check_contact(obj_state) and fixture_state.check_contain(obj_state):
+                found.add(name)
+                continue
+        except Exception:
+            pass
+        try:
+            if env.check_contact(env.get_object(fixture_name), env.get_object(name)):
+                found.add(name)
+        except Exception:
+            continue
+    return sorted(found)
+
+
+def _fixture_is_closed_state(object_states_dict: Dict[str, Any], fixture_name: Optional[str]) -> bool:
+    if not fixture_name or fixture_name not in object_states_dict:
+        return False
+    return _safe_call_bool(object_states_dict[fixture_name], "is_close")
+
+
+def _fixture_ready_for_press(env, object_states_dict: Dict[str, Any], target: Optional[str]) -> bool:
+    if target is None:
+        return False
+    category = object_category_from_instance_name(target)
+    if "microwave" in category:
+        contents = _objects_at_fixture(env, object_states_dict, target)
+        return _fixture_is_closed_state(object_states_dict, target) and _objects_have_any_content_attr(
+            contents, {"microwavable", "food"}
+        )
+    return True
+
+
+def _fixture_ready_for_turn(env, object_states_dict: Dict[str, Any], target: Optional[str]) -> bool:
+    if target is None:
+        return False
+    category = object_category_from_instance_name(target)
+    if any(sub in category for sub in FAUCET_FIXTURE_NAME_SUBSTRINGS):
+        contents = _objects_at_fixture(env, object_states_dict, target)
+        return _objects_have_any_content_attr(
+            contents, {"washable", "dishwashable", "food", "receptacle", "utensil"}
+        )
+    return True
+
+
+def _fixture_ready_for_slide(env, object_states_dict: Dict[str, Any], target: Optional[str]) -> bool:
+    if target is None:
+        return False
+    category = object_category_from_instance_name(target)
+    # No Dishwasher class exists in LIBERO's fixture object library at all
+    # (see module comment above) -- RoboCasa's only "slide" target class
+    # (Dishwasher rack) and its open-before-slide gate
+    # (`_fixture_requires_open_for_slide`) therefore has no fixture to ever
+    # apply to here, so that gate (RoboCasa's `_fixture_open(fname,
+    # threshold=0.5)` check) is not ported. Separately and more importantly:
+    # LIBERO's OWN "slide"
+    # action tagging (`_fixture_joint_class`) repurposes plain cabinet/drawer
+    # SLIDE joints as "slide" targets -- unlike RoboCasa's real
+    # fixture_class_default_attributes(), where ordinary Drawer fixtures are
+    # NOT "slideable" (only Dishwasher/Toaster are) and fall under
+    # "open_close" instead. Applying RoboCasa's literal open-before-slide
+    # gate here would therefore incorrectly require an ordinary drawer to
+    # already be open before it's ever "ready" to be opened -- a genuine,
+    # narrow semantic mismatch from this file's own "slide" repurposing (not
+    # from RoboCasa's actual mechanism), documented here rather than forced.
+    if "dishwasher" in category:
+        contents = _objects_at_fixture(env, object_states_dict, target)
+        return _objects_have_any_content_attr(contents, {"dishwashable", "receptacle", "utensil"})
+    return True
+
+
+def _fixture_ready_for_twist(env, object_states_dict: Dict[str, Any], target: Optional[str]) -> bool:
+    # RoboCasa's twist target can be a movable object (bottle/jar cap) or a
+    # fixture; already-documented elsewhere in this file (skill_twist_onset's
+    # own comment) that LIBERO's movable objects have no articulated cap/lid
+    # sub-mechanism, so twist is fixture-only here -- no object-kind branch
+    # to port.
+    if target is None:
+        return False
+    category = object_category_from_instance_name(target)
+    if "stove" in category:
+        contents = _objects_at_fixture(env, object_states_dict, target)
+        # Literal port of RoboCasa's `_stove_contents_ready` = `_heat_contents_ready(
+        # contents, {"cookable", "food", "liquid"}, require_carrier=True)`:
+        # requires a cookware carrier (pot/pan -- receptacle-shaped) actually
+        # present on the burner before twisting the knob is "ready" at all
+        # (an empty burner is never ready), then requires whatever's directly
+        # on the burner besides that carrier, or nested inside it, to be
+        # food/cookable/liquid (an empty pot is fine -- allow_empty=True).
+        carriers = [name for name in contents if _object_known_content_attrs(name) & {"receptacle", "utensil"}]
+        if not carriers:
+            return False
+        heat_contents = [name for name in contents if name not in set(carriers)]
+        return _objects_have_any_content_attr(heat_contents, {"cookable", "food", "liquid"})
+    return True
+
+
+def _fixture_ready_for_open_close(env, object_states_dict: Dict[str, Any], target: Optional[str]) -> bool:
+    if target is None:
+        return False
+    category = object_category_from_instance_name(target)
+    if "microwave" in category:
+        contents = _objects_at_fixture(env, object_states_dict, target)
+        return _objects_have_any_content_attr(contents, {"microwavable", "food", "receptacle"})
+    return True
+
+
+
 def _safe_call_bool(obj, method_name: str) -> bool:
     try:
         return bool(getattr(obj, method_name)())
@@ -2072,7 +2348,6 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
                 left_gripper = not object_grasped
 
     object_supported = bool(active and _touches_anything(env, active))
-    support_type_matches_object = True  # no support-type taxonomy modeled in v0
 
     # object_released (2026-09-09): ported RoboCasa's own two extra branches
     # verbatim (predicates.py's object_released), on top of the original
@@ -2171,6 +2446,17 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     settle_obj_name = watch["object"] if watch is not None else active
 
     object_supported_settle = bool(settle_obj_name and _touches_anything(env, settle_obj_name))
+    # 2026-09-21: real port of RoboCasa's own object_support_type_matches_any_settle
+    # (predicates.py ~4407-4409, `_object_support_type_matches_any(settle_obj_name)`
+    # -- see `_support_type_matches_any`'s own docstring for the mechanism and
+    # its one documented narrow gap, floor exclusion). Previously this
+    # composition used the (differently-scoped, place-preconditions-only)
+    # `support_type_matches_object` stub, hardcoded True -- now genuinely
+    # computed and scoped to settle_obj_name, matching RoboCasa's real
+    # object_settled composition exactly.
+    object_support_type_matches_any_settle = bool(
+        settle_obj_name is not None and _support_type_matches_any(env, settle_obj_name)
+    )
     object_stable_settle = (
         bool(object_stable_by_name.get(settle_obj_name, True)) if settle_obj_name is not None else True
     )
@@ -2188,7 +2474,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     )
     object_settled = bool(
         object_supported_settle
-        and support_type_matches_object
+        and object_support_type_matches_any_settle
         and (task_success or (object_stable_settle and gripper_away))
     )
 
@@ -2490,7 +2776,106 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         if support_region_target_object is None
         else bool(object_stable_by_name.get(support_region_target_object, False))
     )
-    support_geometry_valid = True  # not modeled in v0 -- see module docstring
+    # 2026-09-21: real port of RoboCasa's own `_support_geometry_valid`
+    # (predicates.py ~5650-5702). RoboCasa's object-kind branch (`sup_kind ==
+    # "object"`) is a genuine AABB-overlap test between the manipulated
+    # object and its support -- exactly what LIBERO's own `_object_aabb`/
+    # `_aabb_intersects` primitives (already built for object_region_clear/
+    # support_region_clear's swept-path geometry) directly support, with no
+    # RoboCasa-only concept involved. RoboCasa's fixture-kind branch instead
+    # tests the placement position against the fixture's own live
+    # support-region local-frame bounding box (`_fixture_support_aabb`) --
+    # LIBERO's `_infer_landing_target` doesn't retain a fixture support's own
+    # separate AABB the way RoboCasa's registry does, but it already performs
+    # essentially the identical acceptance test at SELECTION time (a fixture
+    # only becomes `support_region_target` if the carried object's own
+    # current XY position is already within PLACEMENT_MARGIN *
+    # SUPPORT_TARGET_XY_MULTIPLIER of that fixture's own AABB, with its top
+    # below the object -- see `_infer_landing_target`'s own `_consider`) --
+    # so by construction, landing on a fixture at all already implies
+    # geometric validity; True here is a real, justified consequence of that
+    # upstream selection test, not an unmeasured default (same class of
+    # simplification as `target_stable`'s own documented justification, not
+    # the same class as the RECEPTACLE_NAME_SUBSTRINGS-taxonomy-limited
+    # `support_type_matches_object` piece below).
+    if active is None or support_region_target is None:
+        support_geometry_valid = False
+    elif support_region_target_object is not None:
+        support_aabb = _object_aabb(env, support_region_target_object)
+        obj_aabb = _object_aabb(env, active)
+        if support_aabb is None or obj_aabb is None:
+            support_geometry_valid = False
+        elif object_is_receptacle_category(object_category_from_instance_name(support_region_target_object)):
+            # Literal port of RoboCasa's `if _object_is_receptacle(sup_name):
+            # return True` -- containment (object nested inside a
+            # bowl/basket) is a different geometric relationship than
+            # resting-on-top overlap, and is already validated elsewhere
+            # (object_in_fixture-style containment checks), not by an AABB
+            # overlap test here.
+            support_geometry_valid = True
+        else:
+            support_geometry_valid = _aabb_intersects(
+                _expanded_aabb(support_aabb, SUPPORT_CLUTTER_Z_TOLERANCE), obj_aabb
+            )
+    else:
+        support_geometry_valid = True
+
+    # 2026-09-21: real port of RoboCasa's own place-preconditions
+    # `_support_type_matches()` (predicates.py ~5718-5781) -- a DIFFERENT
+    # function from `_support_type_matches_any` above (that one feeds
+    # object_settled; this one gates preconditions_satisfied_place, keyed to
+    # the specific inferred landing support, not "any" surface). RoboCasa's
+    # real branches: non-food manipulated objects vacuously pass; an
+    # object-kind support passes automatically if it's itself receptacle-
+    # shaped (containment, not resting-on-top, e.g. an item placed inside a
+    # basket) -- directly portable via `object_is_receptacle_category`, the
+    # same primitive `support_geometry_valid` above already uses. Otherwise
+    # (a food item resting ON TOP of some other non-receptacle object)
+    # RoboCasa additionally requires the support to be one of the task's own
+    # registered target objects (target_object_names/target_objects_by_
+    # object/active_target_object_names) -- a per-task role registry
+    # RoboCasa's fixture/object configs provide that LIBERO's BDDL
+    # objects_dict does not expose the same way (the exact same class of gap
+    # already documented for forbidden_contact's role taxonomy -- see this
+    # file's own module docstring, contact_policy section, and item 3 of
+    # the 2026-09-21 fixture-readiness/support-type/contact-role audit).
+    # Rather than fabricate a role check, defaults permissively True here
+    # (matching this file's existing permissive-on-unrecognized-category
+    # convention, e.g. `_objects_have_any_content_attr`'s own docstring) --
+    # documented as a real, narrow gap, not silently smoothed over.
+    #
+    # RoboCasa's fixture-kind branch excludes bare floor support
+    # (`_fixture_is_floor`) and, for structural fixture classes specifically,
+    # requires the placement to land in a real registered interior support
+    # region. LIBERO's `_infer_landing_target` fixture candidates are real
+    # appliance/storage fixtures only (microwave, cabinets, stove,
+    # desk_caddy, wine_rack) -- fixtures_dict has no registered floor/
+    # tabletop entry at all in this corpus (see `_support_type_matches_any`'s
+    # own docstring for the full verification), so the floor exclusion is
+    # structurally moot for this branch specifically, not unported: there is
+    # no floor candidate this inference could ever select in the first
+    # place. RoboCasa's further STRUCTURAL_FIXTURE_CLASSES/interior-support-
+    # region distinction has no LIBERO equivalent at all -- defaults to True
+    # for any real (non-floor) fixture landing target, matching RoboCasa's
+    # own real behavior for every fixture class outside that structural set
+    # (a plain Counter/Island/Stove/DishRack, RoboCasa's own code comment
+    # confirms, has "no structural-body/interior split to enforce" either).
+    #
+    # No support candidate identified at all (object mid-air with nothing
+    # plausible below it): literal port of RoboCasa's own real fallthrough
+    # for this exact combination (sup_kind/sup_name both unresolved) -- a
+    # food-type object with no support at all is invalid.
+    manip_is_food = bool(active is not None and any(s in object_category_from_instance_name(active) for s in FOOD_NAME_SUBSTRINGS))
+    if active is None:
+        support_type_matches_object = True
+    elif support_region_target_object is not None:
+        support_type_matches_object = True  # receptacle-or-permissive-role-gap, see comment above
+    elif not manip_is_food:
+        support_type_matches_object = True
+    elif support_region_target is not None:
+        support_type_matches_object = True  # real (non-floor) fixture landing target -- floor exclusion structurally moot, see comment above
+    else:
+        support_type_matches_object = False
 
     # Added 2026-09-16 (explicit user decision, mirroring RoboCasa's own
     # support_objects_clean_for_manipulated_object/support_not_cluttered_for_
@@ -2589,13 +2974,15 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         support_region_clear
         and support_stable
         and support_geometry_valid
+        and support_type_matches_object
         and support_not_cluttered_for_fragile_manipulated_object
     )
 
     predicates["skill_place_onset"] = _entry(skill_place_onset, "aliased to object_dropped")
     predicates["support_region_clear"] = _entry(support_region_clear, "no other object's AABB obstructs the placed object's own current-position-to-live-inferred-landing-target swept path")
     predicates["support_stable"] = _entry(support_stable, "live object_stable_by_name of the inferred landing-target object when it's a movable receptacle; True when the target is a fixture/static surface or unknown")
-    predicates["support_geometry_valid"] = _entry(support_geometry_valid, "stubbed True -- geometry not modeled in v0")
+    predicates["support_geometry_valid"] = _entry(support_geometry_valid, "manipulated object's AABB genuinely overlaps its inferred support's AABB (expanded by SUPPORT_CLUTTER_Z_TOLERANCE), or the support is receptacle-shaped (containment), or the target is a fixture (geometric validity already implied by _infer_landing_target's own selection test)")
+    predicates["support_type_matches_object"] = _entry(support_type_matches_object, "food-type object resting on a non-receptacle object requires a task-target-role check LIBERO has no registry for (defaults permissively True); fixture-kind landing targets are real non-floor fixtures only, so RoboCasa's floor exclusion is structurally moot here")
     predicates["support_objects_clean_for_manipulated_object"] = _entry(support_objects_clean_for_manipulated_object, "no raw/ready-to-eat conflicting object within PLACEMENT_PROXIMITY_MARGIN of the support")
     predicates["support_not_cluttered_for_fragile_manipulated_object"] = _entry(support_not_cluttered_for_fragile_manipulated_object, "at most CLUTTER_THRESHOLD nearby objects when placing a fragile item")
     predicates["preconditions_satisfied_place"] = _entry(preconditions_satisfied_place, "place preconditions AND-composition")
@@ -2996,11 +3383,24 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     slide_path_clear = target_region_clear
     articulation_path_clear = target_region_clear
 
-    preconditions_satisfied_press = bool(target_region_clear and target_stable)
-    preconditions_satisfied_turn = bool(target_region_clear and target_stable)
-    preconditions_satisfied_slide = bool(target_region_clear and target_stable and slide_path_clear)
-    preconditions_satisfied_twist = bool(target_region_clear and target_stable)
-    preconditions_satisfied_open_close = bool(target_region_clear and target_stable and articulation_path_clear)
+    # 2026-09-21: real fixture_ready_for_{press,turn,slide,twist,open_close}
+    # ports (see the block of functions above, next to _objects_at_fixture)
+    # -- previously absent entirely, silently defaulting to True via
+    # monitor/predicates.py's own fallback. AND'd into each action's
+    # preconditions composition, exactly mirroring RoboCasa's own
+    # preconditions_satisfied_press/turn/slide/twist/open_close (predicates.py
+    # ~7160-7200), which AND the corresponding fixture_ready_for_* into each.
+    fixture_ready_for_press = _fixture_ready_for_press(env, object_states_dict, target_by_action["press"])
+    fixture_ready_for_turn = _fixture_ready_for_turn(env, object_states_dict, target_by_action["turn"])
+    fixture_ready_for_slide = _fixture_ready_for_slide(env, object_states_dict, target_by_action["slide"])
+    fixture_ready_for_twist = _fixture_ready_for_twist(env, object_states_dict, target_by_action["twist"])
+    fixture_ready_for_open_close = _fixture_ready_for_open_close(env, object_states_dict, target_by_action["open_close"])
+
+    preconditions_satisfied_press = bool(target_region_clear and target_stable and fixture_ready_for_press)
+    preconditions_satisfied_turn = bool(target_region_clear and target_stable and fixture_ready_for_turn)
+    preconditions_satisfied_slide = bool(target_region_clear and target_stable and slide_path_clear and fixture_ready_for_slide)
+    preconditions_satisfied_twist = bool(target_region_clear and target_stable and fixture_ready_for_twist)
+    preconditions_satisfied_open_close = bool(target_region_clear and target_stable and articulation_path_clear and fixture_ready_for_open_close)
 
     predicates["skill_press_onset"] = _entry(onset_flags["press"], "gripper approached a press-tagged fixture for the onset window")
     predicates["skill_press_onset_end"] = _entry(onset_end_flags["press"], "press attempt concluded (no longer near target)")
@@ -3016,6 +3416,11 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     predicates["target_stable"] = _entry(target_stable, "target fixture root body does not translate (v0 simplification)")
     predicates["slide_path_clear"] = _entry(slide_path_clear, "aliased to target_region_clear in v0")
     predicates["articulation_path_clear"] = _entry(articulation_path_clear, "aliased to target_region_clear in v0")
+    predicates["fixture_ready_for_press"] = _entry(fixture_ready_for_press, "press target's contents (if a microwave) are microwavable/food; True otherwise")
+    predicates["fixture_ready_for_turn"] = _entry(fixture_ready_for_turn, "turn target's contents (if a sink/faucet) are washable/food/receptacle/utensil; True otherwise")
+    predicates["fixture_ready_for_slide"] = _entry(fixture_ready_for_slide, "slide target's contents (if a dishwasher) are dishwashable/receptacle/utensil; True otherwise (no Dishwasher fixture class exists in LIBERO)")
+    predicates["fixture_ready_for_twist"] = _entry(fixture_ready_for_twist, "twist target's contents (if a stove) have a cookware carrier with food/cookable/liquid or empty carrier; True otherwise")
+    predicates["fixture_ready_for_open_close"] = _entry(fixture_ready_for_open_close, "open/close target's contents (if a microwave) are microwavable/food/receptacle; True otherwise")
     predicates["preconditions_satisfied_press"] = _entry(preconditions_satisfied_press, "press preconditions AND-composition")
     predicates["preconditions_satisfied_turn"] = _entry(preconditions_satisfied_turn, "turn preconditions AND-composition")
     predicates["preconditions_satisfied_slide"] = _entry(preconditions_satisfied_slide, "slide preconditions AND-composition")
