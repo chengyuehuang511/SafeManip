@@ -2258,15 +2258,29 @@ def _fixture_action_tags(env, name: str) -> set:
     # already has and already trusts elsewhere (MICROWAVE_FIXTURE_NAME_
     # SUBSTRINGS at fixture_ready_for_press/microwave_empty's own _is_
     # microwave, FAUCET_FIXTURE_NAME_SUBSTRINGS at fixture_ready_for_turn).
-    # Confirmed via the 400-episode baseline: skill_press_onset was 0/400
-    # before this fix even though this corpus's microwave fixture is a real
-    # RoboCasa-pressable class, purely because "microwave" was never in
-    # ACTION_COMPONENT_KEYWORDS["press"]. skill_turn_onset stays 0/400
-    # either way (no faucet/sink fixture exists in this corpus at all), so
-    # this branch is a correctness/future-proofing fix with no observable
-    # effect on the current corpus, not a live-bug fix like the press one.
-    if any(sub in category for sub in MICROWAVE_FIXTURE_NAME_SUBSTRINGS):
-        tags.add("press")
+    #
+    # "press" tagging REVERTED (2026-09-21, explicit user decision, found
+    # via the v32 corpus-wide 100%-violation-rate scan): RoboCasa's real
+    # press-onset proximity is computed against the SPECIFIC BUTTON GEOM
+    # within the microwave fixture (_fixture_component_geom_ids /
+    # ACTION_COMPONENT_KEYWORDS), not the fixture's whole root-body
+    # position -- LIBERO's `_focus_fixture_for_action`/`_body_pos` only
+    # ever measures proximity to the whole fixture's root body, with no
+    # component-level distinction available (the microwave asset's own
+    # button mesh, `microbutton`, has no separately-addressable geom name
+    # or collision geom in this LIBERO checkout -- confirmed by inspecting
+    # `assets/articulated_objects/microwave.xml` directly). Tagging the
+    # whole microwave "pressable" therefore made skill_press_onset fire on
+    # ANY approach to the microwave at all (opening the door, placing an
+    # object inside), not specifically on pressing a button -- confirmed
+    # via KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_
+    # and_close_it, which never presses a button anywhere in its real
+    # demonstrations, yet showed rc_press_preconditions_safe violated in
+    # 10/10 episodes once this tag was added. Reverted; "press" stays
+    # genuinely inert for LIBERO's real 40-task corpus until real
+    # component-level geom addressing is built (same category of gap as
+    # RoboCasa's real _fixture_interior_support_aabb needing per-fixture
+    # asset metadata LIBERO's assets don't expose).
     if any(sub in category for sub in FAUCET_FIXTURE_NAME_SUBSTRINGS):
         tags.add("turn")
     jclass = _fixture_joint_class(env, name)
