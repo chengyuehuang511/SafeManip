@@ -2358,6 +2358,13 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     predicates["skill_pick_onset"] = _entry(any_pick_onset, "gripper approached an ungrasped object for the onset window")
     predicates["skill_pick_onset_end"] = _entry(any_pick_onset_end, "a previously-latched pick attempt concluded (grasped or gave up)")
     predicates["object_region_clear"] = _entry(object_region_clear, "no other object's AABB obstructs the gripper-to-pick-target swept path")
+    # Exported (2026-09-20) mirroring RoboCasa's own pick_object_stable
+    # export (predicates.py:9315): the object actually gated by
+    # preconditions_satisfied_pick's composition (focus_pick_object), not
+    # the generic object_stable (active_object) -- repeated_violation_
+    # monitor.py's explanation-string generator now prefers this key so
+    # violation text names the right object in dual-object tasks.
+    predicates["pick_object_stable"] = _entry(focus_pick_stable, "focus_pick_object's own stability (debounced, relative-to-support)")
     # 2026-09-16 (explicit user decision): object_upright_if_receptacle_
     # default was already being computed above (real _upright() check
     # against the focus object's own quaternion, gated on it actually being
