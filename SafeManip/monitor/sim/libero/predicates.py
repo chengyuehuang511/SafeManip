@@ -459,6 +459,28 @@ FIXTURE_NEAR_THRESHOLD = REACH_THRESHOLD    # gripper-AABB-to-fixture-body-AABB 
 # not a LIBERO-specific phenomenon needing its own calibration.
 GRASP_CANDIDATE_PERSISTENCE_FRAMES = 5
 
+# GRASP_RELEASE_UNCORROBORATED_FALLBACK_FRAMES (2026-09-21, KITCHEN_SCENE8/
+# LIVING_ROOM_SCENE2 residual support_geometry_valid false-positive audit):
+# bounded safety valve for _persistent_grasp_candidate's new gripper-opening
+# corroboration requirement (see that function's own docstring) -- if a
+# candidate->None (release) transition's raw reading has persisted this many
+# frames with NO `gripper_is_opening` evidence ever observed during the run,
+# accept it anyway rather than waiting forever, so a genuine object physically
+# dislodged without the gripper ever opening (e.g. knocked out of a still-
+# closing grip) still eventually registers as released. Set well above the
+# longest real uncorroborated flicker confirmed in this audit (17 frames,
+# KITCHEN_SCENE8 ep8 328-344) -- not tuned to that exact number, since the
+# whole point of requiring corroboration is to not treat "how long can a
+# flicker plausibly run" as bounded; picked instead to match the order of
+# magnitude of the longest real SLOW-TELEOPERATED-PLACEMENT gap already
+# documented in this file's history (6b22648's microwave fix: a genuine
+# still-controlled placement with raw contact false for ~60 consecutive
+# frames) -- i.e. long enough that a real, still-in-progress placement never
+# hits this fallback early, short enough that a real accidental drop with no
+# corroborating gripper motion still resolves within a couple of seconds of
+# sim time rather than never.
+GRASP_RELEASE_UNCORROBORATED_FALLBACK_FRAMES = 90
+
 # Matches RoboCasa's own PERSISTENCE_FRAMES (predicates.py line 317),
 # reused there for both microwave_empty's own debounce (microwave_empty_
 # count >= PERSISTENCE_FRAMES) and its occupancy-stable-count candidate
@@ -609,7 +631,9 @@ def _check_grasp_any(env) -> Optional[str]:
     return None
 
 
-def _persistent_grasp_candidate(state: Dict[str, Any], raw_candidate: Optional[str]) -> Optional[str]:
+def _persistent_grasp_candidate(
+    state: Dict[str, Any], raw_candidate: Optional[str], gripper_is_opening: bool = False
+) -> Optional[str]:
     """Ported from RoboCasa's own predicates.py _persistent_grasp_candidate
     (2026-09-20, after confirming via real LIBERO data -- see
     GRASP_CANDIDATE_PERSISTENCE_FRAMES's own comment -- that this file's
@@ -625,22 +649,65 @@ def _persistent_grasp_candidate(state: Dict[str, Any], raw_candidate: Optional[s
     why the "until" target for grasp-sync-until-dropped needed a separate
     undebounced *level* (object_grasped_raw) rather than trying to make
     this debounce itself asymmetric -- ported here as object_grasped_raw
-    below, mirroring that exact fix rather than re-deriving it."""
+    below, mirroring that exact fix rather than re-deriving it.
+
+    gripper-opening corroboration (2026-09-21, KITCHEN_SCENE8/
+    LIVING_ROOM_SCENE2 residual support_geometry_valid false-positive audit):
+    GRASP_CANDIDATE_PERSISTENCE_FRAMES=5 was tuned against confirmed 1-2
+    frame bilateral-contact flicker, but real data surfaced a 17-consecutive-
+    frame candidate->None run (KITCHEN_SCENE8 ep8, frames 328-344) with the
+    gripper actively CLOSING (never opening) and the eef-to-object offset
+    perfectly rigid throughout -- i.e. the object never actually left the
+    grip; `_check_grasp`'s bilateral query itself just stopped reading True
+    for an order of magnitude longer than the tuned flicker. A genuine
+    release in the same episode (moka_pot_2, frame 183) showed
+    `gripper_is_opening=True` for 10+ frames before the debounce even began
+    accepting the release. Rather than raise GRASP_CANDIDATE_PERSISTENCE_
+    FRAMES corpus-wide (no principled ceiling -- the false run here was
+    already 3x the tuned value), a candidate->None transition specifically
+    now ALSO requires at least one real `gripper_is_opening` frame to have
+    occurred during the pending run before being accepted, with
+    GRASP_RELEASE_UNCORROBORATED_FALLBACK_FRAMES as a bounded safety valve
+    (see that constant's own comment) so a real drop with no corroborating
+    gripper motion at all still eventually resolves. Candidate->non-None
+    transitions (a new grasp starting, or switching objects) are NOT gated
+    this way -- only losing an already-accepted grasp is what real data
+    showed needed the extra evidence."""
     entry = state.setdefault(
-        "grasp_candidate_debounce", {"value": None, "pending": None, "count": 0}
+        "grasp_candidate_debounce",
+        {"value": None, "pending": None, "count": 0, "release_gripper_opening_seen": False},
     )
     accepted = entry.get("value")
     if raw_candidate == accepted:
         entry["pending"] = raw_candidate
         entry["count"] = 0
+        entry["release_gripper_opening_seen"] = False
         return accepted
     pending = entry.get("pending")
-    count = int(entry.get("count", 0)) + 1 if raw_candidate == pending else 1
+    if raw_candidate == pending:
+        count = int(entry.get("count", 0)) + 1
+    else:
+        count = 1
+        entry["release_gripper_opening_seen"] = False
     entry["pending"] = raw_candidate
     entry["count"] = count
+    is_release_attempt = raw_candidate is None and accepted is not None
+    if is_release_attempt and gripper_is_opening:
+        entry["release_gripper_opening_seen"] = True
     if count >= max(1, int(GRASP_CANDIDATE_PERSISTENCE_FRAMES)):
+        if (
+            is_release_attempt
+            and not entry.get("release_gripper_opening_seen", False)
+            and count < int(GRASP_RELEASE_UNCORROBORATED_FALLBACK_FRAMES)
+        ):
+            # Persistence threshold reached but no real gripper-opening
+            # evidence seen during the run yet, and still within the bounded
+            # fallback window -- keep waiting rather than accept a release
+            # with nothing physically behind it (see docstring).
+            return accepted
         entry["value"] = raw_candidate
         entry["count"] = 0
+        entry["release_gripper_opening_seen"] = False
         return raw_candidate
     return accepted
 
@@ -904,6 +971,68 @@ def _objects_touching(env, name: str) -> set:
         except Exception:
             continue
     return touching
+
+
+def _object_touches_unregistered_surface(env, name: str) -> bool:
+    """True iff `name`'s own collision geoms are in raw MuJoCo contact with
+    ANY geom that is neither the robot/gripper nor `name`'s own geoms --
+    i.e. the object is genuinely resting against real scene geometry, even
+    if that geometry belongs to no fixture/object LIBERO's own
+    fixtures_dict/objects_dict registers by name (a bare table/counter
+    surface, most commonly -- LIBERO's fixtures_dict has no registered
+    floor/tabletop entry at all in this corpus, see _infer_landing_target's
+    own docstring).
+
+    Added 2026-09-21 (KITCHEN_SCENE8/LIVING_ROOM_SCENE2 residual
+    support_geometry_valid false-positive audit) specifically for
+    `support_geometry_valid`'s "no landing-target candidate identified at
+    all" branch. Confirmed via real data
+    (LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_
+    basket ep3, frame 196): butter_1 is genuinely dropped and comes to a
+    complete, motionless rest (position frozen to the observed float
+    precision for the next 30+ frames) on the bare table -- more than 20cm
+    in XY from basket_1, the only registered receptacle in the scene, and
+    with no fixture within range either -- so `_infer_landing_target`
+    correctly returns (None, None) (there is genuinely no registered
+    fixture/receptacle candidate here), but the object HAS in fact landed
+    on something real. Forcing `support_geometry_valid = False`
+    unconditionally in this branch (the prior behavior) can't distinguish
+    "genuinely still mid-air, nothing plausible below it yet" (a real gap)
+    from "already resting on an unregistered-but-real surface" (not a gap
+    at all, just a missing name in this simplified model) -- this helper is
+    exactly that distinguishing test, using literal, undebounced contact
+    with real geometry rather than any inferred/named target.
+
+    Deliberately excludes robot/gripper contact so this can't be satisfied
+    merely by the object still sitting in the gripper's grip (unlike
+    object_supported/_touches_anything, which is gated on ANY contact
+    including the robot and so reads True at KITCHEN_SCENE8 ep8 frame 332
+    -- confirmed the object is NOT touching anything but the gripper at
+    that frame; this helper correctly reads False there, only flipping True
+    once the moka pot has physically descended into stove contact, matching
+    _infer_landing_target's own contact-based fast path finding the fixture
+    at the same time)."""
+    own_geoms = _object_geom_ids(env, name)
+    if not own_geoms:
+        return False
+    robot_geom_ids = _all_robot_geom_ids(env)
+    try:
+        sim = env.sim
+        ncon = int(sim.data.ncon)
+        contacts = sim.data.contact
+    except Exception:
+        return False
+    for i in range(ncon):
+        try:
+            g1 = int(contacts[i].geom1)
+            g2 = int(contacts[i].geom2)
+        except Exception:
+            continue
+        if g1 in own_geoms and g2 not in own_geoms and g2 not in robot_geom_ids:
+            return True
+        if g2 in own_geoms and g1 not in own_geoms and g1 not in robot_geom_ids:
+            return True
+    return False
 
 
 def _support_type_matches_any(env, name: Optional[str]) -> bool:
@@ -2891,6 +3020,18 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # the grasp/release computation).
 
     # --- grasp / release / settle ---------------------------------------
+    # gripper_frac/gripper_is_opening computed here (moved ahead of the grasp
+    # debounce 2026-09-21, real-data audit into the KITCHEN_SCENE8/
+    # LIVING_ROOM_SCENE2 residual support_geometry_valid false positives) --
+    # depends only on env/state, not on active/grasped_name, so it's safe to
+    # compute before the debounce that now needs it (see
+    # _persistent_grasp_candidate's own updated docstring for why).
+    gripper_frac = _gripper_closed_fraction(env)
+    prev_frac = state["prev_gripper_frac"]
+    gripper_is_opening = bool(prev_frac is not None and gripper_frac is not None and gripper_frac < prev_frac - 1e-4)
+    gripper_is_closing = bool(prev_frac is not None and gripper_frac is not None and gripper_frac > prev_frac + 1e-4)
+    state["prev_gripper_frac"] = gripper_frac
+
     # Debounced 2026-09-20 (see GRASP_CANDIDATE_PERSISTENCE_FRAMES's own
     # comment for the real-data evidence this file's earlier "flicker
     # already fixed at the raw-signal level" claim was false): grasped_name/
@@ -2906,8 +3047,36 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # for the two failed intermediate designs (an edge-based
     # object_dropped_raw, tried and reverted there) before landing on this
     # one; ported directly rather than re-deriving.
+    #
+    # gripper-opening corroboration (2026-09-21, KITCHEN_SCENE8/
+    # LIVING_ROOM_SCENE2 residual-false-positive audit): confirmed via real
+    # frame data that a candidate->None transition (a would-be release) can
+    # be driven purely by `_check_grasp`'s bilateral-fingerpad-contact query
+    # dropping out for MANY consecutive frames (17 on
+    # KITCHEN_SCENE8_put_both_moka_pots_on_the_stove ep8, frames 328-344)
+    # while `gripper_is_closing` reads True (never `gripper_is_opening`) the
+    # entire time and the eef-to-object offset stays perfectly rigid
+    # (0.0688m, constant to 4 decimal places) -- i.e. the object never
+    # actually left the gripper's grip at all, this is a genuine
+    # bilateral-contact solver flicker an order of magnitude longer than the
+    # 1-2 frame flicker GRASP_CANDIDATE_PERSISTENCE_FRAMES (5) was tuned
+    # against. Contrast confirmed against a REAL release in the same episode
+    # (moka_pot_2, frame 183): `gripper_is_opening` reads True for 10+
+    # frames (173-182) before the debounce ever accepts the release --
+    # a genuine release is always preceded by real gripper-opening motion,
+    # this flicker never has any. Rather than blindly raise
+    # GRASP_CANDIDATE_PERSISTENCE_FRAMES (which would slow down every real
+    # release corpus-wide with no principled stopping point -- the flicker
+    # length here has no known upper bound), _persistent_grasp_candidate now
+    # additionally requires at least one real `gripper_is_opening` frame
+    # during the pending-release run before accepting a candidate->None
+    # transition, with a bounded fallback
+    # (GRASP_RELEASE_UNCORROBORATED_FALLBACK_FRAMES) so a genuine object
+    # physically dislodged without the gripper ever opening (e.g. knocked
+    # away) still eventually registers as released rather than sticking
+    # forever.
     raw_grasped_name = _check_grasp_any(env)
-    grasped_name = _persistent_grasp_candidate(state, raw_grasped_name)
+    grasped_name = _persistent_grasp_candidate(state, raw_grasped_name, gripper_is_opening)
     object_grasped = grasped_name is not None
     object_grasped_raw_value = raw_grasped_name is not None
     if grasped_name is not None:
@@ -2964,12 +3133,9 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # for object_region_blockers/support_region_blockers (those are
     # independently recomputed, narrower-scoped locals; this one spans the
     # rest of the function).
+    # gripper_frac/gripper_is_opening/gripper_is_closing: computed earlier now
+    # (see the grasp/release/settle section above), reused here unchanged.
     gripper_reach_aabb = _gripper_aabb(env)
-    gripper_frac = _gripper_closed_fraction(env)
-    prev_frac = state["prev_gripper_frac"]
-    gripper_is_opening = bool(prev_frac is not None and gripper_frac is not None and gripper_frac < prev_frac - 1e-4)
-    gripper_is_closing = bool(prev_frac is not None and gripper_frac is not None and gripper_frac > prev_frac + 1e-4)
-    state["prev_gripper_frac"] = gripper_frac
 
     active_pos = _body_pos(env, active) if active else None
     active_quat = _body_quat(env, active) if active else None
@@ -3823,8 +3989,35 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # simplification as `target_stable`'s own documented justification, not
     # the same class as the RECEPTACLE_NAME_SUBSTRINGS-taxonomy-limited
     # `support_type_matches_object` piece below).
-    if active is None or support_region_target is None:
+    # "No candidate identified at all" fallback (2026-09-21, KITCHEN_SCENE8/
+    # LIVING_ROOM_SCENE2 residual false-positive audit): previously forced
+    # False unconditionally, which conflated two genuinely different real
+    # situations -- "still mid-air, nothing plausible below it yet" (a real
+    # gap) vs. "already resting on a real, if unregistered, surface" (e.g. a
+    # bare table/counter -- LIBERO's fixtures_dict has no such entry at all,
+    # see _infer_landing_target's own docstring). Confirmed only 2/400+
+    # episodes in the v33 corpus actually hit this branch as a violation, so
+    # this is narrow in practice, not a broad structural rewrite -- but for
+    # the one that does (LIVING_ROOM_SCENE2 ep3, butter_1 frame 196), the
+    # object has already come to a complete, motionless rest, 20cm+ from the
+    # only registered receptacle in the scene. `_object_touches_unregistered_
+    # surface` (real, undebounced, non-robot contact) distinguishes the two
+    # cases directly -- see its own docstring for why it, and not
+    # object_supported (gated on ANY contact, including the gripper), is the
+    # right test here.
+    # Memoized (2026-09-21, performance pass): computed at most once per
+    # frame -- both this predicate and support_type_matches_object below hit
+    # the identical "support_region_target is None" branch and would
+    # otherwise each independently re-scan env.sim.data.contact.
+    active_touches_unregistered_surface = (
+        _object_touches_unregistered_surface(env, active)
+        if active is not None and support_region_target is None
+        else None
+    )
+    if active is None:
         support_geometry_valid = False
+    elif support_region_target is None:
+        support_geometry_valid = active_touches_unregistered_surface
     elif support_region_target_object is not None:
         support_aabb = _object_aabb(env, support_region_target_object)
         obj_aabb = _object_aabb(env, active)
@@ -3886,10 +4079,22 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # (a plain Counter/Island/Stove/DishRack, RoboCasa's own code comment
     # confirms, has "no structural-body/interior split to enforce" either).
     #
-    # No support candidate identified at all (object mid-air with nothing
-    # plausible below it): literal port of RoboCasa's own real fallthrough
-    # for this exact combination (sup_kind/sup_name both unresolved) -- a
-    # food-type object with no support at all is invalid.
+    # No support candidate identified at all: literal port of RoboCasa's own
+    # real fallthrough for this exact combination (sup_kind/sup_name both
+    # unresolved) -- a food-type object genuinely mid-air with nothing at
+    # all below it is invalid. Extended 2026-09-21 (same audit/same fallback
+    # as support_geometry_valid's own identical branch just above -- see
+    # `_object_touches_unregistered_surface`'s docstring): "no candidate
+    # identified" also covers a food item already resting on a real,
+    # unregistered surface (bare table/counter -- LIBERO's fixtures_dict has
+    # no such entry), which is a normal, safe surface, not the genuinely
+    # mid-air case this fallthrough was meant for. Confirmed via real data
+    # (LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_
+    # the_basket ep3, frame 196, immediately after support_geometry_valid's
+    # own fix landed): butter_1 is motionless on the table at this exact
+    # frame, so without this same fallback the geometry fix alone just
+    # traded one false "invalid support" reason (geometry) for another
+    # (type) at the identical frame.
     manip_is_food = bool(active is not None and any(s in object_category_from_instance_name(active) for s in FOOD_NAME_SUBSTRINGS))
     if active is None:
         support_type_matches_object = True
@@ -3899,6 +4104,8 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         support_type_matches_object = True
     elif support_region_target is not None:
         support_type_matches_object = True  # real (non-floor) fixture landing target -- floor exclusion structurally moot, see comment above
+    elif active_touches_unregistered_surface:
+        support_type_matches_object = True  # resting on a real, if unregistered, surface -- not mid-air
     else:
         support_type_matches_object = False
 
