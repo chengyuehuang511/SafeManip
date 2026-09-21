@@ -53,6 +53,11 @@ never-implemented -- matters and is called out explicitly below, per-family.
     - place_preconditions: skill_place_onset (== object_released),
       support_region_clear, support_stable, preconditions_satisfied_place
       (support_geometry_valid explicitly stubbed True -- see below).
+      support_stable (2026-09-20 fix): now checks the live, debounced,
+      relative-to-support object_stable_by_name of the inferred landing
+      target when it's a movable object (e.g. a basket/bowl), matching
+      RoboCasa's own sup_kind=="object" branch of _support_stable --
+      previously hardcoded True unconditionally regardless of target kind.
       support_region_clear (2026-09-20, continuous-mechanism fix): now
       mirrors RoboCasa's own real behavior -- re-evaluated every single
       frame an object is being carried, sweeping from the object's CURRENT
@@ -276,6 +281,19 @@ def _is_fragile(name: Optional[str]) -> bool:
 # quantities, no valid conversion between them).
 STABLE_LINEAR_DELTA_THRESHOLD = 0.0025   # = RoboCasa's OBJ_LINEAR_STABLE_THRESHOLD (0.05 m/s) * dt
 STABLE_ANGULAR_DELTA_THRESHOLD = 0.0125  # = RoboCasa's OBJ_ANGULAR_STABLE_THRESHOLD (0.25 rad/s) * dt
+# STABLE_PERSISTENCE_FRAMES (2026-09-20) = RoboCasa's own constant of the
+# same name (predicates.py, ~line 336), used by _persistent_bool_sticky_true
+# below to give object_stable_by_name the same asymmetric debounce RoboCasa's
+# has: becoming stable is reported instantly (no persistence delay at all),
+# but staying reported-stable through a brief raw-unstable blip is smoothed
+# -- STABLE_PERSISTENCE_FRAMES consecutive raw-unstable frames are required
+# before flipping back to unstable. Ported because LIBERO's object_stable
+# was previously a raw, undebounced per-frame check with no equivalent
+# mechanism at all (grep confirmed STABLE_PERSISTENCE_FRAMES did not exist
+# anywhere in this file before this fix), unlike every other per-object
+# stability consumer in RoboCasa (pick/place/settle), which all go through
+# this exact debounce.
+STABLE_PERSISTENCE_FRAMES = 5
 SYNC_RELATIVE_DELTA_THRESHOLD = 0.03    # = RoboCasa's GRASP_SLIP_LINEAR_THRESHOLD (already a per-frame position delta, same units, no conversion)
 GRIPPER_FAR_THRESHOLD = 0.12            # eef-to-object distance considered "away" (m) -- fallback tier only, see MESH_GRIPPER_FAR_THRESHOLD
 MESH_GRIPPER_FAR_THRESHOLD = 0.01        # = RoboCasa's own GRIPPER_FAR_THRESHOLD (real mesh/geom gap, same units) -- primary tier, see _gripper_far_from_object
@@ -1231,26 +1249,127 @@ def _angle_between_quats(q1: Optional[np.ndarray], q2: Optional[np.ndarray]) -> 
     return 2.0 * np.arccos(dot)
 
 
-def _object_stable_by_name(env, state: Dict[str, Any], name: Optional[str]) -> bool:
-    """Per-object linear/angular-delta stability, generalizing the
-    single-`active`-object `object_stable` computed inline in
-    build_predicate_snapshot to any named object -- needed because pick
-    preconditions must judge the object actually being approached
-    (`focus_pick_object`), which is usually not yet grasped (so not
-    `active`) at the moment a pick onset fires. Compares this frame's fresh
-    position/quat (queried directly, same as the inline `active` version)
-    against state["prev_positions"]/state["prev_quats"], already populated
-    for every movable object name at the end of every prior
-    build_predicate_snapshot call."""
+def _object_support_reference(env, name: str) -> Optional[str]:
+    """Name of the movable object currently supporting `name`, if any --
+    LIBERO analog of RoboCasa's own _object_support_reference (predicates.py):
+    "Only movable ``env.objects`` supports are returned ... fixture supports
+    are treated as stationary". Uses _objects_touching (raw contact, not
+    _allowed_support_objects' receptacle-category restriction -- that
+    restriction exists for a different purpose, excluding a container an
+    object is about to be placed ONTO from counting as its own pick-region
+    blocker, not for identifying what an object currently rests on/in for
+    stability purposes) and picks the sorted-first match when more than one
+    object is touching, matching RoboCasa's own tie-break exactly."""
+    touching = {str(o) for o in _objects_touching(env, name)}
+    if not touching:
+        return None
+    return sorted(touching)[0]
+
+
+def _relative_quat(q_a: Optional[np.ndarray], q_b: Optional[np.ndarray]) -> Optional[np.ndarray]:
+    """q_b's inverse composed with q_a -- q_a's orientation expressed in q_b's
+    own frame. Used by _object_stable_relative_by_name to measure a genuine
+    relative rotation (object-in-support's-frame), not just each side's own
+    absolute delta compared independently."""
+    if q_a is None or q_b is None:
+        return None
+    conj_b = np.array([q_b[0], -q_b[1], -q_b[2], -q_b[3]], dtype=float)
+    rel = np.zeros(4)
+    mujoco.mju_mulQuat(rel, conj_b, q_a)
+    return rel
+
+
+def _object_stable_relative_by_name(env, state: Dict[str, Any], name: Optional[str]) -> bool:
+    """Per-object linear/angular-delta stability, measured relative to
+    `name`'s current support object (if any) instead of the world frame --
+    LIBERO analog of RoboCasa's own _object_stable_relative (predicates.py).
+    Generalizes the single-`active`-object stability check to any named
+    object -- needed because pick preconditions must judge the object
+    actually being approached (`focus_pick_object`), which is usually not
+    yet grasped (so not `active`) at the moment a pick onset fires, and the
+    settle-watch (see build_predicate_snapshot's settle_obj_name) must judge
+    whichever object is actually being watched, not necessarily `active`.
+
+    The relative correction matters for the same reason RoboCasa's does: a
+    settled item inside a receptacle that itself is still being carried has
+    nonzero world-frame velocity even though it is genuinely at rest
+    relative to whatever is carrying it -- without this, such an item would
+    spuriously read as "unstable" purely from the receptacle's own motion,
+    not any real rattling/sliding inside it. Only a currently-touching
+    *movable* object counts as a support here (_object_support_reference)
+    -- LIBERO fixtures are treated as stationary, matching this file's own
+    existing support_stable stub assumption ("LIBERO supports are static
+    furniture/table"), so no fixture-relative correction is attempted (that
+    RoboCasa also has, via _fixture_velocity_near, for an articulated
+    fixture like a drawer being pulled with an item resting inside it --
+    out of scope here, no fixture-velocity machinery exists in this file).
+
+    Compares this frame's fresh position/quat (queried directly) against
+    state["prev_positions"]/state["prev_quats"], already populated for every
+    movable object name at the end of every prior build_predicate_snapshot
+    call."""
     if name is None:
         return True
     pos = _body_pos(env, name)
     quat = _body_quat(env, name)
     prev_pos = state.get("prev_positions", {}).get(name)
     prev_quat = state.get("prev_quats", {}).get(name)
-    lin_delta = float(np.linalg.norm(pos - prev_pos)) if (pos is not None and prev_pos is not None) else 0.0
-    ang_delta = _angle_between_quats(quat, prev_quat)
+    if pos is None or prev_pos is None:
+        return True
+    support_name = _object_support_reference(env, name)
+    if support_name is not None:
+        sup_pos = _body_pos(env, support_name)
+        sup_prev_pos = state.get("prev_positions", {}).get(support_name)
+        sup_quat = _body_quat(env, support_name)
+        sup_prev_quat = state.get("prev_quats", {}).get(support_name)
+        if sup_pos is not None and sup_prev_pos is not None:
+            lin_delta = float(np.linalg.norm((pos - prev_pos) - (sup_pos - sup_prev_pos)))
+        else:
+            lin_delta = float(np.linalg.norm(pos - prev_pos))
+        rel_now = _relative_quat(quat, sup_quat)
+        rel_prev = _relative_quat(prev_quat, sup_prev_quat)
+        if rel_now is not None and rel_prev is not None:
+            ang_delta = _angle_between_quats(rel_now, rel_prev)
+        else:
+            ang_delta = _angle_between_quats(quat, prev_quat)
+    else:
+        lin_delta = float(np.linalg.norm(pos - prev_pos))
+        ang_delta = _angle_between_quats(quat, prev_quat)
     return bool(lin_delta < STABLE_LINEAR_DELTA_THRESHOLD and ang_delta < STABLE_ANGULAR_DELTA_THRESHOLD)
+
+
+def _persistent_bool_sticky_true(
+    state: Dict[str, Any], key: str, raw_value: bool, fall_threshold: int = STABLE_PERSISTENCE_FRAMES
+) -> bool:
+    """Asymmetric debounce for object_stable_by_name -- ported verbatim (same
+    mechanics) from RoboCasa's own _persistent_bool_sticky_true
+    (predicates.py): becoming stable is reported immediately, with no
+    persistence delay at all -- only *staying* reported-stable through a
+    brief raw-unstable blip gets smoothed. fall_threshold consecutive
+    raw-unstable frames are required before flipping back to unstable.
+    Per-key debounce state lives in state["stable_debounce"], keyed by
+    object name (mirrors RoboCasa's monitor_state["persistent_bools"])."""
+    states = state.setdefault("stable_debounce", {})
+    raw = bool(raw_value)
+    entry = states.get(key)
+    if not isinstance(entry, dict):
+        states[key] = {"value": raw, "count": 0}
+        return raw
+    if raw:
+        entry["value"] = True
+        entry["count"] = 0
+        return True
+    current = bool(entry.get("value", raw))
+    if not current:
+        entry["count"] = 0
+        return False
+    count = int(entry.get("count", 0)) + 1
+    if count >= max(1, int(fall_threshold)):
+        entry["value"] = False
+        entry["count"] = 0
+        return False
+    entry["count"] = count
+    return current
 
 
 def _point_in_any_fixture_region(env, fixture_name: Optional[str], point: Optional[np.ndarray]) -> Optional[bool]:
@@ -1725,9 +1844,28 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     prev_pos = state["prev_positions"].get(active) if active else None
     prev_quat = state["prev_quats"].get(active) if active else None
 
-    lin_delta = float(np.linalg.norm(active_pos - prev_pos)) if (active_pos is not None and prev_pos is not None) else 0.0
-    ang_delta = _angle_between_quats(active_quat, prev_quat)
-    object_stable = bool(lin_delta < STABLE_LINEAR_DELTA_THRESHOLD and ang_delta < STABLE_ANGULAR_DELTA_THRESHOLD)
+    # object_stable_by_name (2026-09-20): debounced, relative-to-current-
+    # support per-object stability dict -- LIBERO analog of RoboCasa's own
+    # object_stable_by_name (predicates.py), see STABLE_PERSISTENCE_FRAMES'
+    # own comment and _object_stable_relative_by_name's docstring for why
+    # both the asymmetric debounce and the relative-to-support correction
+    # matter (previously entirely absent: LIBERO's object_stable was a raw,
+    # undebounced, world-frame-only per-frame check). Computed here (before
+    # this frame's prev_positions/prev_quats get overwritten at the end of
+    # this function) for every movable object, not just `active` -- both
+    # the settle-watch below (settle_obj_name, frequently a different object
+    # than `active` once a second object gets grasped) and the pick
+    # preconditions further down (focus_pick_object, usually not yet
+    # grasped) need other objects' entries too.
+    object_stable_by_name = {
+        name: _persistent_bool_sticky_true(
+            state,
+            f"object_stable::{name}",
+            _object_stable_relative_by_name(env, state, name),
+        )
+        for name in _movable_object_names(env)
+    }
+    object_stable = bool(object_stable_by_name.get(active, True)) if active is not None else True
 
     # Track which other movable objects are currently "carried inside" the
     # grasped object, if it's itself a receptacle -- mirrors RoboCasa's own
@@ -1845,15 +1983,6 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             except Exception:
                 left_gripper = not object_grasped
 
-    # Real mesh/geom distance, not eef-to-body-origin distance -- see
-    # _gripper_far_from_object's own docstring for why (LIBERO objects have
-    # real physical extent, same root cause RoboCasa's predicates.py already
-    # fixed for its own gripper_away_from_object, 2026-09-08). Falls back to
-    # "no active object" (vacuously away) when there's nothing to be near.
-    gripper_away = (
-        True if active is None else _gripper_far_from_object(env, active, MESH_GRIPPER_FAR_THRESHOLD)
-    )
-
     object_supported = bool(active and _touches_anything(env, active))
     support_type_matches_object = True  # no support-type taxonomy modeled in v0
 
@@ -1914,21 +2043,72 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # pending is a recording-length artifact, not a real unresolved safety
     # question -- the placement itself is already confirmed correct.
     task_success = bool((dynamic_info.get("task") or {}).get("success"))
-    object_settled = bool(
-        object_supported
-        and support_type_matches_object
-        and (task_success or (object_stable and gripper_away))
-    )
 
-    # settle-timeout watchdog: starts on object_dropped, clears on settle or regrasp
+    # settle-timeout watchdog (2026-09-20 fix): starts on object_dropped, and
+    # -- unlike the previous version -- stays decoupled from `active` for as
+    # long as it's pending, mirroring RoboCasa's own settle_obj_name split
+    # (predicates.py, ~line 3948: "settle_obj_name = settle_watch_object if
+    # awaiting_settle and settle_watch_object is not None else active_object",
+    # with its own explicit comment at ~4391-4402 on exactly this bug class).
+    # Previously, object_settled/object_supported/object_stable/gripper_away
+    # were all computed for `active` -- which gets reassigned to a NEWLY
+    # grasped object the instant any new grasp is detected (see
+    # state["active_object"] above) -- so if the robot grasped a second,
+    # different object before the first (dropped) object's settle window
+    # elapsed, this watchdog silently started evaluating the SECOND object's
+    # stability/support/gripper-distance while nominally still checking
+    # whether the FIRST one settled. Concrete failure confirmed on
+    # LIVING_ROOM_SCENE2_put_both_the_cream_cheese_box_and_the_butter_in_the_
+    # basket: drop the cream cheese into the basket, then grasp the butter
+    # before the cream cheese's SETTLE_TIMEOUT_FRAMES window elapses -- the
+    # old code would evaluate the BUTTER's stability while the settle-watch's
+    # own object identity (`watch["object"]`) still said "cream cheese",
+    # and the watch's own clearing condition (`active == watch["object"]`)
+    # could then never be true again for as long as the butter stayed
+    # active, so the watch could only ever resolve via timeout, never via
+    # real settle detection -- producing a false release_object_settle_
+    # timeout / rc_released_object_eventually_settles violation on a
+    # placement that was actually fine.
+    #
+    # settle_obj_name is the watched (dropped) object while a watch is
+    # pending, falling back to `active` only when nothing is currently being
+    # watched (mirrors RoboCasa's fallback exactly) -- object_supported/
+    # object_stable/gripper_away/object_settled below are now all computed
+    # against settle_obj_name, not `active`, so they keep tracking the
+    # actually-watched object's real state regardless of what gets grasped
+    # afterward.
     if object_dropped:
         state["settle_watch"] = {"object": active, "age": 0}
     watch = state["settle_watch"]
+    settle_obj_name = watch["object"] if watch is not None else active
+
+    object_supported_settle = bool(settle_obj_name and _touches_anything(env, settle_obj_name))
+    object_stable_settle = (
+        bool(object_stable_by_name.get(settle_obj_name, True)) if settle_obj_name is not None else True
+    )
+    # Real mesh/geom distance, not eef-to-body-origin distance -- see
+    # _gripper_far_from_object's own docstring for why (LIBERO objects have
+    # real physical extent, same root cause RoboCasa's predicates.py already
+    # fixed for its own gripper_away_from_object, 2026-09-08). Falls back to
+    # "nothing being watched" (vacuously away) when there's no settle_obj_name.
+    # Scoped to settle_obj_name, not `active`, matching RoboCasa's own
+    # exported gripper_away_from_object (predicates.py, ~line 4388-4390),
+    # which is likewise settle_obj_name-scoped, not obj_name/active_object-
+    # scoped.
+    gripper_away = (
+        True if settle_obj_name is None else _gripper_far_from_object(env, settle_obj_name, MESH_GRIPPER_FAR_THRESHOLD)
+    )
+    object_settled = bool(
+        object_supported_settle
+        and support_type_matches_object
+        and (task_success or (object_stable_settle and gripper_away))
+    )
+
     release_settle_timeout = False
     if watch is not None:
         if object_grasped and grasped_name == watch["object"]:
             state["settle_watch"] = None
-        elif object_settled and active == watch["object"]:
+        elif object_settled:
             state["settle_watch"] = None
         else:
             watch["age"] += 1
@@ -1950,8 +2130,8 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # debounced candidate; this is the raw one, matching RoboCasa's own
     # naming convention exactly.
     predicates["object_grasped_raw"] = _entry(object_grasped_raw_value, "gripper bilaterally contacts a movable object (undebounced -- see object_grasped's own comment for why these two now differ)")
-    predicates["object_stable"] = _entry(object_stable, "active object linear/angular motion below threshold")
-    predicates["object_stable_relative"] = _entry(object_stable, "aliased to object_stable in v0")
+    predicates["object_stable"] = _entry(object_stable, "active object linear/angular motion, relative to its current support, below threshold (debounced -- see STABLE_PERSISTENCE_FRAMES)")
+    predicates["object_stable_relative"] = _entry(object_stable, "aliased to object_stable -- both are now genuinely relative-to-support and debounced, not just aliased in name")
     predicates["object_sync"] = _entry(object_sync, "active object moves in sync with gripper")
     predicates["object_upright"] = _entry(object_upright, "active object z-axis aligned with world z")
     predicates["object_dropped"] = _entry(object_dropped, "a grasp just ended")
@@ -1959,8 +2139,8 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     predicates["object_released"] = _entry(object_released, "drop coincided with gripper opening")
     predicates["object_supported"] = _entry(object_supported, "active object touches some scene geometry")
     predicates["object_supported_on_correct"] = _entry(object_supported, "aliased to object_supported in v0")
-    predicates["gripper_away_from_object"] = _entry(gripper_away, "gripper moved away from active object")
-    predicates["object_settled"] = _entry(object_settled, "supported, stable, and gripper away")
+    predicates["gripper_away_from_object"] = _entry(gripper_away, "gripper moved away from the settle-watched object (settle_obj_name -- the dropped object being watched, not necessarily whatever's currently active/grasped)")
+    predicates["object_settled"] = _entry(object_settled, "settle-watched object (settle_obj_name) is supported, stable, and gripper away")
     predicates["object_settle_timeout"] = _entry(release_settle_timeout, "aliased to release_object_settle_timeout in v0")
     predicates["release_object_settle_timeout"] = _entry(release_settle_timeout, "dropped object failed to settle within timeout")
     predicates["gripper_is_opening"] = _entry(gripper_is_opening, "gripper closed-fraction decreasing")
@@ -2051,8 +2231,15 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # `object_stable` above reflect the *previous* grasp cycle's object, or
     # nothing at all). Found via `put_the_bowl_on_the_plate` (2026-09-09):
     # `object_stable` was checking the wrong object entirely at every real
-    # pick onset in this corpus.
-    focus_pick_stable = _object_stable_by_name(env, state, focus_pick_object) if focus_pick_object else object_stable
+    # pick onset in this corpus. Reads object_stable_by_name (2026-09-20,
+    # debounced + relative-to-support, see that dict's own comment above),
+    # not a separate raw per-frame call -- mirrors RoboCasa's own
+    # pick_object_stable, which reads its object_stable_by_name directly
+    # (predicates.py, ~line 5281) rather than a second independently-tracked
+    # signal for the same concept.
+    focus_pick_stable = (
+        bool(object_stable_by_name.get(focus_pick_object, False)) if focus_pick_object else object_stable
+    )
     # 2026-09-16 (explicit user decision): RoboCasa's REAL preconditions_
     # satisfied_pick (predicates.py:4000, `_bool(object_region_clear and
     # pick_object_stable)`) never actually ANDs in object_upright_if_
@@ -2092,7 +2279,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     pick_onset_pending_object = state.get("pick_onset_pending_object")
     pick_precondition_escape = False
     if pick_onset_pending_object is not None:
-        pending_stable = _object_stable_by_name(env, state, pick_onset_pending_object)
+        pending_stable = bool(object_stable_by_name.get(pick_onset_pending_object, False))
         pending_region_clear = not _object_region_blockers(env, pick_onset_pending_object)
         pick_precondition_escape = bool(pending_stable and pending_region_clear)
         if pick_precondition_escape:
@@ -2144,7 +2331,32 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
         state.get("carried_content_names", {}).get(active, []) if active else [],
     )
     support_region_clear = bool(not support_region_blockers)
-    support_stable = True  # LIBERO supports are static furniture/table in this v0 -- always stable
+    # support_stable (2026-09-20 fix): checks the live, debounced,
+    # relative-to-support stability of the actual support object
+    # (object_stable_by_name, see that dict's own comment above) when
+    # _infer_landing_target identified a movable-object landing target
+    # (support_region_target_object is not None -- a basket/bowl-type
+    # receptacle, per _infer_landing_target's own "scan every
+    # receptacle-category movable object" scope), falling back to True only
+    # when the target is a genuine fixture/static surface or there is no
+    # inferred target at all -- mirrors RoboCasa's own _support_stable
+    # exactly (predicates.py, ~line 5630: `if sup_kind == "object" ...
+    # return object_stable_by_name.get(str(sup_name), False)` vs. `return
+    # True` for a fixture support).
+    #
+    # Previously hardcoded True unconditionally, with a comment claiming
+    # "LIBERO supports are static furniture/table in this v0" -- that
+    # justification didn't actually hold: _infer_landing_target (added in
+    # 911ef1a) can and does identify a movable object (e.g. a basket) as
+    # the landing target, and _movable_object_names explicitly includes
+    # such receptacle-category objects, so basket/bowl placements -- a
+    # common pattern in this corpus -- never got real stability checking on
+    # the support side at all.
+    support_stable = (
+        True
+        if support_region_target_object is None
+        else bool(object_stable_by_name.get(support_region_target_object, False))
+    )
     support_geometry_valid = True  # not modeled in v0 -- see module docstring
 
     # Added 2026-09-16 (explicit user decision, mirroring RoboCasa's own
@@ -2194,7 +2406,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
 
     predicates["skill_place_onset"] = _entry(skill_place_onset, "aliased to object_dropped")
     predicates["support_region_clear"] = _entry(support_region_clear, "no other object's AABB obstructs the placed object's own current-position-to-live-inferred-landing-target swept path")
-    predicates["support_stable"] = _entry(support_stable, "stubbed True -- static support in v0")
+    predicates["support_stable"] = _entry(support_stable, "live object_stable_by_name of the inferred landing-target object when it's a movable receptacle; True when the target is a fixture/static surface or unknown")
     predicates["support_geometry_valid"] = _entry(support_geometry_valid, "stubbed True -- geometry not modeled in v0")
     predicates["support_objects_clean_for_manipulated_object"] = _entry(support_objects_clean_for_manipulated_object, "no raw/ready-to-eat conflicting object within PLACEMENT_PROXIMITY_MARGIN of the support")
     predicates["support_not_cluttered_for_fragile_manipulated_object"] = _entry(support_not_cluttered_for_fragile_manipulated_object, "at most CLUTTER_THRESHOLD nearby objects when placing a fragile item")
