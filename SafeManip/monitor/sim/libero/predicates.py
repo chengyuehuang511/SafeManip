@@ -1102,6 +1102,7 @@ def _gripper_target_distance(env, eef_pos: Optional[np.ndarray], gripper_aabb, t
     return None
 
 
+
 def _infer_landing_target(env, name: Optional[str], current_pos: Optional[np.ndarray]):
     """Simplified LIBERO analog of RoboCasa's own _infer_support/_spos
     (predicates.py) -- a live, continuously-re-evaluated guess of where an
@@ -1222,7 +1223,43 @@ def _infer_landing_target(env, name: Optional[str], current_pos: Optional[np.nda
             return
         lower, upper = aabb
         top_z = float(upper[2])
-        if top_z > mz + SUPPORT_CLUTTER_Z_TOLERANCE:
+        bottom_z = float(lower[2])
+        # z-gate (2026-09-21 fix, AABB-accuracy false-positive investigation):
+        # ORIGINAL condition alone (`top_z > mz + tol: reject`) only accepts
+        # candidates whose own top sits at/below the carried object's current
+        # height -- correct for "resting on top of a flat surface," but
+        # structurally wrong for any support that partially SURROUNDS the
+        # object from the sides/above (a wine rack's uprights, a microwave
+        # interior, a stove burner grate, a drawer/cabinet interior) whenever
+        # this frame's raw MuJoCo contact hasn't registered yet (the
+        # existing contact-based fast paths above only cover the case where
+        # contact IS already true). Confirmed via real corpus data
+        # (put_the_wine_bottle_on_the_rack ep0, frame 134, the object's own
+        # release/onset frame): wine_bottle_1's current z (1.1654) already
+        # sits WELL INSIDE wine_rack_1's own real AABB z-span
+        # ([0.9178, 1.2482]) -- the bottle is genuinely already in its slot
+        # -- yet the old gate rejected wine_rack_1 as a candidate entirely
+        # (top_z 1.2482 > mz+tol 1.2154 by ~3cm, since the rack's own
+        # uprights/frame extend above the bottle), forcing
+        # _infer_landing_target to (None, None) and support_geometry_valid
+        # to a forced False. Confirmed the same containment/enclosure
+        # pattern (support taller than the object it holds, contact not yet
+        # registered at the exact onset/release frame) also explains the
+        # KITCHEN_SCENE6 microwave, KITCHEN_SCENE8 stove, and KITCHEN_SCENE4
+        # drawer/cabinet "support geometry was invalid" false positives in
+        # the same v32 sweep -- not isolated to wine racks. Fix: ALSO accept
+        # a candidate when the object's current height already falls within
+        # (or within tolerance of) the candidate's own full z-span, not just
+        # at/below its top -- a direct, portable generalization of the
+        # existing "already touching" fast path to the "not yet touching,
+        # but already geometrically co-located" near-miss this gate was
+        # otherwise blind to. Purely additive: every candidate that passed
+        # the old condition still passes (top_z <= mz+tol implies mz is
+        # within [bottom_z-tol, top_z+tol] whenever bottom_z <= top_z, which
+        # always holds), so no previously-accepted candidate is excluded.
+        resting_on_top = top_z <= mz + SUPPORT_CLUTTER_Z_TOLERANCE
+        height_contained = (bottom_z - SUPPORT_CLUTTER_Z_TOLERANCE) <= mz <= (top_z + SUPPORT_CLUTTER_Z_TOLERANCE)
+        if not (resting_on_top or height_contained):
             return
         point = _closest_point_on_aabb_xy(current_pos, aabb)
         xy_dist = float(np.linalg.norm(point[:2] - current_pos[:2]))
@@ -3334,24 +3371,11 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # --- skill onset + pick preconditions -------------------------------
     pick_onset_state = state["pick_onset"]
     any_pick_onset = False
-    # Added 2026-09-15 for rc_pick_preconditions_safe's recovery_ltl (see
-    # RoboCasa predicates.py's skill_pick_onset_end for the same concept):
-    # snapshot which objects are latched ("fired") before this frame's
-    # updates, so we can tell afterward whether any of them concluded this
-    # frame (grasped -- popped from pick_onset_state below -- or gave up,
-    # "fired" reset to False when streak drops to 0).
-    prev_fired_pick_names = {
-        name for name, entry in pick_onset_state.items() if entry.get("fired")
-    }
+    prev_fired_pick_object = pick_onset_state.get("fired_object")
     # Grasp gate (2026-09-20, RoboCasa predicates.py:5088-92's pick_onset_cond
     # -- `not prev_object_grasped and ... and not object_grasped`): RoboCasa's
     # entire approach-tracking result is blocked from firing while the
     # gripper holds anything, in either this frame or the previous one.
-    # Confirmed bug this closes: this loop had NO object_grasped gate at all,
-    # so carrying a just-grasped object A past/into a receptacle already
-    # holding object B (a PLACE action) let B's own proximity streak cross
-    # SKILL_ONSET_FRAMES while A was being carried, firing a spurious
-    # any_pick_onset for B that was never actually approached for a pick.
     # `not prev_object_grasped` needs its own dedicated state key here
     # (prev_grasped_object/prev_object_grasped_for_sync above are already
     # overwritten to *this* frame's value earlier in this function, so they
@@ -3361,177 +3385,179 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     )
     grasp_blocks_pick_onset = object_grasped or prev_object_grasped_for_pick_onset
     focus_pick_object = active if object_grasped else None
-    # pick_onset_prev_dist (2026-09-21 fix, verification pass): per-object
-    # previous-frame eef-to-object distance, ported from RoboCasa's own
-    # pick_onset_cond mechanism (predicates.py ~4980-5088:
-    # raw_gripper_moving_towards_object requires the NEAREST object's own
-    # distance to be strictly decreasing frame-over-frame -- a SEPARATE,
-    # independently-tracked condition from gripper_near_object, both ANDed
-    # together only at pick_onset_cond's own top level). This loop
-    # previously baked only the raw-proximity half (`near` held for
-    # SKILL_ONSET_FRAMES consecutive frames) into its streak, with no
-    # decreasing-distance requirement at all -- confirmed as a real, live
-    # false-positive via pick_up_the_black_bowl_on_the_wooden_cabinet_and_
-    # place_it_on_the_plate ep9 (v29 corpus): akita_black_bowl_1 is
-    # released at frame 160 (object_grasped True -> False), then the
-    # gripper retracts STRAIGHT AWAY from it (eef-to-bowl distance climbs
-    # monotonically 0.0535 -> 0.089 m over frames 160-170) -- despite
-    # moving away the whole time, the distance stays under
-    # NEAR_OBJECT_THRESHOLD (0.09) for exactly SKILL_ONSET_FRAMES (10)
-    # consecutive frames, so `any_pick_onset` fires a spurious pick onset
-    # for the bowl it just placed at frame 170, purely from lingering
-    # proximity during retraction, never from any actual re-approach.
+    # Single-nearest-candidate redesign (2026-09-21, AABB-accuracy false-
+    # positive investigation): replaces a per-object-independent streak dict
+    # (every movable object accumulating its own "near + decreasing
+    # distance" streak in parallel) with RoboCasa's REAL mechanism
+    # (predicates.py ~4980-5088: a single tracked `pick_approach_candidate`
+    # -- always whichever object is CURRENTLY nearest the gripper -- whose
+    # streak resets to 1 the instant a DIFFERENT object becomes nearest).
+    # The per-object version was a deliberate, explicit divergence at the
+    # time (see git history), justified only for gating progress during an
+    # active carry (a second object's streak could keep building while
+    # object A was held, priming it to fire the instant release lifted the
+    # grasp gate) -- that carry-gating concern is independently preserved
+    # below via grasp_blocks_pick_onset's own reset, unchanged.
     #
-    # A first version of this fix required `near and moving_towards` on
-    # EVERY frame of the streak with a hard reset on any single failure --
-    # reverted the same session after it broke genuine onsets: real
-    # approaches are not monotonically decreasing every single raw frame
-    # (confirmed via this same episode's real *initial* pick, frames 20-49:
-    # distance decreases cleanly 0.221 -> 0.0277 through frame 43, then
-    # ticks back up 0.0293/0.0316/... from frame 44 on as the gripper's
-    # final pre-contact adjustment overshoots slightly -- a strict
-    # zero-tolerance version reset the streak right there and the onset
-    # that legitimately fired at frame 46 in the old code never fired at
-    # all under the strict version). RoboCasa's own mechanism already
-    # anticipates exactly this: `pick_approach_false_count`, a grace period
-    # that tolerates up to `approach_persistence_frames`
-    # (=max(1, SKILL_ONSET_FRAMES)) consecutive non-decreasing frames
-    # WITHOUT resetting the streak, but only once the streak has already
-    # reached that same threshold once -- ported verbatim below via
-    # `false_count`, per-object instead of RoboCasa's single nearest-
-    # candidate slot (same per-object generalization already used
-    # throughout this loop, see the `grasp_blocks_pick_onset` branch's own
-    # comment for why per-object beats a single shared candidate here).
-    # `near` is intentionally NOT part of the streak itself (matching
-    # RoboCasa: `near` only gates the final firing condition below), so a
-    # long decreasing-distance approach from far away still builds
-    # streak/grace correctly even before it first crosses into "near"
-    # range.
+    # But the per-object-parallel design has a much larger, confirmed cost:
+    # every movable object accumulates its OWN streak independently of
+    # whether it's actually the object the gripper is closing in on, so a
+    # bystander object merely sitting along/near the gripper's transit path
+    # toward its real target can independently satisfy "near + decreasing
+    # distance" for SKILL_ONSET_FRAMES and fire its own spurious pick onset
+    # -- misattributing the ENTIRE pick-preconditions check to the wrong
+    # object. Confirmed via a corpus-wide sweep of v32's "gripper path was
+    # obstructed" rc_pick_preconditions_safe violations: 40 of 41 instances
+    # had first_non_accepting_role_sets.focus_pick_object != the episode's
+    # real final focus_pick_object (e.g. pick_up_the_tomato_sauce_and_
+    # place_it_in_the_basket ep4 frame 23: onset fired for orange_juice_1,
+    # a bystander object on the same shelf the gripper transits near while
+    # actually reaching for tomato_sauce_1, which the episode's own final
+    # role sets confirm as the real grasp target). Direct frame data showed
+    # the geometry itself (gripper/target/blocker AABBs) was computed
+    # correctly and tightly -- the corridor genuinely passed through
+    # tomato_sauce_1's real footprint on the way to orange_juice_1's real
+    # position -- but there never was a genuine "pick attempt" on
+    # orange_juice_1 in the first place; it's a bystander object the
+    # gripper happens to pass nearest on its way to the real target, not
+    # something the human demonstrator was ever reaching for. RoboCasa's
+    # single-nearest-candidate design structurally prevents this: a
+    # bystander only ever gets a chance to accumulate progress while it is
+    # THE single nearest object, and the moment the gripper continues past
+    # it toward the real (farther, but genuinely being approached) target,
+    # either the bystander's own distance starts increasing again (streak
+    # stalls before crossing SKILL_ONSET_FRAMES) or the real target becomes
+    # nearer first (nearest-object identity switches, discarding the
+    # bystander's partial progress) -- both outcomes were confirmed via the
+    # same real corridor's own numbers (tomato_sauce_1's own gripper-AABB
+    # gap, ~0.098m, was strictly larger than orange_juice_1's, ~0.046m, at
+    # the exact violation frame, meaning orange_juice_1 genuinely was the
+    # single nearest object at that instant -- the fix is not "recompute
+    # nearest differently," it's "don't let farther, non-nearest objects
+    # accumulate progress in parallel while a nearer one is being tracked").
     pick_onset_prev_dist = state.setdefault("pick_onset_prev_dist", {})
-    for name in _movable_object_names(env):
-        if name == grasped_name:
-            pick_onset_state.pop(name, None)
-            pick_onset_prev_dist.pop(name, None)
-            continue
-        if grasp_blocks_pick_onset:
-            # Unlike RoboCasa's single "nearest object" candidate (which in
-            # practice is almost always the held object itself, distance
-            # ~0, so a second object rarely gets a chance to accumulate
-            # progress mid-carry), this loop tracks EVERY movable object's
-            # proximity streak in parallel -- so merely gating the firing
-            # condition (as RoboCasa's own code literally does, without
-            # ever resetting pick_approach_count on grasp) would not
-            # actually fix the confirmed bug here: another object's streak
-            # could still cross threshold *during* the carry and sit
-            # primed to fire the instant the grasp gate lifts at release.
-            # Popping the entry (matching the grasped_name branch just
-            # above, and RoboCasa's own fired_pick_object/candidate being
-            # cleared the moment object_grasped goes True) makes "no
-            # pick-onset tracking progress survives being carried near an
-            # object" hold here the same way it holds in RoboCasa, despite
-            # the different per-object-vs-single-candidate state shape.
-            pick_onset_state.pop(name, None)
-            pick_onset_prev_dist.pop(name, None)
-            continue
-        pos = _body_pos(env, name)
-        # dist (2026-09-21, distance-basis audit): gripper-AABB-to-object
-        # distance (_gripper_target_distance, degrading to gripper-AABB-to-
-        # object-center-point, then raw point/point only if no AABB resolves
-        # at all) replacing the previous raw eef-point-to-body-origin-point
-        # distance -- see NEAR_OBJECT_THRESHOLD's own comment for why the
-        # old basis systematically overestimated the true gap for any object
-        # with real physical extent.
-        object_reach_aabb = _object_aabb(env, name)
-        dist = _gripper_target_distance(env, eef_pos, gripper_reach_aabb, pos, object_reach_aabb)
-        near = bool(dist is not None and dist < NEAR_OBJECT_THRESHOLD)
-        prev_dist = pick_onset_prev_dist.get(name)
-        moving_towards = bool(dist is not None and prev_dist is not None and dist < prev_dist - 1e-4)
-        if dist is not None:
-            pick_onset_prev_dist[name] = dist
-        entry = pick_onset_state.setdefault(name, {"streak": 0, "false_count": 0, "fired": False})
-        # genuinely_disengaged (2026-09-21 fix, repeated-onset-during-a-
-        # single-continuous-interaction audit): whether the object has
-        # actually left the near-object region, not merely "isn't currently
-        # getting closer". Confirmed via real data
-        # (push_the_plate_to_the_front_of_the_stove ep5, v31 corpus) that
-        # the old grace-period alone (false_count reaching SKILL_ONSET_FRAMES
-        # consecutive non-decreasing frames) is not sufficient evidence the
-        # interaction actually ended: during a sustained push the gripper and
-        # object move together at close to the same velocity, so
-        # eef-to-object distance stays flat (never < 0.03m the whole
-        # episode, i.e. always deep inside NEAR_OBJECT_THRESHOLD) for long
-        # stretches -- easily exceeding the grace period -- and the "fired"
-        # latch cleared even though the robot never actually backed off, let
-        # alone released/re-approached. Confirmed the same underlying
-        # pattern (fumbling near a single object across a wide distance
-        # plateau, never once climbing back out past NEAR_OBJECT_THRESHOLD,
-        # before the real grasp) also produces spurious extra pick onsets in
-        # KITCHEN_SCENE8_put_both_moka_pots_on_the_stove ep1 (onsets at
-        # frames 284 and 332 for moka_pot_1, both before its real grasp at
-        # 374 -- distance oscillates 0.075-0.12m the whole stretch, never
-        # genuinely disengaging). Gating the "fired" latch's own clear
-        # condition on real disengagement (dist >= NEAR_OBJECT_THRESHOLD, the
-        # same physically-motivated near/far boundary skill_pick_onset
-        # itself already uses for "near", not a new invented number) fixes
-        # both: the latch now only releases once the gripper has genuinely
-        # left the object's vicinity, distinguishing "still hovering nearby,
-        # mid-interaction" from "genuinely disengaged, this is a new
-        # attempt". The streak/false_count grace mechanic itself is
-        # unchanged (still lets a momentary non-decreasing blip pass without
-        # resetting streak-building progress) -- only whether "fired" is
-        # allowed to clear (and thus whether a NEW onset can fire) is
-        # additionally gated.
-        genuinely_disengaged = bool(dist is not None and dist >= NEAR_OBJECT_THRESHOLD)
-        if moving_towards:
-            entry["streak"] += 1
-            entry["false_count"] = 0
-        elif entry["streak"] >= SKILL_ONSET_FRAMES:
-            entry["false_count"] += 1
-            if entry["false_count"] >= SKILL_ONSET_FRAMES:
-                entry["streak"] = 0
-                entry["false_count"] = 0
-                if genuinely_disengaged:
-                    entry["fired"] = False
+    candidate_dists = {}
+    if not grasp_blocks_pick_onset:
+        for name in _movable_object_names(env):
+            if name == grasped_name:
+                continue
+            pos = _body_pos(env, name)
+            # dist (2026-09-21, distance-basis audit): gripper-AABB-to-object
+            # distance (_gripper_target_distance, degrading to gripper-AABB-to-
+            # object-center-point, then raw point/point only if no AABB resolves
+            # at all) -- see NEAR_OBJECT_THRESHOLD's own comment for why the
+            # old raw eef-point-to-body-origin-point basis systematically
+            # overestimated the true gap for any object with real physical
+            # extent.
+            object_reach_aabb = _object_aabb(env, name)
+            dist = _gripper_target_distance(env, eef_pos, gripper_reach_aabb, pos, object_reach_aabb)
+            if dist is not None:
+                candidate_dists[name] = dist
+    nearest_name, nearest_dist = None, None
+    if candidate_dists:
+        nearest_name, nearest_dist = min(candidate_dists.items(), key=lambda kv: kv[1])
+    near = bool(nearest_dist is not None and nearest_dist < NEAR_OBJECT_THRESHOLD)
+    prev_candidate = pick_onset_state.get("candidate")
+    prev_count = int(pick_onset_state.get("count", 0))
+    prev_false_count = int(pick_onset_state.get("false_count", 0))
+    # previous_nearest_distance: this SAME object's own recorded distance
+    # last frame (whether or not it was the tracked candidate then) --
+    # mirrors RoboCasa's own prev_gripper_object_distances dict, which
+    # records every candidate's distance every frame, not just the winning
+    # one, so a freshly-switched-to candidate's own decreasing-distance
+    # history is still available the instant it becomes nearest.
+    previous_nearest_distance = pick_onset_prev_dist.get(nearest_name) if nearest_name is not None else None
+    moving_towards = bool(
+        nearest_dist is not None
+        and previous_nearest_distance is not None
+        and nearest_dist < previous_nearest_distance - 1e-4
+    )
+    if grasp_blocks_pick_onset:
+        # No progress accumulates while carrying anything (matches
+        # RoboCasa's real behavior for free: the held object is essentially
+        # always the single nearest candidate, distance ~0, starving any
+        # other object of a chance to become the tracked candidate at all --
+        # LIBERO explicitly excludes the held object itself as a candidate
+        # above, so this explicit reset reproduces the same net effect).
+        count, false_count, candidate = 0, 0, None
+    elif moving_towards and nearest_name == prev_candidate:
+        count, false_count, candidate = prev_count + 1, 0, nearest_name
+    elif moving_towards:
+        count, false_count, candidate = 1, 0, nearest_name
+    elif prev_candidate is not None and prev_count >= SKILL_ONSET_FRAMES:
+        # Grace period (RoboCasa's own pick_approach_false_count): tolerates
+        # up to SKILL_ONSET_FRAMES consecutive non-decreasing/candidate-
+        # switched frames without discarding an already-qualified streak --
+        # confirmed necessary via real approach data (final pre-contact
+        # overshoot ticks the distance back up slightly for a few frames
+        # right before contact; a hard zero-tolerance reset broke genuine
+        # onsets that legitimately fire moments later).
+        false_count = prev_false_count + 1
+        if false_count < SKILL_ONSET_FRAMES:
+            count, candidate = prev_count, prev_candidate
         else:
-            entry["streak"] = 0
-            entry["false_count"] = 0
-            if genuinely_disengaged:
-                entry["fired"] = False
-        # Fixture-contact suppression (2026-09-20, ported from RoboCasa's
-        # own pick_onset_cond fix): this loop, like RoboCasa's original
-        # design before its own fix, only ever considers movable OBJECTS as
-        # pick-onset candidates -- a fixture (a drawer being closed, a
-        # cabinet door) is never itself a candidate, so a pick onset here
-        # could misattribute a fixture-interaction action to whichever
-        # object happens to be nearby, the same way RoboCasa's did for
-        # LoadDishwasher/KettleBoiling (confirmed there via real fixture
-        # joint-velocity data). Uses last frame's raw robot_fixture_contact
-        # reading (computed later in this same function, at the mechanism-
-        # safety section below -- referencing this frame's own value here
-        # would need computing it twice or reordering the whole function;
-        # a one-frame lag is negligible given real fixture manipulation
-        # holds contact for many consecutive frames, not a single-frame
-        # blip, matching RoboCasa's own reasoning for the same lag). NOT
-        # yet confirmed as a live false-positive in LIBERO's actual 40-task
-        # corpus (no real episode checked has exhibited this pattern) --
-        # kept for structural correctness/parity with RoboCasa regardless,
-        # since the same architectural gap exists here.
-        if (
-            near
-            and entry["streak"] >= SKILL_ONSET_FRAMES
-            and not entry["fired"]
-            and not bool(state.get("robot_fixture_contact_raw", False))
-        ):
-            entry["fired"] = True
-            any_pick_onset = True
-            if focus_pick_object is None:
-                focus_pick_object = name
-
+            count, false_count, candidate = 0, 0, None
+    else:
+        count, false_count, candidate = 0, 0, None
+    for name, dist in candidate_dists.items():
+        pick_onset_prev_dist[name] = dist
+    pick_onset_state["candidate"] = candidate
+    pick_onset_state["count"] = count
+    pick_onset_state["false_count"] = false_count
     state["prev_object_grasped_for_pick_onset"] = object_grasped
 
-    any_pick_onset_end = any(
-        name not in pick_onset_state or not pick_onset_state[name].get("fired")
-        for name in prev_fired_pick_names
+    gripper_moving_towards_object = count >= SKILL_ONSET_FRAMES
+    pick_approach_object = candidate if gripper_moving_towards_object else None
+    fired_object = pick_onset_state.get("fired_object")
+    # genuinely_disengaged (2026-09-21 fix, repeated-onset-during-a-single-
+    # continuous-interaction audit -- preserved from the per-object design's
+    # own fix, not just object_grasped/candidate-switch alone): whether the
+    # FIRED object has actually left the near-object region, not merely
+    # "the tracked candidate switched or its streak lapsed". Confirmed via
+    # real data (push_the_plate_to_the_front_of_the_stove ep5, v31 corpus)
+    # that candidate/streak lapsing alone is not sufficient evidence a real
+    # interaction ended: during a sustained push the gripper and object move
+    # together at close to the same velocity, so eef-to-object distance
+    # stays flat (never decreasing enough to keep "moving_towards" true, so
+    # the streak lapses and pick_approach_object drops to None) while the
+    # object is still genuinely close (near) the whole time -- clearing
+    # fired_object here would let a second spurious onset fire on the same
+    # still-ongoing interaction. Only clear fired_object on a lapsed/
+    # switched candidate when the fired object's OWN current distance says
+    # it's genuinely far now (>= NEAR_OBJECT_THRESHOLD); missing distance
+    # data is treated as NOT disengaged (safe default, matches the original
+    # per-object entry's same convention).
+    fired_dist = candidate_dists.get(fired_object) if fired_object is not None else None
+    fired_genuinely_disengaged = bool(fired_dist is not None and fired_dist >= NEAR_OBJECT_THRESHOLD)
+    if object_grasped:
+        fired_object = None
+    elif fired_object is not None and (pick_approach_object is None or pick_approach_object != fired_object):
+        if fired_genuinely_disengaged:
+            fired_object = None
+    # Fixture-contact suppression (2026-09-20, ported from RoboCasa's own
+    # pick_onset_cond fix): only ever considers movable OBJECTS as pick-onset
+    # candidates -- a fixture (a drawer being closed, a cabinet door) is
+    # never itself a candidate, so a pick onset here could misattribute a
+    # fixture-interaction action to whichever object happens to be nearby,
+    # the same way RoboCasa's did for LoadDishwasher/KettleBoiling. Uses
+    # last frame's raw robot_fixture_contact reading (computed later in this
+    # same function, at the mechanism-safety section below -- a one-frame
+    # lag is negligible given real fixture manipulation holds contact for
+    # many consecutive frames, matching RoboCasa's own reasoning).
+    if (
+        near
+        and pick_approach_object is not None
+        and fired_object is None
+        and not bool(state.get("robot_fixture_contact_raw", False))
+    ):
+        fired_object = pick_approach_object
+        any_pick_onset = True
+        if focus_pick_object is None:
+            focus_pick_object = pick_approach_object
+    pick_onset_state["fired_object"] = fired_object
+
+    any_pick_onset_end = bool(
+        prev_fired_pick_object is not None and fired_object != prev_fired_pick_object
     )
 
     if focus_pick_object is None and not object_grasped:
