@@ -2190,9 +2190,45 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     prev_fired_pick_names = {
         name for name, entry in pick_onset_state.items() if entry.get("fired")
     }
+    # Grasp gate (2026-09-20, RoboCasa predicates.py:5088-92's pick_onset_cond
+    # -- `not prev_object_grasped and ... and not object_grasped`): RoboCasa's
+    # entire approach-tracking result is blocked from firing while the
+    # gripper holds anything, in either this frame or the previous one.
+    # Confirmed bug this closes: this loop had NO object_grasped gate at all,
+    # so carrying a just-grasped object A past/into a receptacle already
+    # holding object B (a PLACE action) let B's own proximity streak cross
+    # SKILL_ONSET_FRAMES while A was being carried, firing a spurious
+    # any_pick_onset for B that was never actually approached for a pick.
+    # `not prev_object_grasped` needs its own dedicated state key here
+    # (prev_grasped_object/prev_object_grasped_for_sync above are already
+    # overwritten to *this* frame's value earlier in this function, so they
+    # can't be reused as "previous frame" from this point on).
+    prev_object_grasped_for_pick_onset = bool(
+        state.get("prev_object_grasped_for_pick_onset", False)
+    )
+    grasp_blocks_pick_onset = object_grasped or prev_object_grasped_for_pick_onset
     focus_pick_object = active if object_grasped else None
     for name in _movable_object_names(env):
         if name == grasped_name:
+            pick_onset_state.pop(name, None)
+            continue
+        if grasp_blocks_pick_onset:
+            # Unlike RoboCasa's single "nearest object" candidate (which in
+            # practice is almost always the held object itself, distance
+            # ~0, so a second object rarely gets a chance to accumulate
+            # progress mid-carry), this loop tracks EVERY movable object's
+            # proximity streak in parallel -- so merely gating the firing
+            # condition (as RoboCasa's own code literally does, without
+            # ever resetting pick_approach_count on grasp) would not
+            # actually fix the confirmed bug here: another object's streak
+            # could still cross threshold *during* the carry and sit
+            # primed to fire the instant the grasp gate lifts at release.
+            # Popping the entry (matching the grasped_name branch just
+            # above, and RoboCasa's own fired_pick_object/candidate being
+            # cleared the moment object_grasped goes True) makes "no
+            # pick-onset tracking progress survives being carried near an
+            # object" hold here the same way it holds in RoboCasa, despite
+            # the different per-object-vs-single-candidate state shape.
             pick_onset_state.pop(name, None)
             continue
         pos = _body_pos(env, name)
@@ -2232,6 +2268,8 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             any_pick_onset = True
             if focus_pick_object is None:
                 focus_pick_object = name
+
+    state["prev_object_grasped_for_pick_onset"] = object_grasped
 
     any_pick_onset_end = any(
         name not in pick_onset_state or not pick_onset_state[name].get("fired")
