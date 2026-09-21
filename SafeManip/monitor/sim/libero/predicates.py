@@ -300,6 +300,25 @@ STABLE_ANGULAR_DELTA_THRESHOLD = 0.0125  # = RoboCasa's OBJ_ANGULAR_STABLE_THRES
 # this exact debounce.
 STABLE_PERSISTENCE_FRAMES = 5
 SYNC_RELATIVE_DELTA_THRESHOLD = 0.03    # = RoboCasa's GRASP_SLIP_LINEAR_THRESHOLD (already a per-frame position delta, same units, no conversion)
+# SYNC_ANGULAR_DELTA_THRESHOLD (2026-09-21, comprehensive-mirror audit):
+# = RoboCasa's GRASP_SLIP_ANGULAR_THRESHOLD (predicates.py, 0.3 rad) --
+# already a per-frame quaternion-angle delta (the angle of the diff
+# quaternion between the object's actual and rigidly-expected orientation
+# this frame), not a rate, so no dt conversion is needed, same as
+# SYNC_RELATIVE_DELTA_THRESHOLD above. Added because object_sync below
+# previously had NO angular/orientation component at all (only compared
+# a raw world-frame obj_pos-eef_pos offset, never rotated into the eef's
+# own frame and never compared against the object's orientation) -- a
+# real gap against RoboCasa's own _object_grasp_slip/_object_sync, which
+# independently requires BOTH linear_slip < GRASP_SLIP_LINEAR_THRESHOLD
+# AND angular_slip < GRASP_SLIP_ANGULAR_THRESHOLD. Confirmed via corpus
+# comparison: RoboCasa's own v28 500-episode baseline shows 8/500 real
+# rc_grasp_remains_synced_until_dropped violations, while LIBERO's
+# parallel v28 comprehensive-mirror corpus (400 episodes) showed 0/400 --
+# consistent with a structurally weaker sync check silently missing
+# genuine slip/rotation events, not with LIBERO grasps simply never
+# slipping.
+SYNC_ANGULAR_DELTA_THRESHOLD = 0.3
 GRIPPER_FAR_THRESHOLD = 0.12            # eef-to-object distance considered "away" (m) -- fallback tier only, see MESH_GRIPPER_FAR_THRESHOLD
 MESH_GRIPPER_FAR_THRESHOLD = 0.01        # = RoboCasa's own GRIPPER_FAR_THRESHOLD (real mesh/geom gap, same units) -- primary tier, see _gripper_far_from_object
 NEAR_OBJECT_THRESHOLD = 0.09            # eef-to-object distance considered "near" for onset (m)
@@ -452,6 +471,57 @@ def _eef_pos(env) -> Optional[np.ndarray]:
         return np.array(env.sim.data.get_site_xpos(site_name), dtype=float)
     except Exception:
         return None
+
+
+def _eef_quat(env) -> Optional[np.ndarray]:
+    """End-effector (grip site) world orientation, wxyz -- the LIBERO
+    counterpart to RoboCasa's own _eef_orientation() (predicates.py),
+    added 2026-09-21 (comprehensive-mirror audit) so object_sync below can
+    do the same rotation-corrected linear check and angular-slip check
+    RoboCasa's _object_grasp_slip does. There is no site_xquat in mjData
+    directly (only site_xmat, a 3x3 rotation matrix) -- mujoco.mju_mat2Quat
+    is the same conversion MuJoCo's own C API uses internally, returned
+    already in wxyz (mujoco's native quaternion convention, matching
+    _body_quat's env.sim.data.body_xquat above -- no xyzw reorder needed,
+    unlike RoboCasa's own _xyzw_to_wxyz helper, which exists only because
+    RoboCasa's kitchen_ext.py stores poses in robosuite/scipy's xyzw
+    convention instead)."""
+    try:
+        gripper = env.robots[0].gripper
+        site_name = gripper.important_sites["grip_site"]
+        site_mat = np.asarray(env.sim.data.get_site_xmat(site_name), dtype=float).reshape(3, 3)
+        quat = np.zeros(4, dtype=float)
+        mujoco.mju_mat2Quat(quat, site_mat.reshape(-1))
+        if not np.all(np.isfinite(quat)):
+            return None
+        return quat
+    except Exception:
+        return None
+
+
+def _quat_conjugate(q: np.ndarray) -> np.ndarray:
+    return np.array([q[0], -q[1], -q[2], -q[3]])
+
+
+def _quat_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
+    w1, x1, y1, z1 = q1
+    w2, x2, y2, z2 = q2
+    return np.array([
+        w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+        w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+        w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+        w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+    ])
+
+
+def _quat_rotate_vector(q: np.ndarray, v: np.ndarray) -> np.ndarray:
+    qv = np.array([0.0, v[0], v[1], v[2]])
+    return _quat_multiply(_quat_multiply(q, qv), _quat_conjugate(q))[1:4]
+
+
+def _quat_angle(q: np.ndarray) -> float:
+    w = float(np.clip(abs(q[0]), -1.0, 1.0))
+    return float(2.0 * np.arccos(w))
 
 
 def _gripper_closed_fraction(env) -> Optional[float]:
@@ -2580,6 +2650,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             "prev_gripper_frac": None,
             "sync_baseline_object": None,
             "sync_baseline_offset": None,
+            "sync_baseline_quat": None,
             "settle_watch": None,  # {"object": name, "age": int}
             "forbidden_streak": 0,
             "pick_onset": {},  # name -> {"streak": int, "fired": bool}
@@ -2657,6 +2728,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     )
 
     eef_pos = _eef_pos(env)
+    eef_quat = _eef_quat(env)
     gripper_frac = _gripper_closed_fraction(env)
     prev_frac = state["prev_gripper_frac"]
     gripper_is_opening = bool(prev_frac is not None and gripper_frac is not None and gripper_frac < prev_frac - 1e-4)
@@ -2716,8 +2788,9 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
                 ]
                 state.setdefault("carried_content_names", {})[active] = contained
 
-    # object_sync (2026-09-09): ported RoboCasa's own grasp-slip pattern --
-    # a dedicated reference (obj_pos - eef_pos) re-seeded fresh at the exact
+    # object_sync (2026-09-09, rotation/angular-slip fix 2026-09-21): ported
+    # RoboCasa's own grasp-slip pattern (_object_grasp_slip/_object_sync,
+    # predicates.py) -- a dedicated reference re-seeded fresh at the exact
     # frame a NEW grasp begins, refreshed every frame thereafter (per-frame
     # drift, not accumulated-since-onset -- same rationale as RoboCasa's
     # _object_grasp_slip: a one-time settling shift right after lift-off
@@ -2747,30 +2820,81 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_...: a
     # drop-then-regrasp of the same bowl (frames 155/160) still showed
     # object_sync=False at 160 without this.
+    #
+    # Rotation/angular-slip fix (2026-09-21, dependency-tree audit): the
+    # version above only ever compared a raw WORLD-frame offset
+    # (active_pos - eef_pos) against the previous frame's raw world-frame
+    # offset, with no rotation correction and no angular component at all --
+    # unlike RoboCasa's real _object_grasp_slip. This meant a rigidly-held
+    # object being carried through an ordinary wrist rotation (no real slip
+    # at all) would report a large, spurious world-frame offset delta the
+    # moment the object swept through space relative to the world, and it
+    # meant a real object spinning/rotating in the gripper's grip (a genuine
+    # slip) could never be detected at all if its position stayed centered.
+    # Ported RoboCasa's exact fix: track the reference offset ROTATED INTO
+    # THE EEF'S OWN FRAME (sync_baseline_offset, now
+    # quat_rotate_vector(conj(eef_quat), active_pos - eef_pos) rather than a
+    # raw world-frame subtraction) so a pure wrist rotation no longer looks
+    # like slip, plus a separate baseline RELATIVE ORIENTATION
+    # (sync_baseline_quat = conj(eef_quat) * active_quat) checked against
+    # SYNC_ANGULAR_DELTA_THRESHOLD every frame. Both the (now
+    # rotation-corrected) linear check AND the new angular check must pass
+    # for object_sync to hold, exactly mirroring RoboCasa's
+    # `linear_slip < GRASP_SLIP_LINEAR_THRESHOLD and angular_slip <
+    # GRASP_SLIP_ANGULAR_THRESHOLD`.
     fresh_grasp = object_grasped and (
         not state.get("prev_object_grasped_for_sync", False)
         or state.get("sync_baseline_object") != active
     )
     state["prev_object_grasped_for_sync"] = object_grasped
+    _sync_refs_available = (
+        active_pos is not None
+        and active_quat is not None
+        and eef_pos is not None
+        and eef_quat is not None
+    )
     if fresh_grasp:
         state["sync_baseline_object"] = active
-        state["sync_baseline_offset"] = (
-            (active_pos - eef_pos) if (active_pos is not None and eef_pos is not None) else None
-        )
+        if _sync_refs_available:
+            eef_quat_conj = _quat_conjugate(eef_quat)
+            state["sync_baseline_offset"] = _quat_rotate_vector(eef_quat_conj, active_pos - eef_pos)
+            state["sync_baseline_quat"] = _quat_multiply(eef_quat_conj, active_quat)
+        else:
+            state["sync_baseline_offset"] = None
+            state["sync_baseline_quat"] = None
         object_sync = True
     elif active is None:
         state["sync_baseline_object"] = None
         state["sync_baseline_offset"] = None
+        state["sync_baseline_quat"] = None
         object_sync = True
     else:
-        offset = (active_pos - eef_pos) if (active_pos is not None and eef_pos is not None) else None
         baseline_offset = state.get("sync_baseline_offset")
-        offset_delta = (
-            float(np.linalg.norm(offset - baseline_offset))
-            if (offset is not None and baseline_offset is not None) else 0.0
-        )
-        object_sync = bool(offset is None or offset_delta < SYNC_RELATIVE_DELTA_THRESHOLD)
-        state["sync_baseline_offset"] = offset if offset is not None else baseline_offset
+        baseline_quat = state.get("sync_baseline_quat")
+        if _sync_refs_available and baseline_offset is not None and baseline_quat is not None:
+            expected_pos = eef_pos + _quat_rotate_vector(eef_quat, baseline_offset)
+            linear_slip = float(np.linalg.norm(active_pos - expected_pos))
+            expected_quat = _quat_multiply(eef_quat, baseline_quat)
+            diff_quat = _quat_multiply(_quat_conjugate(expected_quat), active_quat)
+            angular_slip = _quat_angle(diff_quat)
+            object_sync = bool(
+                linear_slip < SYNC_RELATIVE_DELTA_THRESHOLD
+                and angular_slip < SYNC_ANGULAR_DELTA_THRESHOLD
+            )
+            # Refresh the reference to *this* frame's actual relative pose,
+            # regardless of whether slip exceeded threshold -- this is what
+            # makes the check per-frame rather than accumulated-since-onset
+            # (see the comment block above), same as RoboCasa's
+            # _object_grasp_slip.
+            eef_quat_conj = _quat_conjugate(eef_quat)
+            state["sync_baseline_offset"] = _quat_rotate_vector(eef_quat_conj, active_pos - eef_pos)
+            state["sync_baseline_quat"] = _quat_multiply(eef_quat_conj, active_quat)
+        else:
+            # No usable reference this frame (missing pose data, or no
+            # baseline seeded yet) -- "nothing to compare against" reads as
+            # in-sync, and the stale baseline (if any) is left untouched
+            # rather than clobbered with an unusable reading.
+            object_sync = True
 
     object_upright = _upright(active_quat)
 
