@@ -3847,11 +3847,37 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # same function, at the mechanism-safety section below -- a one-frame
     # lag is negligible given real fixture manipulation holds contact for
     # many consecutive frames, matching RoboCasa's own reasoning).
+    #
+    # fixture_is_opening_raw/fixture_is_closing_raw OR'd in (2026-09-21,
+    # KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_
+    # and_close_it ep3): confirmed via real frame data that this was NOT a
+    # one-frame-staleness/latch bug (the hypothesis this session started
+    # with) -- robot_fixture_contact_raw stayed False for the entire
+    # frames-190-224 drawer-opening interval, not just one transition
+    # frame, so no reordering of when it's computed would have helped.
+    # Root cause is this module's own documented, pre-existing v0
+    # imprecision (see this file's module docstring under "fixture-skill
+    # onset": "LIBERO's handle geoms frequently never register raw contact
+    # with the gripper during a real pull at all, even while the joint is
+    # visibly, continuously articulating") -- robot_fixture_contact is a
+    # pure contact-geom check and structurally misses drawer/handle
+    # interactions the same way it was already known to for the fixture-
+    # skill onsets (which is why those use proximity instead of contact).
+    # fixture_is_opening/closing are driven by joint open-fraction deltas,
+    # not contact geoms, so they don't share that gap; ORing them in here
+    # (also read one-frame-stale, same rationale as robot_fixture_contact_
+    # raw -- fixture articulation likewise holds for many consecutive
+    # frames) gives pick-onset suppression a working signal for exactly
+    # the slide/hinge-jointed-fixture interactions robot_fixture_contact
+    # alone misses, without touching robot_fixture_contact_raw itself
+    # (still needed for fixtures/contacts it does detect correctly).
     if (
         near
         and pick_approach_object is not None
         and fired_object is None
         and not bool(state.get("robot_fixture_contact_raw", False))
+        and not bool(state.get("fixture_is_opening_raw", False))
+        and not bool(state.get("fixture_is_closing_raw", False))
     ):
         fired_object = pick_approach_object
         any_pick_onset = True
@@ -4866,6 +4892,27 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # loop's own comment for why this must be last frame's value, not this
     # frame's live one).
     state["robot_fixture_contact_raw"] = robot_fixture_contact
+    # fixture_is_opening_raw/fixture_is_closing_raw (2026-09-21, KITCHEN_
+    # SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_
+    # close_it ep3 pick-onset false-positive): also stashed for the
+    # pick-onset suppression check above, alongside robot_fixture_contact_
+    # raw -- see that check's own comment for why this is necessary. Real
+    # frame data on this episode showed robot_fixture_contact stayed False
+    # for the ENTIRE drawer-opening interval (frames ~190-224) even though
+    # fixture_is_opening was True the whole time (frames 197-219) -- i.e.
+    # this was never a one-frame-staleness/latch problem, it's this
+    # module's own documented, pre-existing v0 imprecision (see this
+    # file's own module docstring, "Proximity, not raw geom contact, gates
+    # onset": "LIBERO's handle geoms frequently never register raw contact
+    # with the gripper during a real pull at all, even while the joint is
+    # visibly, continuously articulating"). robot_fixture_contact_raw alone
+    # is therefore not a reliable fixture-engagement signal for
+    # slide/hinge-jointed fixtures (drawers, cabinet/microwave doors) in
+    # this corpus -- fixture_is_opening/closing (driven by joint open-
+    # fraction deltas, not contact geoms) doesn't share that gap and is
+    # ORed in as a second, independent path to the same suppression.
+    state["fixture_is_opening_raw"] = fixture_is_opening
+    state["fixture_is_closing_raw"] = fixture_is_closing
     # Capture, once per fixture, which movable objects were already
     # touching it the first time it's observed as the mechanism-safety
     # focus (e.g. a bowl that starts the episode already resting inside
