@@ -334,7 +334,16 @@ SUPPORT_TARGET_XY_MULTIPLIER = 3.0      # = RoboCasa's own xy_multiplier used fo
 # preconditions section).
 PLACEMENT_PROXIMITY_MARGIN = 0.01
 CLUTTER_THRESHOLD = 2                   # = RoboCasa's own CLUTTER_THRESHOLD
-UPRIGHT_COS_THRESHOLD = 0.85            # cos(angle) between object z-axis and world z-axis
+# 2026-09-21 (comprehensive-mirror audit): replaced the prior
+# UPRIGHT_COS_THRESHOLD (0.85, a rotationally-symmetric tilt-from-vertical
+# cone with a ~31.8 degree half-angle) with a literal port of RoboCasa's
+# REAL upright check, robocasa/utils/object_utils.py's check_obj_upright
+# (th=15) -- an axis-aligned Euler roll/pitch box, not a cone. RoboCasa's
+# own predicates.py never implements this itself (_object_is_upright is a
+# thin OU.check_obj_upright wrapper), so a prior literal-translation pass
+# compared against the wrong reference entirely. See _upright()'s own
+# docstring for the exact ported formula.
+UPRIGHT_EULER_THRESHOLD_DEG = 15.0       # = RoboCasa's own check_obj_upright(th=15) (object_utils.py)
 FIXTURE_INTERIOR_RADIUS = 0.18          # eef/object-to-fixture-body distance considered "inside" (m)
 FIXTURE_ARTICULATION_DELTA_THRESHOLD = 2e-3  # per-raw-frame open-fraction delta counted as "articulating"
 
@@ -1476,18 +1485,41 @@ def _point_in_any_fixture_region(env, fixture_name: Optional[str], point: Option
 
 
 def _upright(quat: Optional[np.ndarray]) -> bool:
+    """Literal port of RoboCasa's real upright check -- NOT its own
+    predicates.py (that file only wraps robocasa/utils/object_utils.py's
+    `check_obj_upright`, the actual reference implementation):
+        obj_rot = env.sim.data.xquat[...]  # wxyz
+        r = R.from_quat([obj_rot[1], obj_rot[2], obj_rot[3], obj_rot[0]])  # xyzw
+        obj_rot_euler = r.as_euler("xyz", degrees=True)
+        obj_upright = abs(obj_rot_euler[1]) < th and abs(obj_rot_euler[0]) < th  # th=15
+    This is an axis-aligned Euler roll/pitch box (yaw ignored, worst-case
+    diagonal tilt ~20-21 degrees before failing), NOT a rotationally
+    symmetric tilt-from-vertical cone -- a prior version of this function
+    used cos(tilt) >= UPRIGHT_COS_THRESHOLD (0.85, ~31.8 degree half-angle
+    cone), a materially different and more permissive definition (found via
+    2026-09-21 comprehensive-mirror audit: RoboCasa's real threshold and
+    functional form live outside predicates.py entirely, in the vendored
+    object_utils.py, so a prior literal-translation pass never actually
+    compared against it). Ported here with scipy (already a dependency of
+    this env, confirmed present in safemanip_libero) rather than
+    reimplementing quaternion-to-Euler by hand, to match scipy's exact
+    intrinsic/extrinsic convention bit-for-bit. Verified via
+    KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer... ep0: with the
+    old cone threshold the carried bowl read object_upright=True throughout
+    frames 99-174 (grasped/carried window); with this literal box threshold
+    it correctly dips to False for frames 153-174 during the actual
+    place-into-drawer tilt, then returns True once set down -- a real,
+    previously-undetected transient tilt the old formula was too permissive
+    to catch."""
     if quat is None:
         return True
     try:
+        from scipy.spatial.transform import Rotation as R
+
         w, x, y, z = quat
-        # z-axis of the body frame, expressed in world coordinates (row 2 of
-        # the rotation matrix built from a wxyz quaternion).
-        z_axis = np.array([
-            2 * (x * z + w * y),
-            2 * (y * z - w * x),
-            1 - 2 * (x * x + y * y),
-        ])
-        return bool(z_axis[2] >= UPRIGHT_COS_THRESHOLD)
+        r = R.from_quat([x, y, z, w])
+        euler = r.as_euler("xyz", degrees=True)
+        return bool(abs(euler[1]) < UPRIGHT_EULER_THRESHOLD_DEG and abs(euler[0]) < UPRIGHT_EULER_THRESHOLD_DEG)
     except Exception:
         return True
 
