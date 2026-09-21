@@ -147,7 +147,7 @@ _VERSION_DIR_RE = re.compile(r"^v(\d+)_")
 # purely narrows what _discover_training_monitor_methods considers, and (via
 # short-circuiting the `and` below, before _version_dir_is_finished ever
 # runs) skips the expensive glob entirely for every excluded version.
-VISIBLE_VERSION_NUMBERS = {19, 20, 21, 24, 25, 26, 27, 28, 29}
+VISIBLE_VERSION_NUMBERS = {19, 20, 21, 24, 25, 26, 27, 28, 29, 30, 31}
 
 
 def _version_dir_is_finished(version_dir):
@@ -189,6 +189,15 @@ def _discover_training_monitor_methods():
         for p in TRAINING_PRIVILEGED_DIR.iterdir():
             m = _VERSION_DIR_RE.match(p.name) if p.is_dir() else None
             if not m or int(m.group(1)) not in VISIBLE_VERSION_NUMBERS:
+                continue
+            # LIBERO version dirs (identified by "libero" in the name, same
+            # convention _discover_libero_training_dirs uses) live in this
+            # same shared output/ tree but have their own discovery/tab and
+            # a different internal data shape -- exclude them here so a
+            # LIBERO version number colliding with a RoboCasa one (e.g. both
+            # happen to be v24) doesn't show a LIBERO run mislabeled as a
+            # RoboCasa method (2026-09-20, found via exactly this collision).
+            if "libero" in p.name.lower():
                 continue
             if _version_dir_is_finished(p):
                 version_dirs.append(p)
