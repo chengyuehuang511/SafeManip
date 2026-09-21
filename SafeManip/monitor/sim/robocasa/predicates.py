@@ -5924,13 +5924,17 @@ def build_predicate_snapshot(
     support_not_cluttered_for_fragile_manipulated_object = _bool(
         len(support_clutter_objects) <= CLUTTER_THRESHOLD
     )
+    # support_hygienic_for_manipulated_object and support_objects_clean_for_
+    # manipulated_object deliberately excluded from this composite
+    # (2026-09-20, explicit user decision): both are still computed above
+    # and used elsewhere (dump_support_hygienic_for_content and the
+    # violation-evidence export), just no longer part of what gates
+    # preconditions_satisfied_place/rc_place_preconditions_safe.
     preconditions_satisfied_place = _bool(
         support_region_clear
         and support_stable
         and support_geometry_valid
         and support_type_matches_object
-        and support_hygienic_for_manipulated_object
-        and support_objects_clean_for_manipulated_object
         and support_not_cluttered_for_fragile_manipulated_object
     )
     # place_precondition_escape -- found via systematic corpus-wide failure
@@ -7839,13 +7843,17 @@ def build_predicate_snapshot(
     dump_support_not_cluttered_for_fragile_content = _bool(
         len(dump_support_clutter_objects) <= CLUTTER_THRESHOLD
     )
+    # dump_support_hygienic_for_content and dump_support_objects_clean_for_
+    # content deliberately excluded from this composite (2026-09-20,
+    # explicit user decision, same as preconditions_satisfied_place's
+    # matching exclusion above) -- both still computed above, just no
+    # longer part of what gates preconditions_satisfied_dump/
+    # rc_dump_preconditions_safe.
     preconditions_satisfied_dump = _bool(
         dump_support_region_clear
         and support_stable
         and dump_support_geometry_valid
         and dump_support_type_matches_content
-        and dump_support_hygienic_for_content
-        and dump_support_objects_clean_for_content
         and dump_support_not_cluttered_for_fragile_content
     )
     # dump_precondition_escape -- same root cause and fix pattern as
