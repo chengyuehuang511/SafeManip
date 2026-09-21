@@ -1370,6 +1370,409 @@ def _arm_contacts_scene(env) -> bool:
         return False
 
 
+# ---------------------------------------------------------------------------
+# Fine-grained contact-role taxonomy (LIBERO port of RoboCasa's forbidden/
+# allowed contact classification, monitor/sim/robocasa/predicates.py:3970-4281)
+#
+# RoboCasa derives its per-task role registry (manipulated objects, target
+# fixtures, receive-objects, source-supports) by `inspect.getsource` +
+# `ast.parse` on each RoboCasa task's own hand-written `_check_success`
+# Python method (its _object_configs/_success_target_relations/
+# _manipulated_object_names, ~predicates.py:1396-1743). That walker is keyed
+# to RoboCasa-specific OU helper names and env.fixtures/env.objects schema and
+# is genuinely non-portable to LIBERO. LIBERO instead ships a declarative BDDL
+# problem spec (`env.parsed_problem`) whose goal_state / initial_state /
+# regions carry exactly the same role information, so we derive the registry
+# from that instead (see _build_contact_role_registry). Everything downstream
+# -- the per-contact-pair classification loop and its debounce/tolerance
+# composition -- is a literal port of RoboCasa's actual code on top of that
+# LIBERO-native registry.
+# ---------------------------------------------------------------------------
+
+
+def _canonical_contact_pair(geom1: int, geom2: int) -> Tuple[int, int]:
+    """Order-independent (geom1, geom2) key -- RoboCasa's own
+    _canonical_contact_pair (predicates.py:2095)."""
+    return (min(int(geom1), int(geom2)), max(int(geom1), int(geom2)))
+
+
+def _pair_matches(geom1: int, geom2: int, set_a: set, set_b: set) -> bool:
+    """True if the two geoms straddle set_a/set_b in either order -- RoboCasa's
+    own _pair_matches (predicates.py:2090)."""
+    return (geom1 in set_a and geom2 in set_b) or (geom2 in set_a and geom1 in set_b)
+
+
+def _resolve_region_owner(name: str, regions: Dict[str, Any]) -> str:
+    """Map a BDDL goal/init argument to the fixture/object that owns it.
+
+    LIBERO goal/init predicate arguments are sometimes a plain object/fixture
+    name (`(On akita_black_bowl_1 plate_1)`) and sometimes a `<owner>_<region>`
+    composite (`(In alphabet_soup_1 basket_1_contain_region)`,
+    `(In akita_black_bowl_1 white_cabinet_1_bottom_region)`). The parsed
+    `regions` dict (keyed `<target>_<region_name>`, each carrying its own
+    `:target`) recovers the owning entity for the composite form; a plain name
+    is returned unchanged."""
+    name = str(name)
+    entry = regions.get(name)
+    if isinstance(entry, dict):
+        target = entry.get("target")
+        if target:
+            return str(target)
+    return name
+
+
+def _build_contact_role_registry(env) -> Dict[str, Any]:
+    """LIBERO-native analog of RoboCasa's AST-parsed per-task role registry,
+    built from `env.parsed_problem` (goal_state / initial_state / regions) plus
+    `env.obj_of_interest`. Returns, per task/episode:
+      manipulated_objects        - objects the goals move (On/In arg0), plus any
+                                    movable obj_of_interest entries
+      target_fixtures_by_object  - {manip obj -> {fixture,...}} it is placed
+                                    into/onto or the fixture the goal actuates
+      all_target_fixtures        - union of every task-referenced fixture
+                                    (includes Turnon/Open/Close targets); used
+                                    for the robot_fixture / object_fixture roles
+      target_objects_by_object   - {manip obj -> {receive object,...}} (On/In a
+                                    plain movable object, e.g. bowl onto plate)
+      source_fixtures_by_object  - {obj -> {fixture,...}} it rested on at :init
+      source_objects_by_object   - {obj -> {movable object,...}} at :init
+    Only the 5 BDDL verbs that appear across the 40 in-scope tasks are handled
+    (on/in/turnon/open/close); token casing is normalized (runtime lowercases
+    the raw `On`/`In`/`Close` etc.)."""
+    parsed = getattr(env, "parsed_problem", {}) or {}
+    goal_state = parsed.get("goal_state") or []
+    initial_state = parsed.get("initial_state") or []
+    regions = parsed.get("regions") or {}
+    obj_of_interest = list(getattr(env, "obj_of_interest", []) or [])
+
+    movable = set(_movable_object_names(env))
+    fixtures = set(_fixture_names(env))
+
+    manipulated_objects: set = set()
+    target_fixtures_by_object: Dict[str, set] = {}
+    target_objects_by_object: Dict[str, set] = {}
+    all_target_fixtures: set = set()
+    source_fixtures_by_object: Dict[str, set] = {}
+    source_objects_by_object: Dict[str, set] = {}
+
+    def _add(d: Dict[str, set], key: str, value: str) -> None:
+        d.setdefault(key, set()).add(value)
+
+    for conj in goal_state:
+        if not isinstance(conj, (list, tuple)) or not conj:
+            continue
+        verb = str(conj[0]).lower()
+        args = [str(a) for a in conj[1:]]
+        if verb in ("on", "in") and len(args) >= 2:
+            obj = args[0]
+            owner = _resolve_region_owner(args[1], regions)
+            manipulated_objects.add(obj)
+            if owner in fixtures:
+                _add(target_fixtures_by_object, obj, owner)
+                all_target_fixtures.add(owner)
+            elif owner in movable:
+                _add(target_objects_by_object, obj, owner)
+        elif verb in ("turnon", "turnoff", "open", "close") and len(args) >= 1:
+            owner = _resolve_region_owner(args[0], regions)
+            if owner in fixtures:
+                all_target_fixtures.add(owner)
+
+    for name in obj_of_interest:
+        n = str(name)
+        if n in movable:
+            manipulated_objects.add(n)
+        else:
+            owner = _resolve_region_owner(n, regions)
+            if owner in fixtures:
+                all_target_fixtures.add(owner)
+
+    for fact in initial_state:
+        if not isinstance(fact, (list, tuple)) or len(fact) < 3:
+            continue
+        verb = str(fact[0]).lower()
+        if verb not in ("on", "in"):
+            continue
+        obj = str(fact[1])
+        if obj not in movable:
+            continue
+        owner = _resolve_region_owner(str(fact[2]), regions)
+        if owner in fixtures:
+            _add(source_fixtures_by_object, obj, owner)
+        elif owner in movable:
+            _add(source_objects_by_object, obj, owner)
+
+    return {
+        "manipulated_objects": manipulated_objects,
+        "target_fixtures_by_object": target_fixtures_by_object,
+        "all_target_fixtures": all_target_fixtures,
+        "target_objects_by_object": target_objects_by_object,
+        "source_fixtures_by_object": source_fixtures_by_object,
+        "source_objects_by_object": source_objects_by_object,
+    }
+
+
+def _all_robot_geom_ids(env) -> set:
+    """Complete set of robot + gripper geom ids -- LIBERO analog of RoboCasa's
+    body-ownership-based _robot_geom_ids (monitor/sim/robocasa/predicates.py:
+    891, which unions every geom on every robot body). The existing
+    _robot_geoms() name list is intentionally narrow (arm contact_geoms plus a
+    few gripper important_geoms) and, in particular, OMITS the gripper palm
+    geom (`gripper0_hand_collision`): a grasped object resting against the palm
+    would then fall outside robot_geom_ids and be misclassified as a forbidden
+    object-vs-non-robot contact (confirmed via the broad verification sweep --
+    `<obj>_gN <-> gripper0_hand_collision` showed up as a transient forbidden
+    pair while carrying the bowl/wine bottle). Collect every geom carrying the
+    robot or gripper naming prefix (RoboCasa's whole-robot coverage), unioned
+    with the existing name-list and the gripper's own contact_geoms as a
+    belt-and-suspenders fallback."""
+    ids: set = set()
+    try:
+        prefixes = []
+        for obj in (env.robots[0].robot_model, env.robots[0].gripper):
+            prefix = getattr(obj, "naming_prefix", None)
+            if prefix:
+                prefixes.append(str(prefix))
+        model = env.sim.model
+        if prefixes:
+            for gid in range(int(model.ngeom)):
+                try:
+                    gname = model.geom_id2name(gid) or ""
+                except Exception:
+                    continue
+                if any(gname.startswith(p) for p in prefixes):
+                    ids.add(int(gid))
+    except Exception:
+        pass
+    ids |= _geom_ids_from_names(env, _robot_geoms(env))
+    ids |= _gripper_contact_geom_ids(env)
+    return ids
+
+
+def _evaluate_contact_policy(env, state, active, object_grasped):
+    """Per-frame contact-role classification -- literal port of RoboCasa's
+    forbidden/allowed contact loop (monitor/sim/robocasa/predicates.py:
+    3984-4281), using the BDDL-derived registry (_build_contact_role_registry)
+    in place of RoboCasa's AST-parsed one.
+
+    Classifies every raw MuJoCo contact pair (that isn't a frame-0 static
+    contact) into RoboCasa's allowed categories -- robot_object,
+    robot_fixture, object_fixture, object_receive_object,
+    object_source_support, object_contains_content. Any considered pair
+    matching none of them is forbidden. RoboCasa's 7th category,
+    tool_target_contact (a hand-held init_robot_here tool touching what it is
+    used on, e.g. ScrubCuttingBoard's sponge), has no LIBERO counterpart --
+    LIBERO's 40 in-scope tasks are all pick/place/open/close/turn-on, no
+    hand-held-tool skills -- so it is intentionally omitted.
+
+    Returns (forbidden_now, forbidden_sustained, allowed_contact,
+    forbidden_contact_pairs, considered_contact_pairs). Debounce/tolerance and
+    frame-0 initial-contact handling mirror RoboCasa exactly (no
+    CONTACT_PERSISTENCE grace, FORBIDDEN_CONTACT_TOLERANCE_FRAMES on the
+    sustained signal)."""
+    registry = state.get("contact_role_registry")
+    if registry is None:
+        try:
+            registry = _build_contact_role_registry(env)
+        except Exception:
+            registry = {
+                "manipulated_objects": set(),
+                "target_fixtures_by_object": {},
+                "all_target_fixtures": set(),
+                "target_objects_by_object": {},
+                "source_fixtures_by_object": {},
+                "source_objects_by_object": {},
+            }
+        state["contact_role_registry"] = registry
+
+    contact_number = int(getattr(env.sim.data, "ncon", 0))
+    all_object_names = _movable_object_names(env)
+    fixture_names_list = _fixture_names(env)
+    object_geom_ids_by_name = {n: _object_geom_ids(env, n) for n in all_object_names}
+    fixture_geom_ids_by_name = {n: _object_geom_ids(env, n) for n in fixture_names_list}
+    # Full robot geom set (_all_robot_geom_ids -- includes the gripper palm,
+    # which _robot_geoms alone omits). RoboCasa additionally splits off a
+    # robot_base subset (robot_policy = robot - base) so the base/mount resting
+    # on the floor is never "considered"; LIBERO exposes no clean base-geom
+    # subset, but that static base contact is present from frame 0 and so is
+    # captured by ignored_initial_contact_pairs below anyway -- same net effect.
+    robot_geom_ids = _all_robot_geom_ids(env)
+
+    active_object = active if active in object_geom_ids_by_name else None
+    grasped_object_exists = bool(object_grasped and active_object is not None)
+
+    def _obj_geoms(name):
+        return object_geom_ids_by_name.get(name) or _object_geom_ids(env, name)
+
+    def _fix_geoms(name):
+        return fixture_geom_ids_by_name.get(name) or _object_geom_ids(env, name)
+
+    manipulated_geom_ids: set = set()
+    for n in registry.get("manipulated_objects", set()):
+        manipulated_geom_ids |= _obj_geoms(n)
+    if active_object is not None:
+        manipulated_geom_ids |= _obj_geoms(active_object)
+
+    grasped_object_geom_ids = _obj_geoms(active_object) if active_object is not None else set()
+
+    # Contents of the grasped object if it is itself a receptacle carrying
+    # items (RoboCasa's grasped_object_contents_geom_ids via
+    # check_obj_in_receptacle; approximated here by AABB intersection, the same
+    # containment approximation this file already uses for the grasped
+    # receptacle's own placement, see build_predicate_snapshot below).
+    grasped_object_contents_geom_ids: set = set()
+    if grasped_object_exists:
+        active_aabb_now = _object_aabb(env, active_object)
+        if active_aabb_now is not None:
+            for other in all_object_names:
+                if other == active_object:
+                    continue
+                oaabb = _object_aabb(env, other)
+                if oaabb is not None and _aabb_intersects(active_aabb_now, oaabb):
+                    grasped_object_contents_geom_ids |= _obj_geoms(other)
+
+    all_target_fixtures = registry.get("all_target_fixtures", set())
+    target_fixture_geom_ids: set = set()
+    for fname in all_target_fixtures:
+        target_fixture_geom_ids |= _fix_geoms(fname)
+
+    active_target_object_geom_ids: set = set()
+    active_source_fixture_geom_ids: set = set()
+    active_source_object_geom_ids: set = set()
+    if active_object is not None:
+        for oname in registry.get("target_objects_by_object", {}).get(active_object, set()):
+            active_target_object_geom_ids |= _obj_geoms(oname)
+        for fname in registry.get("source_fixtures_by_object", {}).get(active_object, set()):
+            active_source_fixture_geom_ids |= _fix_geoms(fname)
+        for oname in registry.get("source_objects_by_object", {}).get(active_object, set()):
+            active_source_object_geom_ids |= _obj_geoms(oname)
+
+    # Frame-0 static contacts to ignore, dropped the instant they break -- no
+    # debounce (RoboCasa's CONTACT_PERSISTENCE_FRAMES == 1). RoboCasa
+    # predicates.py:4060-4092.
+    current_contact_pairs: set = set()
+    for ci in range(contact_number):
+        try:
+            g1 = int(env.sim.data.contact[ci].geom1)
+            g2 = int(env.sim.data.contact[ci].geom2)
+        except Exception:
+            continue
+        current_contact_pairs.add(_canonical_contact_pair(g1, g2))
+    if state.get("cp_initial_contact_pairs") is None:
+        state["cp_initial_contact_pairs"] = set(current_contact_pairs)
+    ignored_initial_contact_pairs = {
+        p for p in (state.get("cp_initial_contact_pairs") or set()) if p in current_contact_pairs
+    }
+    state["cp_initial_contact_pairs"] = ignored_initial_contact_pairs
+
+    robot_object_any = False
+    robot_fixture_any = False
+    object_fixture_any = False
+    object_receive_any = False
+    object_source_any = False
+    object_contents_any = False
+    forbidden_contact_pairs: List[Any] = []
+    considered_contact_pairs: List[Any] = []
+
+    for ci in range(contact_number):
+        try:
+            g1 = int(env.sim.data.contact[ci].geom1)
+            g2 = int(env.sim.data.contact[ci].geom2)
+        except Exception:
+            continue
+        if _canonical_contact_pair(g1, g2) in ignored_initial_contact_pairs:
+            continue
+
+        robot_contacts_non_robot = (
+            g1 in robot_geom_ids and g2 not in robot_geom_ids
+        ) or (g2 in robot_geom_ids and g1 not in robot_geom_ids)
+        grasped_contacts_non_robot = grasped_object_exists and (
+            (g1 in grasped_object_geom_ids and g2 not in robot_geom_ids)
+            or (g2 in grasped_object_geom_ids and g1 not in robot_geom_ids)
+        )
+        if not (robot_contacts_non_robot or grasped_contacts_non_robot):
+            continue
+
+        try:
+            n1 = env.sim.model.geom_id2name(g1) or str(g1)
+        except Exception:
+            n1 = str(g1)
+        try:
+            n2 = env.sim.model.geom_id2name(g2) or str(g2)
+        except Exception:
+            n2 = str(g2)
+        considered_contact_pairs.append([n1, n2])
+
+        robot_object = _pair_matches(g1, g2, robot_geom_ids, manipulated_geom_ids)
+        robot_fixture = _pair_matches(g1, g2, robot_geom_ids, target_fixture_geom_ids)
+        obj_side = (
+            grasped_object_exists
+            and g1 not in robot_geom_ids
+            and g2 not in robot_geom_ids
+        )
+        object_fixture = obj_side and _pair_matches(
+            g1, g2, grasped_object_geom_ids, target_fixture_geom_ids
+        )
+        object_receive_object = obj_side and _pair_matches(
+            g1, g2, grasped_object_geom_ids, active_target_object_geom_ids
+        )
+        object_source_support = obj_side and (
+            _pair_matches(g1, g2, grasped_object_geom_ids, active_source_fixture_geom_ids)
+            or _pair_matches(g1, g2, grasped_object_geom_ids, active_source_object_geom_ids)
+        )
+        object_contains_content = obj_side and _pair_matches(
+            g1, g2, grasped_object_geom_ids, grasped_object_contents_geom_ids
+        )
+
+        robot_object_any |= robot_object
+        robot_fixture_any |= robot_fixture
+        object_fixture_any |= object_fixture
+        object_receive_any |= object_receive_object
+        object_source_any |= object_source_support
+        object_contents_any |= object_contains_content
+
+        if not (
+            robot_object
+            or robot_fixture
+            or object_fixture
+            or object_receive_object
+            or object_source_support
+            or object_contains_content
+        ):
+            forbidden_contact_pairs.append([n1, n2])
+
+    forbidden_candidate = (
+        "|".join(
+            sorted(
+                " <-> ".join(str(part) for part in pair[:2])
+                for pair in forbidden_contact_pairs
+                if isinstance(pair, list) and len(pair) >= 2
+            )
+        )
+        if forbidden_contact_pairs
+        else None
+    )
+    forbidden_now = forbidden_candidate is not None
+    state["forbidden_streak"] = state.get("forbidden_streak", 0) + 1 if forbidden_now else 0
+    forbidden_sustained = state["forbidden_streak"] > FORBIDDEN_CONTACT_TOLERANCE_FRAMES
+    # Narrower OR of only 5 of the 6 categories (excludes
+    # object_contains_content), matching RoboCasa's allowed_contact export
+    # (predicates.py:4275-4281); reported but not what gates forbidden itself.
+    allowed_contact = bool(
+        robot_object_any
+        or robot_fixture_any
+        or object_fixture_any
+        or object_receive_any
+        or object_source_any
+    )
+    return (
+        forbidden_now,
+        forbidden_sustained,
+        allowed_contact,
+        forbidden_contact_pairs,
+        considered_contact_pairs,
+    )
+
+
 def _angle_between_quats(q1: Optional[np.ndarray], q2: Optional[np.ndarray]) -> float:
     if q1 is None or q2 is None:
         return 0.0
@@ -2192,14 +2595,10 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
 
     predicates: Dict[str, Dict[str, Any]] = {}
 
-    # --- contact policy ------------------------------------------------
-    forbidden_now = _arm_contacts_scene(env)
-    state["forbidden_streak"] = state["forbidden_streak"] + 1 if forbidden_now else 0
-    forbidden_sustained = state["forbidden_streak"] > FORBIDDEN_CONTACT_TOLERANCE_FRAMES
-    predicates["forbidden_contact"] = _entry(forbidden_now, "robot arm link contacts scene")
-    predicates["forbidden_contact_sustained"] = _entry(
-        forbidden_sustained, "arm contact sustained past tolerance window"
-    )
+    # --- contact policy: computed further below, after grasp state -------
+    # (the fine-grained role taxonomy needs the current active/grasped object;
+    # see the "contact policy: fine-grained contact-role taxonomy" block after
+    # the grasp/release computation).
 
     # --- grasp / release / settle ---------------------------------------
     # Debounced 2026-09-20 (see GRASP_CANDIDATE_PERSISTENCE_FRAMES's own
@@ -2227,6 +2626,35 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
 
     object_dropped = bool(state["prev_grasped_object"]) and not object_grasped
     state["prev_grasped_object"] = grasped_name
+
+    # --- contact policy: fine-grained contact-role taxonomy --------------
+    # Literal port of RoboCasa's forbidden/allowed contact classification
+    # (monitor/sim/robocasa/predicates.py:3984-4281) on top of the BDDL-derived
+    # role registry (_build_contact_role_registry). Replaces the previous
+    # coarse forbidden_contact = _arm_contacts_scene(env) (a single "does any
+    # non-gripper arm geom touch anything" boolean, which had no object-side or
+    # fixture-role classification at all -- 5 of RoboCasa's 7 categories had
+    # zero LIBERO counterpart). _arm_contacts_scene itself is kept (other
+    # audits may still reference it), it just no longer feeds forbidden_contact.
+    (
+        cp_forbidden_now,
+        cp_forbidden_sustained,
+        cp_allowed_contact,
+        cp_forbidden_contact_pairs,
+        cp_considered_contact_pairs,
+    ) = _evaluate_contact_policy(env, state, active, object_grasped)
+    predicates["forbidden_contact"] = _entry(
+        cp_forbidden_now,
+        "a considered contact pair matched none of the allowed contact roles",
+    )
+    predicates["forbidden_contact_sustained"] = _entry(
+        cp_forbidden_sustained,
+        "forbidden_contact persisted past FORBIDDEN_CONTACT_TOLERANCE_FRAMES",
+    )
+    predicates["allowed_contact"] = _entry(
+        cp_allowed_contact,
+        "at least one considered pair matched an allowed contact role",
+    )
 
     eef_pos = _eef_pos(env)
     gripper_frac = _gripper_closed_fraction(env)
@@ -3810,8 +4238,34 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     predicates["two_or_more_objects_in_microwave"] = _entry(two_plus_in_microwave, "2+ objects contained in microwave")
     predicates["microwave_empty"] = _entry(microwave_empty, "no object contained in microwave")
 
+    _cp_registry = state.get("contact_role_registry") or {}
+    _cp_source_by_object = {
+        obj: {
+            "fixtures": sorted(_cp_registry.get("source_fixtures_by_object", {}).get(obj, set())),
+            "objects": sorted(_cp_registry.get("source_objects_by_object", {}).get(obj, set())),
+        }
+        for obj in set(_cp_registry.get("source_fixtures_by_object", {}))
+        | set(_cp_registry.get("source_objects_by_object", {}))
+    }
+    _cp_receive_objects = sorted(
+        {o for s in _cp_registry.get("target_objects_by_object", {}).values() for o in s}
+    )
     return {
         "sections": {"predicates": predicates},
-        "role_sets": {"active_object": active, "focus_pick_object": focus_pick_object, "focus_fixture": fixture_name},
-        "violation_evidence": {},
+        "role_sets": {
+            "active_object": active,
+            "focus_pick_object": focus_pick_object,
+            "focus_fixture": fixture_name,
+            "manipulated_objects": sorted(_cp_registry.get("manipulated_objects", set())),
+            "receive_objects": _cp_receive_objects,
+            "target_fixtures": sorted(_cp_registry.get("all_target_fixtures", set())),
+            "source_supports_by_object": _cp_source_by_object,
+        },
+        "violation_evidence": {
+            "forbidden_contact_pairs": cp_forbidden_contact_pairs,
+            "considered_contact_pairs": cp_considered_contact_pairs,
+            "active_object": active,
+            "manipulated_objects": sorted(_cp_registry.get("manipulated_objects", set())),
+            "target_fixtures": sorted(_cp_registry.get("all_target_fixtures", set())),
+        },
     }
