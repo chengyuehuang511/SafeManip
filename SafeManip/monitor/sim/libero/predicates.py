@@ -1010,9 +1010,206 @@ def _gripper_object_geom_min_distance(env, name: str, distmax: float) -> Optiona
     return best
 
 
-def _geom_aabb(env, geom_id: int) -> Optional[Tuple[np.ndarray, np.ndarray]]:
-    """World-frame axis-aligned bounding box for one geom -- ported verbatim
-    from RoboCasa's own _geom_aabb (predicates.py)."""
+# ---------------------------------------------------------------------------
+# True-OBB geometry core (2026-09-21, mirrors RoboCasa's own 2026-09-18
+# "true-OBB rewrite" -- monitor/output/v27_2026-09-18_claude_branch_obb_
+# rewrite_grace_scoping_spot_contamination_fixture_fixes/ -- ported into
+# LIBERO for gripper/robot/object/fixture geometry uniformly, per explicit
+# user direction, since a real corpus-wide scan of this file's own v36
+# baseline (400 episodes) confirmed genuinely non-axis-aligned object
+# rotation is common here (bowls/bottles/moka-pots tipped/rotated well past
+# 90-degree-multiple orientations during real pick/place sequences, e.g.
+# put_the_wine_bottle_on_the_rack, open_the_top_drawer_and_put_the_bowl_
+# inside, KITCHEN_SCENE8_put_both_moka_pots_on_the_stove), not merely a
+# hypothetical edge case -- so the same rotation-inflation artifact
+# RoboCasa's rewrite fixed (a rotated box's world-frame min/max envelope
+# growing past its own true extent, confirmed there via ArrangeBreadBasket's
+# container-Z-flip bug) is a live risk here too.
+#
+# Representation: OBB = (center, axes, half_extents), identical convention
+# to RoboCasa's own (see that file's module docstring): center is (3,)
+# world position, axes is (3,3) whose COLUMNS are the box's own unit local
+# X/Y/Z axes in world coordinates (same convention as MuJoCo's geom_xmat/
+# body_xmat: world_point = center + axes @ local_point), half_extents is
+# (3,) half-widths along those local axes. A plain axis-aligned box (no
+# single coherent rotation, e.g. _gripper_link_aabb's multi-body point
+# cloud) is represented as axes=identity, handled by the same math with no
+# branching needed.
+#
+# Every previously-plain-(lower, upper)-tuple-returning helper below
+# (_geom_aabb, _geom_ids_aabb, _object_aabb, _gripper_aabb, and every
+# _aabb_*/_union_aabb/_translate_aabb/_expanded_aabb wrapper) now builds/
+# consumes this OBB representation instead. Callers throughout the rest of
+# this file are unaffected: every one of them goes through these named
+# wrapper functions (never destructures an aabb as a raw (lower, upper)
+# pair directly -- the 3 call sites that used to were also updated, see
+# _infer_landing_target's `_consider`, _entity_footprint_radius,
+# _contact_patch_radius_from_geom, all now reading _obb_world_envelope(...)
+# explicitly where a plain world-frame envelope is genuinely what's
+# needed).
+def _obb_make(center: np.ndarray, axes: np.ndarray, half_extents: np.ndarray):
+    return (
+        np.asarray(center, dtype=float).reshape(3),
+        np.asarray(axes, dtype=float).reshape(3, 3),
+        np.asarray(half_extents, dtype=float).reshape(3),
+    )
+
+
+def _obb_from_minmax(lower: np.ndarray, upper: np.ndarray):
+    lower = np.asarray(lower, dtype=float).reshape(3)
+    upper = np.asarray(upper, dtype=float).reshape(3)
+    return _obb_make((lower + upper) / 2.0, np.eye(3), (upper - lower) / 2.0)
+
+
+def _obb_corners(obb) -> np.ndarray:
+    center, axes, half = obb
+    corners = []
+    for sx in (-1.0, 1.0):
+        for sy in (-1.0, 1.0):
+            for sz in (-1.0, 1.0):
+                local = np.array([sx * half[0], sy * half[1], sz * half[2]])
+                corners.append(center + axes @ local)
+    return np.asarray(corners, dtype=float)
+
+
+def _obb_world_envelope(obb) -> Tuple[np.ndarray, np.ndarray]:
+    """World-frame axis-aligned envelope of an OBB -- used only where a
+    caller genuinely needs a plain world-frame min/max box (a swept-path
+    corridor spanning two different poses, or a scalar footprint-radius
+    estimate), not as a general substitute for OBB-aware math elsewhere."""
+    corners = _obb_corners(obb)
+    return np.min(corners, axis=0), np.max(corners, axis=0)
+
+
+def _obb_union(a, b):
+    lower_a, upper_a = _obb_world_envelope(a)
+    lower_b, upper_b = _obb_world_envelope(b)
+    return _obb_from_minmax(np.minimum(lower_a, lower_b), np.maximum(upper_a, upper_b))
+
+
+def _obb_translate(obb, delta: np.ndarray):
+    center, axes, half = obb
+    return _obb_make(center + np.asarray(delta, dtype=float).reshape(3), axes, half)
+
+
+def _obb_sat_intersects(a, b) -> Tuple[bool, float]:
+    """Standard 15-axis oriented-bounding-box separating-axis test -- ported
+    verbatim from RoboCasa's own _obb_sat_intersects (predicates.py; see
+    that function's own docstring for the SAT references). Returns
+    (intersects, penetration_depth)."""
+    a_c, a_ax, a_h = a
+    b_c, b_ax, b_h = b
+    t = b_c - a_c
+    R = a_ax.T @ b_ax
+    t_a = a_ax.T @ t
+    abs_r = np.abs(R) + 1e-9
+
+    best_slack = None
+
+    def _check(ra: float, rb: float, proj: float) -> bool:
+        nonlocal best_slack
+        slack = (ra + rb) - abs(proj)
+        if slack < 0.0:
+            return False
+        if best_slack is None or slack < best_slack:
+            best_slack = slack
+        return True
+
+    for i in range(3):
+        ra = float(a_h[i])
+        rb = float(b_h @ abs_r[i, :])
+        if not _check(ra, rb, float(t_a[i])):
+            return False, 0.0
+    for j in range(3):
+        ra = float(a_h @ abs_r[:, j])
+        rb = float(b_h[j])
+        proj = float(t_a @ R[:, j])
+        if not _check(ra, rb, proj):
+            return False, 0.0
+    for i in range(3):
+        i1, i2 = (i + 1) % 3, (i + 2) % 3
+        for j in range(3):
+            j1, j2 = (j + 1) % 3, (j + 2) % 3
+            ra = float(a_h[i1] * abs_r[i2, j] + a_h[i2] * abs_r[i1, j])
+            rb = float(b_h[j1] * abs_r[i, j2] + b_h[j2] * abs_r[i, j1])
+            proj = float(t_a[i2] * R[i1, j] - t_a[i1] * R[i2, j])
+            if not _check(ra, rb, proj):
+                return False, 0.0
+    return True, float(best_slack if best_slack is not None else 0.0)
+
+
+def _obb_intersects(a, b) -> bool:
+    intersects, _ = _obb_sat_intersects(a, b)
+    return intersects
+
+
+def _obb_overlap_depth(a, b) -> float:
+    _, depth = _obb_sat_intersects(a, b)
+    return depth
+
+
+def _obb_point_closest(obb, point: np.ndarray) -> np.ndarray:
+    center, axes, half = obb
+    point = np.asarray(point, dtype=float).reshape(3)
+    local = axes.T @ (point - center)
+    clamped = np.clip(local, -half, half)
+    return center + axes @ clamped
+
+
+def _obb_point_distance(obb, point: np.ndarray) -> float:
+    return float(np.linalg.norm(np.asarray(point, dtype=float).reshape(3) - _obb_point_closest(obb, point)))
+
+
+def _obb_distance(a, b) -> float:
+    """Approximate (not exact) closest distance between two OBBs when they
+    don't intersect -- ported verbatim from RoboCasa's own _obb_distance
+    (see that function's own docstring: exact for vertex/face-closest
+    cases, an approximation only in the rarer edge-edge-closest case)."""
+    if _obb_intersects(a, b):
+        return 0.0
+    a_corners = _obb_corners(a)
+    b_corners = _obb_corners(b)
+    d1 = min(_obb_point_distance(b, c) for c in a_corners)
+    d2 = min(_obb_point_distance(a, c) for c in b_corners)
+    return float(min(d1, d2))
+
+
+def _obb_xy_distance(a, b) -> float:
+    a_lower, a_upper = _obb_world_envelope(a)
+    b_lower, b_upper = _obb_world_envelope(b)
+    gap = np.maximum(0.0, np.maximum(b_lower[:2] - a_upper[:2], a_lower[:2] - b_upper[:2]))
+    return float(np.linalg.norm(gap))
+
+
+def _obb_point_xy_distance(point: np.ndarray, obb) -> float:
+    # Uses the box's true world-frame axis-aligned envelope (not a
+    # local-XY clamp) -- see RoboCasa's own _obb_point_xy_distance docstring
+    # (predicates.py, 2026-09-18) for why clamping the query point's LOCAL
+    # X/Y while comparing only WORLD X/Y silently breaks for a tipped-over
+    # object whose local Z axis isn't aligned with world Z.
+    lower, upper = _obb_world_envelope(obb)
+    point = np.asarray(point, dtype=float).reshape(3)
+    clamped_xy = np.clip(point[:2], lower[:2], upper[:2])
+    return float(np.linalg.norm(point[:2] - clamped_xy))
+
+
+def _obb_closest_point_on_top_face(point: np.ndarray, obb) -> np.ndarray:
+    center, axes, half = obb
+    point = np.asarray(point, dtype=float).reshape(3)
+    local = axes.T @ (point - center)
+    clamped_xy = np.clip(local[:2], -half[:2], half[:2])
+    local_top = np.array([clamped_xy[0], clamped_xy[1], half[2]])
+    return center + axes @ local_top
+
+
+def _geom_aabb(env, geom_id: int):
+    """Per-geom true OBB -- ported from RoboCasa's own post-2026-09-18
+    _geom_aabb: center=geom_xpos, axes=geom_xmat (the geom's own live
+    rotation), half=geom_size -- no envelope/inflation step, since a geom's
+    own live pose and size already fully define its oriented box. Name kept
+    (not renamed to e.g. _geom_obb) to avoid a disruptive rename across this
+    file's many existing call sites -- same convention RoboCasa's own
+    rewrite used (see that file's wrapper-functions comment)."""
     try:
         center = np.asarray(env.sim.data.geom_xpos[int(geom_id)], dtype=float)[:3]
         xmat = np.asarray(env.sim.data.geom_xmat[int(geom_id)], dtype=float).reshape(3, 3)
@@ -1028,27 +1225,62 @@ def _geom_aabb(env, geom_id: int) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         or not np.all(np.isfinite(size))
     ):
         return None
-    half_extents = np.abs(xmat) @ np.maximum(size, 0.0)
-    return center - half_extents, center + half_extents
+    return _obb_make(center, xmat, np.maximum(size, 0.0))
 
 
-def _geom_ids_aabb(env, geom_ids) -> Optional[Tuple[np.ndarray, np.ndarray]]:
-    """Union AABB over a set of geom ids -- ported verbatim from RoboCasa's
-    own _geom_ids_aabb."""
-    geom_aabbs = [aabb for gid in geom_ids for aabb in [_geom_aabb(env, gid)] if aabb is not None]
-    if not geom_aabbs:
+def _geom_ids_aabb(env, geom_ids):
+    """Merge multiple geoms into one tight OBB -- ported from RoboCasa's own
+    post-2026-09-18 _geom_ids_obb (renamed there from _geom_ids_aabb; kept
+    as _geom_ids_aabb here to avoid a disruptive rename across this file's
+    many call sites). Geoms rigidly attached to the same MuJoCo body share
+    that body's live rotation, so the combined box is built in the body's
+    own local frame (a true, non-inflated oriented box for the common
+    single-rigid-body case); geoms spanning more than one distinct body fall
+    back to the axis-aligned envelope of each geom's own OBB (no worse than
+    the previous plain-AABB behavior for that rare case)."""
+    geom_ids = list(geom_ids)
+    geom_obbs = [obb for gid in geom_ids for obb in [_geom_aabb(env, gid)] if obb is not None]
+    if not geom_obbs:
         return None
-    lowers = [aabb[0] for aabb in geom_aabbs]
-    uppers = [aabb[1] for aabb in geom_aabbs]
-    return np.min(lowers, axis=0), np.max(uppers, axis=0)
+    if len(geom_obbs) == 1:
+        return geom_obbs[0]
+    body_ids = set()
+    for gid in geom_ids:
+        try:
+            body_ids.add(int(env.sim.model.geom_bodyid[int(gid)]))
+        except Exception:
+            body_ids.add(None)
+    if len(body_ids) == 1 and None not in body_ids:
+        body_id = next(iter(body_ids))
+        try:
+            body_center = np.asarray(env.sim.data.body_xpos[body_id], dtype=float)
+            body_axes = np.asarray(env.sim.data.body_xmat[body_id], dtype=float).reshape(3, 3)
+        except Exception:
+            body_center, body_axes = None, None
+        if body_center is not None:
+            all_local = []
+            for obb in geom_obbs:
+                corners = _obb_corners(obb)
+                all_local.append(body_axes.T @ (corners - body_center).T)
+            local = np.concatenate(all_local, axis=1)
+            local_lower = np.min(local, axis=1)
+            local_upper = np.max(local, axis=1)
+            local_center = (local_lower + local_upper) / 2.0
+            half = (local_upper - local_lower) / 2.0
+            return _obb_make(body_center + body_axes @ local_center, body_axes, half)
+    lower, upper = _obb_world_envelope(geom_obbs[0])
+    for obb in geom_obbs[1:]:
+        o_lower, o_upper = _obb_world_envelope(obb)
+        lower = np.minimum(lower, o_lower)
+        upper = np.maximum(upper, o_upper)
+    return _obb_from_minmax(lower, upper)
 
 
 def _aabb_intersects(a, b) -> bool:
-    """Ported verbatim from RoboCasa's own _aabb_overlap_depth/_aabb_intersects."""
-    a_min, a_max = a
-    b_min, b_max = b
-    overlap = np.minimum(a_max, b_max) - np.maximum(a_min, b_min)
-    return bool(np.all(overlap > 0.0))
+    """Now delegates to the true-OBB SAT test (RoboCasa's own
+    _obb_intersects) -- name kept for this file's many existing call
+    sites."""
+    return _obb_intersects(a, b)
 
 
 # ---------------------------------------------------------------------------
@@ -1077,40 +1309,31 @@ def _aabb_intersects(a, b) -> bool:
 
 
 def _aabb_center(aabb) -> np.ndarray:
-    lower, upper = aabb
-    return (np.asarray(lower, dtype=float) + np.asarray(upper, dtype=float)) / 2.0
+    return np.asarray(aabb[0], dtype=float)
 
 
 def _union_aabb(a, b):
-    a_min, a_max = a
-    b_min, b_max = b
-    return np.minimum(a_min, b_min), np.maximum(a_max, b_max)
+    return _obb_union(a, b)
 
 
 def _translate_aabb(aabb, delta: np.ndarray):
-    lower, upper = aabb
-    delta = np.asarray(delta, dtype=float)
-    return lower + delta, upper + delta
+    return _obb_translate(aabb, delta)
 
 
 def _aabb_overlap_depth(a, b) -> float:
-    a_min, a_max = a
-    b_min, b_max = b
-    overlap = np.minimum(a_max, b_max) - np.maximum(a_min, b_min)
-    return float(np.min(overlap))
+    return _obb_overlap_depth(a, b)
 
 
 def _expanded_aabb(aabb, tolerance: float):
-    """Literal port of RoboCasa's own `_expanded_aabb` (predicates.py) --
-    grows a box by `tolerance` on every axis/side, used by
-    `support_geometry_valid` to allow the small real gap that's completely
-    normal between two genuinely-resting objects (bounding-box coarseness,
-    MuJoCo's own contact margin) instead of requiring a zero-tolerance
-    intersection."""
-    lower, upper = aabb
-    lower = np.asarray(lower, dtype=float) - tolerance
-    upper = np.asarray(upper, dtype=float) + tolerance
-    return lower, upper
+    """Now expands an OBB's own half-extents by `tolerance` along its own
+    local axes (ported from RoboCasa's own post-2026-09-18 _expanded_aabb),
+    keeping its center/axes -- the rotation-correct analog of padding a
+    world-frame min/max box. Used by `support_geometry_valid` to allow the
+    small real gap that's completely normal between two genuinely-resting
+    objects (bounding-box coarseness, MuJoCo's own contact margin) instead
+    of requiring a zero-tolerance intersection."""
+    center, axes, half = aabb
+    return _obb_make(center, axes, np.maximum(half + tolerance, 0.0))
 
 
 def _aabb_obstructs_path(blocker, corridor) -> bool:
@@ -1118,36 +1341,34 @@ def _aabb_obstructs_path(blocker, corridor) -> bool:
 
 
 def _aabb_obstructs_between_endpoints(blocker, start, end) -> bool:
-    """True iff `blocker`'s own AABB genuinely obstructs the straight-line
-    path between the two endpoint AABBs `start`/`end` -- ported from
-    RoboCasa's own _aabb_obstructs_between_endpoints (see this section's own
-    module comment above for why this replaced a plain proximity radius)."""
+    """True iff `blocker`'s own OBB genuinely obstructs the straight-line
+    path between the two endpoint OBBs `start`/`end` -- ported from
+    RoboCasa's own post-2026-09-18 true-OBB _aabb_obstructs_between_
+    endpoints (see this section's own module comment above for why this
+    replaced a plain proximity radius)."""
     if not _aabb_obstructs_path(blocker, _union_aabb(start, end)):
         return False
     if _aabb_intersects(blocker, start) or _aabb_intersects(blocker, end):
         return False
-    start_center, end_center = _aabb_center(start), _aabb_center(end)
+    start_center, end_center = start[0], end[0]
     segment_xy = end_center[:2] - start_center[:2]
     segment_len_sq = float(np.dot(segment_xy, segment_xy))
     if segment_len_sq <= 1e-9:
         return False
-    blocker_center = _aabb_center(blocker)
+    blocker_center = blocker[0]
     projection = float(
         np.dot(blocker_center[:2] - start_center[:2], segment_xy) / segment_len_sq
     )
     if projection <= 0.0 or projection >= 1.0:
         return False
     closest_xy = start_center[:2] + projection * segment_xy
-    blocker_min, blocker_max = blocker
-    # XY distance from the blocker's own AABB footprint to the closest point
-    # on the segment (0 if that point already falls within the blocker's own
-    # XY extent) -- the axis-aligned analog of RoboCasa's _obb_point_xy_
-    # distance (point-to-oriented-box distance collapses to point-to-AABB
-    # distance here, since there's no rotation to account for).
-    xy_clamped = np.clip(closest_xy, blocker_min[:2], blocker_max[:2])
-    xy_distance = float(np.linalg.norm(closest_xy - xy_clamped))
-    if xy_distance > PATH_OBSTRUCTION_OVERLAP_ALLOWANCE:
+    segment_xy_distance = _obb_point_xy_distance(
+        np.array([closest_xy[0], closest_xy[1], blocker_center[2]], dtype=float),
+        blocker,
+    )
+    if segment_xy_distance > PATH_OBSTRUCTION_OVERLAP_ALLOWANCE:
         return False
+    blocker_min, blocker_max = _obb_world_envelope(blocker)
     for axis in range(3):
         low = min(start_center[axis], end_center[axis])
         high = max(start_center[axis], end_center[axis])
@@ -1156,13 +1377,13 @@ def _aabb_obstructs_between_endpoints(blocker, start, end) -> bool:
     return True
 
 
-def _object_aabb(env, name: Optional[str]) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+def _object_aabb(env, name: Optional[str]):
     if name is None:
         return None
     return _geom_ids_aabb(env, _object_geom_ids(env, name))
 
 
-def _gripper_aabb(env) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+def _gripper_aabb(env):
     return _geom_ids_aabb(env, _gripper_contact_geom_ids(env))
 
 
@@ -1348,65 +1569,38 @@ def _object_region_blockers(env, name: Optional[str]) -> List[str]:
 
 
 def _closest_point_on_aabb_xy(pos: np.ndarray, aabb) -> np.ndarray:
-    """3D point on `aabb`'s own top surface, XY-clamped to the closest point
-    within `aabb`'s own XY footprint to `pos` -- the axis-aligned analog of
-    RoboCasa's own _closest_point_on_aabb_xy (used inside its _spos, this
-    file's _infer_landing_target below). Returns `pos`'s own XY, at the
-    box's top Z, when `pos` already falls within the footprint (clip is a
-    no-op then) -- i.e. zero remaining horizontal distance once the carried
-    object is already over its target."""
-    lower, upper = aabb
-    xy = np.clip(np.asarray(pos, dtype=float)[:2], lower[:2], upper[:2])
-    return np.array([xy[0], xy[1], float(upper[2])], dtype=float)
+    """3D point on `aabb`'s own top face -- now delegates to RoboCasa's own
+    _obb_closest_point_on_top_face, correct regardless of how the box is
+    rotated (see that function's own docstring: clip within the box's own
+    local XY footprint, then return the point at the box's own local +Z
+    face)."""
+    return _obb_closest_point_on_top_face(pos, aabb)
 
 
 def _point_aabb_xy_distance(pos: np.ndarray, aabb) -> float:
-    """XY distance from `pos` to the nearest point on `aabb`'s own XY
-    footprint (0 if `pos` is already over the footprint) -- the axis-aligned
-    analog of RoboCasa's own _point_aabb_xy_distance (predicates.py), used
-    by the support-hygiene proximity test below."""
-    lower, upper = aabb
-    xy = np.clip(np.asarray(pos, dtype=float)[:2], lower[:2], upper[:2])
-    return float(np.linalg.norm(np.asarray(pos, dtype=float)[:2] - xy))
+    """XY distance from `pos` to the nearest point on `aabb`'s own footprint
+    -- now delegates to RoboCasa's own _obb_point_xy_distance."""
+    return _obb_point_xy_distance(pos, aabb)
 
 
 def _aabb_xy_edge_distance(aabb_a, aabb_b) -> float:
-    """Edge-to-edge XY gap between two axis-aligned boxes (0 if their XY
-    footprints overlap) -- the axis-aligned analog of RoboCasa's own
-    _object_xy_edge_distance/_aabb_xy_distance (predicates.py), used by the
-    fragile-clutter proximity test below in preference to raw center-to-
-    center distance (RoboCasa never uses center-to-center when an AABB is
-    available)."""
-    lower_a, upper_a = aabb_a
-    lower_b, upper_b = aabb_b
-    dx = max(0.0, max(float(lower_a[0] - upper_b[0]), float(lower_b[0] - upper_a[0])))
-    dy = max(0.0, max(float(lower_a[1] - upper_b[1]), float(lower_b[1] - upper_a[1])))
-    return float(np.hypot(dx, dy))
+    """Edge-to-edge XY gap between two boxes -- now delegates to RoboCasa's
+    own _obb_xy_distance."""
+    return _obb_xy_distance(aabb_a, aabb_b)
 
 
 def _aabb_point_distance(aabb, point: np.ndarray) -> float:
-    """Exact 3D distance from an axis-aligned box to a point (0 if the point
-    is inside/on the box) -- the axis-aligned analog of RoboCasa's own
-    _obb_point_distance (predicates.py), used below in place of the previous
-    raw eef-to-body-origin point/point distance for onset proximity."""
-    lower, upper = aabb
-    point = np.asarray(point, dtype=float).reshape(3)
-    clamped = np.clip(point, lower, upper)
-    return float(np.linalg.norm(point - clamped))
+    """Exact 3D distance from a box to a point -- now delegates to
+    RoboCasa's own _obb_point_distance."""
+    return _obb_point_distance(aabb, point)
 
 
 def _aabb_aabb_distance(a, b) -> float:
-    """Exact 3D distance between two axis-aligned boxes (0 if they overlap on
-    every axis) -- the axis-aligned analog of RoboCasa's own _obb_distance
-    (predicates.py); unlike RoboCasa's OBB version (a corner-sampling
-    approximation, since exact convex-convex distance between two rotated
-    boxes needs real GJK), this is exact for the no-rotation case: per-axis
-    gap is 0 wherever the boxes' extents overlap on that axis, and the
-    remaining gaps compose into a genuine 3D distance via Euclidean norm."""
-    a_lower, a_upper = a
-    b_lower, b_upper = b
-    gap = np.maximum(0.0, np.maximum(np.asarray(b_lower) - np.asarray(a_upper), np.asarray(a_lower) - np.asarray(b_upper)))
-    return float(np.linalg.norm(gap))
+    """Closest distance between two boxes -- now delegates to RoboCasa's own
+    _obb_distance (exact for vertex/face-closest cases, a corner-sampling
+    approximation only in the rarer edge-edge-closest case -- see that
+    function's own docstring)."""
+    return _obb_distance(a, b)
 
 
 def _gripper_target_distance(env, eef_pos: Optional[np.ndarray], gripper_aabb, target_pos: Optional[np.ndarray], target_aabb) -> Optional[float]:
@@ -1566,7 +1760,7 @@ def _infer_landing_target(env, name: Optional[str], current_pos: Optional[np.nda
         aabb = _object_aabb(env, cname)
         if aabb is None:
             return
-        lower, upper = aabb
+        lower, upper = _obb_world_envelope(aabb)
         top_z = float(upper[2])
         bottom_z = float(lower[2])
         # z-gate (2026-09-21 fix, AABB-accuracy false-positive investigation):
@@ -1837,9 +2031,8 @@ def _entity_footprint_radius(env, kind: str, name: str) -> float:
         aabb = _geom_ids_aabb(env, _object_geom_ids(env, name))
     if aabb is None:
         return DEFAULT_CONTAMINATION_RADIUS
-    lower, upper = aabb
-    half = (np.asarray(upper, dtype=float) - np.asarray(lower, dtype=float)) / 2.0
-    return float(np.linalg.norm(half[:2]))
+    _, _, half = aabb
+    return float(np.linalg.norm(np.asarray(half, dtype=float)[:2]))
 
 
 def _contact_patch_radius_from_geom(env, geom_id: Optional[int]) -> Optional[float]:
@@ -1857,9 +2050,8 @@ def _contact_patch_radius_from_geom(env, geom_id: Optional[int]) -> Optional[flo
     aabb = _geom_aabb(env, int(geom_id))
     if aabb is None:
         return None
-    lower, upper = aabb
-    half = (np.asarray(upper, dtype=float) - np.asarray(lower, dtype=float)) / 2.0
-    return float(np.linalg.norm(half[:2]))
+    _, _, half = aabb
+    return float(np.linalg.norm(np.asarray(half, dtype=float)[:2]))
 
 
 def _mark_contaminated(
@@ -2409,7 +2601,7 @@ def _object_support_reference(env, name: str) -> Optional[str]:
             other_aabb = _object_aabb(env, other)
             if other_aabb is None:
                 continue
-            _, other_upper = other_aabb
+            _, other_upper = _obb_world_envelope(other_aabb)
             if float(other_upper[2]) <= float(name_pos[2]) + SUPPORT_CLUTTER_Z_TOLERANCE:
                 below.append(other)
         touching = set(below)
@@ -4444,7 +4636,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
             oaabb = _object_aabb(env, oname)
             opos = _body_pos(env, oname)
             if oaabb is not None:
-                o_lower, o_upper = oaabb
+                o_lower, o_upper = _obb_world_envelope(oaabb)
                 same_support_height = (
                     float(o_lower[2]) - SUPPORT_CLUTTER_Z_TOLERANCE
                     <= float(spos[2])
