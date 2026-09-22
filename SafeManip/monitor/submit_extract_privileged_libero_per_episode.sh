@@ -23,6 +23,11 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 DATASET_ROOT="${DATASET_ROOT:-${HOME}/flash/datasets/libero_raw}"
 N_EPISODES="${N_EPISODES:-10}"
 SUITES="${SUITES:-libero_10 libero_goal libero_object libero_spatial}"
+# 2026-09-20: johnny5 observed running array tasks ~7-8x slower than a
+# normally-loaded node (steady progress, not stuck, but a real slowdown) --
+# excluded by default so future sweeps don't land episodes there. Override
+# (e.g. EXCLUDE_NODES= to clear, or a different node list) as needed.
+EXCLUDE_NODES="${EXCLUDE_NODES:-johnny5}"
 
 if [[ $# -gt 0 ]]; then
   TASKS=("$@")
@@ -46,8 +51,14 @@ for task in "${TASKS[@]}"; do
 done
 N_PAIRS=$(wc -l < "${PAIRS_FILE}")
 
+SBATCH_EXTRA_ARGS=()
+if [[ -n "${EXCLUDE_NODES}" ]]; then
+  SBATCH_EXTRA_ARGS+=(--exclude="${EXCLUDE_NODES}")
+fi
+
 echo "submitting array job for ${N_PAIRS} (task, episode) pair(s) across ${#TASKS[@]} task(s) (pairs file: ${PAIRS_FILE})"
 job_id=$(sbatch --parsable --array="0-$((N_PAIRS - 1))" \
+  "${SBATCH_EXTRA_ARGS[@]}" \
   --export=ALL,PAIRS_FILE="${PAIRS_FILE}",DATASET_ROOT="${DATASET_ROOT}" \
   "${SCRIPT_DIR}/run_extract_privileged_from_dataset_libero_per_episode.sbatch")
 echo "job ${job_id} (array 0-$((N_PAIRS - 1))) submitted"
