@@ -96,6 +96,17 @@ LIBERO_INACTIVE_PROPERTIES = {
     "rc_raw_robot_contact_blocks_rte_grasp_until_sanitized",
     "rc_liquid_transfer_eventually_settles",
     "rc_solid_transfer_eventually_settles",
+    # rc_dump_preconditions_safe (2026-09-21, added -- was missing from this
+    # list despite being just as structurally inert as the others above):
+    # LIBERO's monitor/sim/libero/predicates.py doesn't export
+    # skill_dump_onset at all, so the shared DSL fallback
+    # (monitor/predicates.py's skill_dump_onset -> _predicate_value(...,
+    # False)) makes G(skill_dump_onset -> preconditions_satisfied_dump)
+    # vacuously true every frame -- none of the 40 in-scope LIBERO tasks
+    # involve a dump/pour action (confirmed via that file's own module
+    # docstring and its containment_transfer_event comment, "no dump-onset
+    # modeled").
+    "rc_dump_preconditions_safe",
 }
 LIBERO_ORIGINAL_VIDEO_DIR = Path(__file__).parent.parent / "replay" / "libero_original_video" / "output"
 
