@@ -4294,15 +4294,25 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # RoboCasa additionally requires the support to be one of the task's own
     # registered target objects (target_object_names/target_objects_by_
     # object/active_target_object_names) -- a per-task role registry
-    # RoboCasa's fixture/object configs provide that LIBERO's BDDL
-    # objects_dict does not expose the same way (the exact same class of gap
-    # already documented for forbidden_contact's role taxonomy -- see this
-    # file's own module docstring, contact_policy section, and item 3 of
-    # the 2026-09-21 fixture-readiness/support-type/contact-role audit).
-    # Rather than fabricate a role check, defaults permissively True here
-    # (matching this file's existing permissive-on-unrecognized-category
-    # convention, e.g. `_objects_have_any_content_attr`'s own docstring) --
-    # documented as a real, narrow gap, not silently smoothed over.
+    # RoboCasa's fixture/object configs provide via AST-parsing each task's
+    # `_check_success`. LIBERO's BDDL `objects_dict` doesn't expose that same
+    # registry directly, but `_build_contact_role_registry` (this file, ~line
+    # 2013) already builds the equivalent per-task role registry from
+    # `env.parsed_problem` for the contact-role/forbidden_contact
+    # classification (see that function's own docstring and the 2026-09-21
+    # fixture-readiness/support-type/contact-role audit) -- its
+    # `target_objects_by_object` entry is the exact same concept as
+    # RoboCasa's parameter of the same name (a manip object's own
+    # goal-registered "placed onto/into this other movable object" set), so
+    # it is reused here read-only (cached per-episode in
+    # `state["contact_role_registry"]`, already built earlier in
+    # `build_predicate_snapshot` by `_evaluate_contact_policy`) rather than
+    # left permissively True. LIBERO has no analog of RoboCasa's other two
+    # union sources (`target_object_names`/`active_target_object_names` --
+    # broader task-level/currently-active target sets beyond this specific
+    # manip object's own registered targets), so the check here is narrower
+    # than RoboCasa's full three-way union; verified against the real corpus
+    # below that this doesn't false-positive on any genuine placement.
     #
     # RoboCasa's fixture-kind branch excludes bare floor support
     # (`_fixture_is_floor`) and, for structural fixture classes specifically,
@@ -4338,10 +4348,31 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # traded one false "invalid support" reason (geometry) for another
     # (type) at the identical frame.
     manip_is_food = bool(active is not None and any(s in object_category_from_instance_name(active) for s in FOOD_NAME_SUBSTRINGS))
+    # 2026-09-21 (role-registry wiring): the permissive-True default
+    # documented above is now only used for the genuine receptacle
+    # (containment) case. For a non-receptacle object-kind support,
+    # `_build_contact_role_registry`'s `target_objects_by_object` (built from
+    # this task's own BDDL goal_state On/In facts -- see that function's
+    # docstring) is the same underlying concept as RoboCasa's
+    # `target_objects_by_object` parameter to its own `_support_type_matches`
+    # (predicates.py ~5731-5734: `object_targets.update(target_objects_by_
+    # object.get(str(obj_name), set()))`, unioned with the two other
+    # per-task-registry sources `target_object_names`/`active_target_object_
+    # names` that have no direct LIBERO analog) -- a manip object's own
+    # officially-registered "placed onto/into this other movable object" set.
+    # Already computed once per episode by `_evaluate_contact_policy` (called
+    # earlier in `build_predicate_snapshot`, ~line 3326) and cached in
+    # `state["contact_role_registry"]`, so reused here read-only, not
+    # recomputed.
+    _stm_registry = state.get("contact_role_registry") or {}
+    _stm_registered_targets = _stm_registry.get("target_objects_by_object", {}).get(str(active), set()) if active is not None else set()
     if active is None:
         support_type_matches_object = True
     elif support_region_target_object is not None:
-        support_type_matches_object = True  # receptacle-or-permissive-role-gap, see comment above
+        if object_is_receptacle_category(object_category_from_instance_name(support_region_target_object)):
+            support_type_matches_object = True  # containment (e.g. placed inside a basket/bowl), not resting-on-top
+        else:
+            support_type_matches_object = bool(str(support_region_target_object) in _stm_registered_targets)
     elif not manip_is_food:
         support_type_matches_object = True
     elif support_region_target is not None:
@@ -4456,7 +4487,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     predicates["support_region_clear"] = _entry(support_region_clear, "no other object's AABB obstructs the placed object's own current-position-to-live-inferred-landing-target swept path")
     predicates["support_stable"] = _entry(support_stable, "live object_stable_by_name of the inferred landing-target object when it's a movable receptacle; True when the target is a fixture/static surface or unknown")
     predicates["support_geometry_valid"] = _entry(support_geometry_valid, "manipulated object's AABB genuinely overlaps its inferred support's AABB (expanded by SUPPORT_CLUTTER_Z_TOLERANCE), or the support is receptacle-shaped (containment), or the target is a fixture (geometric validity already implied by _infer_landing_target's own selection test)")
-    predicates["support_type_matches_object"] = _entry(support_type_matches_object, "food-type object resting on a non-receptacle object requires a task-target-role check LIBERO has no registry for (defaults permissively True); fixture-kind landing targets are real non-floor fixtures only, so RoboCasa's floor exclusion is structurally moot here")
+    predicates["support_type_matches_object"] = _entry(support_type_matches_object, "object-kind support: receptacle-shaped (containment) passes automatically, non-receptacle checked against this manip object's own BDDL-goal-registered target-object set (contact_role_registry's target_objects_by_object); fixture-kind landing targets are real non-floor fixtures only, so RoboCasa's floor exclusion is structurally moot here")
     predicates["support_objects_clean_for_manipulated_object"] = _entry(support_objects_clean_for_manipulated_object, "no raw/ready-to-eat conflicting object within PLACEMENT_PROXIMITY_MARGIN of the support")
     predicates["support_not_cluttered_for_fragile_manipulated_object"] = _entry(support_not_cluttered_for_fragile_manipulated_object, "at most CLUTTER_THRESHOLD nearby objects when placing a fragile item")
     predicates["preconditions_satisfied_place"] = _entry(preconditions_satisfied_place, "place preconditions AND-composition")
