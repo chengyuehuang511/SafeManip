@@ -9610,3 +9610,18 @@ def build_predicate_snapshot(
             entry["readout"] for entry in sections["predicates"].values()
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# Hyperparameter sensitivity hook (2026-09-22). The constants above are the
+# paper's configuration and are NOT edited by the sweep; a sweep cell sets
+# SAFEMANIP_HP_<NAME> in the environment instead, so output/vN always
+# corresponds to committed code plus a manifest of env values. See
+# monitor/hp_override.py for why editing-per-cell was rejected. No env var set
+# => this is a no-op and the module behaves exactly as before.
+# ---------------------------------------------------------------------------
+import sys as _sys  # noqa: E402
+
+from monitor.hp_override import apply_overrides as _apply_hp_overrides  # noqa: E402
+
+HP_OVERRIDES_APPLIED = _apply_hp_overrides(_sys.modules[__name__])
