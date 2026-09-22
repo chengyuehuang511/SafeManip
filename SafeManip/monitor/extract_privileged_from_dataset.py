@@ -577,7 +577,23 @@ def process_task(task, dataset_root, output_root, episodes, trajectory_horizon,
                 if env is None:
                     env = make_env(dataset_dir)
                 payload = extract_episode(env, dataset_dir, ep, trajectory_horizon, call_stride=call_stride)
-                out_path.write_text(json.dumps(payload, indent=2))
+                # Stream directly to the file object (2026-09-21) instead of
+                # json.dumps() building the entire serialized string in
+                # memory first, then write_text() doing one giant write --
+                # found while investigating why eval-rollout episodes (3-4x
+                # more frames than a training demo) were producing 1.9GB+
+                # raw files that both spiked memory usage and left the
+                # process seemingly "hung" for a long stretch at the very
+                # end (the single write() call blocking on a busy NFS mount
+                # for a multi-GB payload). json.dump(payload, f) serializes
+                # and writes incrementally via its own internal iterencode()
+                # generator, so peak memory no longer needs a second, full
+                # copy of the ~1-2GB string alongside the already-large
+                # payload dict, and the write itself proceeds as chunks are
+                # produced rather than as one atomic burst at the end.
+                # Byte-for-byte identical output (same indent=2 formatting).
+                with open(out_path, "w") as _f:
+                    json.dump(payload, _f, indent=2)
                 n_frames = len(payload["privileged_dynamic_info"])
                 elapsed = round(time.time() - t0, 2)
                 print(f"[{task}] episode {ep}: extracted {n_frames} frames in {elapsed}s -> {out_path}", flush=True)

@@ -1645,6 +1645,25 @@ def monitor_rollout(
                 trace[idx] = not bool(entry["in_violation"])
         recovery_accepting_by_property[property_name] = trace
 
+    # Strip the raw per-frame "trace" (full predicate_values dict per frame,
+    # per violated property) from the persisted output by default (2026-09-21,
+    # found while investigating why eval-rollout monitor.json files -- 3-4x
+    # more frames than a training demo -- were reaching 1+GB each and taking
+    # real wall-clock time just to serialize/write over NFS). Everything this
+    # trace was needed for is already computed above and kept:
+    # recovery_accepting_by_property (the compact per-frame accepting/
+    # rejecting bool array, built from this same trace just above) and
+    # repeated_violation_episodes (the concise per-episode summaries already
+    # embedded in violations[i]["repeated"]). monitor_metrics.py's
+    # _entry_exposure_frames already falls back to summing
+    # repeated_violation_episodes' duration_frames when "trace" is absent, so
+    # no downstream consumer breaks. Set SAFEMANIP_KEEP_MONITOR_TRACE=1 to
+    # restore the old, fully-verbose behavior (e.g. for deep step-by-step
+    # DFA-state debugging of one specific episode).
+    if os.environ.get("SAFEMANIP_KEEP_MONITOR_TRACE") != "1":
+        for repeated_result in repeated_violation_results.values():
+            repeated_result.pop("trace", None)
+
     return {
         "input_path": path,
         "repaired_traces": repaired_traces,
