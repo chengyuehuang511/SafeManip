@@ -1642,7 +1642,12 @@ def _gripper_target_distance(env, eef_pos: Optional[np.ndarray], gripper_aabb, t
 
 
 
-def _infer_landing_target(env, name: Optional[str], current_pos: Optional[np.ndarray]):
+def _infer_landing_target(
+    env,
+    name: Optional[str],
+    current_pos: Optional[np.ndarray],
+    state: Optional[Dict[str, Any]] = None,
+):
     """Simplified LIBERO analog of RoboCasa's own _infer_support/_spos
     (predicates.py) -- a live, continuously-re-evaluated guess of where an
     object still being carried is probably headed, used by
@@ -1652,14 +1657,20 @@ def _infer_landing_target(env, name: Optional[str], current_pos: Optional[np.nda
     _support_region_blockers, called every frame via the single top-level
     predicate-snapshot function, for the real reference this ports).
 
-    This is NOT RoboCasa's full inference (no fixture/object type-matching
-    against the task's own target_object_names/target_fixture_names, no
-    receptacle-content exclusions here, no contact-based shortcut, no
-    mesh-distance tie-break) -- LIBERO's own object/fixture registries don't
-    expose the same per-task role assignment RoboCasa's does (see this
-    module's own docstring, contact_policy section, for the same limitation
-    already accepted for forbidden-contact). Deliberately simplified per
-    explicit direction: scan every receptacle-category movable object and
+    This is NOT RoboCasa's full inference (no fixture-role type-matching
+    against the task's own target_fixture_names, no receptacle-content
+    exclusions here, no mesh-distance tie-break) -- LIBERO's own fixture
+    registry doesn't expose the same per-task role assignment RoboCasa's
+    does (see this module's own docstring, contact_policy section, for the
+    same limitation already accepted for forbidden-contact). Deliberately
+    simplified per explicit direction: highest priority goes to `name`'s own
+    registered target objects (2026-09-21 fix, "add it too" follow-up to
+    597e16f -- `_build_contact_role_registry`'s `target_objects_by_object`,
+    the same per-task role registry `support_type_matches_object` already
+    reads, ported from RoboCasa's real priority-0 candidate tier in
+    _infer_support with NO receptacle-category filter -- a registered target
+    can be a plain non-receptacle object, e.g. a cutting board or tray),
+    falling back to scanning every receptacle-category movable object and
     every fixture, keep only candidates whose own top surface sits at or
     below the carried object's current height (within
     SUPPORT_CLUTTER_Z_TOLERANCE -- a candidate above the carried object
@@ -1750,6 +1761,69 @@ def _infer_landing_target(env, name: Optional[str], current_pos: Optional[np.nda
             fixture_aabb = _object_aabb(env, fname)
             if fixture_aabb is not None:
                 return _closest_point_on_aabb_xy(current_pos, fixture_aabb), None
+
+    # Priority-0 registered-target-object candidates (2026-09-21 fix, "add it
+    # too" follow-up to 597e16f): literal port of RoboCasa's own real
+    # _infer_support (predicates.py ~5527-5528: `for oname in sorted(
+    # target_support_names): add_candidate(0, "object", oname,
+    # _object_position(oname), 3.0)`), where target_support_names is that
+    # task's own registered target objects filtered only to "exists and
+    # isn't the manipulated object itself" -- deliberately NO
+    # _object_is_receptacle check, unlike every other candidate tier
+    # (RoboCasa's own priority-2 receptacle-only fallback, and this file's
+    # existing scan below). This is RoboCasa's HIGHEST-priority candidate
+    # tier: if `name`'s own registered target objects (from
+    # _build_contact_role_registry's target_objects_by_object -- the exact
+    # same per-task role registry 597e16f already wired into
+    # support_type_matches_object) yield a candidate that passes the z/xy
+    # gate, RoboCasa always prefers it over any fixture or generic
+    # receptacle-object candidate, regardless of distance (priority is the
+    # primary sort key in RoboCasa's final `candidates.sort()`). Mirrored
+    # here the same way: if this tier finds a passing candidate, return it
+    # immediately, before ever running the (lower-priority, receptacle-only)
+    # scan below. Uses the same `margin` (PLACEMENT_MARGIN *
+    # SUPPORT_TARGET_XY_MULTIPLIER, already 3.0x -- this file doesn't carry
+    # RoboCasa's separate per-tier multiplier parameterization, since its
+    # existing single-tier scan already uses the wider 3.0 value throughout,
+    # not RoboCasa's narrower 2.0 receptacle-fallback multiplier) and the
+    # same z-gate (`resting_on_top or height_contained`) as every other
+    # candidate here -- only the receptacle-category filter is dropped for
+    # this tier, matching RoboCasa exactly.
+    if name is not None:
+        registry = (state or {}).get("contact_role_registry") if state is not None else None
+        if registry is None:
+            try:
+                registry = _build_contact_role_registry(env)
+            except Exception:
+                registry = {}
+        registered_targets = registry.get("target_objects_by_object", {}).get(str(name), set())
+        movable_names = set(_movable_object_names(env))
+        priority0_point = None
+        priority0_name = None
+        priority0_dist = None
+        for oname in sorted(str(o) for o in registered_targets):
+            if oname == str(name) or oname not in movable_names:
+                continue
+            aabb = _object_aabb(env, oname)
+            if aabb is None:
+                continue
+            lower, upper = _obb_world_envelope(aabb)
+            top_z = float(upper[2])
+            bottom_z = float(lower[2])
+            resting_on_top = top_z <= mz + SUPPORT_CLUTTER_Z_TOLERANCE
+            height_contained = (bottom_z - SUPPORT_CLUTTER_Z_TOLERANCE) <= mz <= (top_z + SUPPORT_CLUTTER_Z_TOLERANCE)
+            if not (resting_on_top or height_contained):
+                continue
+            point = _closest_point_on_aabb_xy(current_pos, aabb)
+            xy_dist = float(np.linalg.norm(point[:2] - current_pos[:2]))
+            if xy_dist > margin:
+                continue
+            if priority0_dist is None or xy_dist < priority0_dist:
+                priority0_dist = xy_dist
+                priority0_point = point
+                priority0_name = oname
+        if priority0_point is not None:
+            return priority0_point, priority0_name
 
     best_point = None
     best_name = None
@@ -4364,7 +4438,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # sweep (the milk_1 false positive) and an even earlier one-frame-back
     # sweep (a footprint-comparable-segment false negative) before it.
     support_region_target, support_region_target_object = _infer_landing_target(
-        env, active, active_pos
+        env, active, active_pos, state
     )
     support_region_blockers = _support_region_blockers(
         env,
