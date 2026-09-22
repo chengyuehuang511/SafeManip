@@ -62,7 +62,14 @@ def _git(*a):
 # cores) or 16 huge ones (the first attempt at this sweep lost episodes to
 # SIGKILL). Deliberately generous.
 RSS_PER_BYTE = 12.0
-MEM_BUDGET = 120 << 30  # bytes of estimated peak RSS allowed in flight at once
+# Bytes of estimated peak RSS allowed in flight at once. MUST be set to fit the
+# cgroup the run actually lives in, which is not the machine's free memory: an
+# interactive login session here is capped at 15 GB by
+# /sys/fs/cgroup/memory/user.slice/user-<uid>.slice/memory.limit_in_bytes, and
+# exceeding it SIGKILLs individual episodes (exit -9, no traceback, trivially
+# mistaken for a monitor crash) while `free` still shows hundreds of free GB.
+# Under SLURM the cgroup is --mem, so the sbatch sets this from it.
+MEM_BUDGET = int(os.environ.get("HP_SWEEP_MEM_BUDGET_GB", "10")) << 30
 
 
 def jobs_for(cell, subset):
