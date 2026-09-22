@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -40,7 +41,11 @@ def main():
     dest.parent.mkdir(parents=True, exist_ok=True)
     # Write via a temp file in the same directory, then rename: a killed process
     # must not leave a half-written JSON that the scorer would read as real.
-    tmp = dest.with_suffix(".json.partial")
+    # The temp name carries the pid: two drivers can legitimately be working the
+    # same cell at once (a resubmit overlapping a still-draining SLURM array), and
+    # a shared temp path would let them interleave writes into one file and then
+    # rename the mixture into place as a valid-looking result.
+    tmp = dest.with_suffix(f".json.partial.{os.getpid()}")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2, sort_keys=True)
     tmp.replace(dest)
