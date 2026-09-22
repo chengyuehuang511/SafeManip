@@ -39,11 +39,24 @@ import glob
 import json
 import os
 import random
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 THIS_DIR = Path(__file__).parent
 OUT_DIR = THIS_DIR / "training_audit"
+
+# The plotting tree's metric_conventions.py is THE definition of violated/count/
+# duration for both suites, and the training-corpus rate in the alignment figure
+# has to be the same quantity as the eval-corpus rate it is compared against. So
+# import the rule from there rather than keeping a third copy of it here -- a
+# divergence would silently turn that figure into a comparison of two different
+# metrics.
+_CONV = ("/nethome/chuang475/testnvme/projects/SafeManip/eval/saved_eval_rollouts"
+         "/monitor_files/0920")
+if _CONV not in sys.path:
+    sys.path.insert(0, _CONV)
+from metric_conventions import recovery_stats, unified_stats  # noqa: E402
 
 # The FINAL corpora. Both suites share one version counter (v32+ in this
 # directory are LIBERO, not later RoboCasa), which is why these are pinned by
@@ -63,33 +76,36 @@ def iter_monitor_files(root):
 
 
 def instances(path):
-    """(property_name, index_within_section, section, unsafe_windows) rows.
+    """(property_name, index_within_section, section, window counts) rows.
 
-    `unsafe_windows` mirrors extract_metrics.py: rising edges of the recovery
-    trace, so a training-corpus count is directly comparable to the eval-corpus
-    numbers in the paper rather than being a differently-defined count.
+    Counts come from metric_conventions, the same module the plotting loaders
+    apply, so a training-corpus number is directly comparable to the eval-corpus
+    numbers in the paper rather than being a differently-defined count:
+    `unsafe_*` are the recovery trace's windows alone, `unified_*` add the
+    terminal unresolved window and are what violated/count/duration are defined
+    from.
     """
     with open(path, encoding="utf-8") as f:
         d = json.load(f)
     rec = d.get("recovery_accepting_by_property") or {}
-    windows = {}
-    for prop, trace in rec.items():
-        prev, n = True, 0
-        for v in trace:
-            if prev and not v:
-                n += 1
-            prev = v
-        windows[prop] = n
+    main = d.get("accepting_by_property") or {}
     rows = []
     for section in ("violations", "satisfied"):
         for i, inst in enumerate(d.get(section) or []):
             p = inst.get("property_name")
+            violated = section == "violations"
+            frames, windows = recovery_stats(rec.get(p) or [])
+            u_frames, u_windows = unified_stats(
+                main.get(p) or [], rec.get(p) or [], violated)
             rows.append({
                 "property_name": p,
                 "instance_index": i,
                 "section": section,
-                "violated": int(section == "violations"),
-                "unsafe_windows": windows.get(p, 0),
+                "violated": int(violated),
+                "unsafe_windows": windows,
+                "unsafe_frames": frames,
+                "unified_windows": u_windows,
+                "unified_frames": u_frames,
                 "ever_non_accepting": int(bool(inst.get("ever_non_accepting"))),
                 "final_trap": int(bool(inst.get("final_trap"))),
             })
@@ -178,7 +194,8 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
 
     fields = ["suite", "task", "episode", "property_name", "instance_index",
-              "section", "violated", "unsafe_windows", "ever_non_accepting",
+              "section", "violated", "unsafe_windows", "unsafe_frames",
+              "unified_windows", "unified_frames", "ever_non_accepting",
               "final_trap", "num_frames", "monitor_path"]
     pools = {}
     for suite, root in CORPORA.items():
