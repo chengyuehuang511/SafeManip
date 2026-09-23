@@ -83,7 +83,9 @@ def instances(path):
     numbers in the paper rather than being a differently-defined count:
     `unsafe_*` are the recovery trace's windows alone, `unified_*` add the
     terminal unresolved window and are what violated/count/duration are defined
-    from.
+    from. The property name is passed to unified_stats because the terminal
+    window starts at the property's own deadline, not at the frame its obligation
+    opened.
     """
     with open(path, encoding="utf-8") as f:
         d = json.load(f)
@@ -96,7 +98,7 @@ def instances(path):
             violated = section == "violations"
             frames, windows = recovery_stats(rec.get(p) or [])
             u_frames, u_windows = unified_stats(
-                main.get(p) or [], rec.get(p) or [], violated)
+                main.get(p) or [], rec.get(p) or [], violated, p)
             rows.append({
                 "property_name": p,
                 "instance_index": i,
