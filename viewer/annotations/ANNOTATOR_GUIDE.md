@@ -1,9 +1,8 @@
 # Annotator Guide (human reviewers)
 
-Thanks for helping build ground truth for SafeManip's safety monitor! This is the
-human-facing version of the instructions Claude itself follows when annotating
-(`.claude/skills/ltl-ground-truth-annotation/SKILL.md`), scoped to what's actually
-available in the viewer today.
+Thanks for helping build ground truth for SafeManip's safety monitor! This guide
+covers the annotation workflow, scoped to what's actually available in the
+viewer today.
 
 ## 0. Register yourself first
 

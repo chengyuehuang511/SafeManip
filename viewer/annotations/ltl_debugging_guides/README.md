@@ -49,7 +49,7 @@ looking at real frame-by-frame data. This isn't optional — LTLf semantics are 
   duration). Does NOT feed the primary classification at all.
 
 **These two must be checked separately, and kept textually identical for `main_ltl`** — there is
-no automatic check enforcing this. A real bug this session: `specs.py`'s field was left as an
+no automatic check enforcing this. A real example: `specs.py`'s field was left as an
 old, simpler string (for the viewer's regex-shape-parser's convenience) while the "real" fix was
 only written into `repeated_violation_monitor.py` — this silently kept the *primary*
 classification on the stale formula, completely unaffected by the fix, for an entire debugging
@@ -132,7 +132,7 @@ confuse the two numbers.
 
 ## Step 6: watch for these specific trap categories
 
-These are the actual bugs found this session, in the order they tend to surface:
+These are actual bugs found in practice, in the order they tend to surface:
 
 1. **Bare-atom `recovery_ltl`** (KNOWN_BUGS.md #10). LTLf evaluates a bare atomic proposition
    only at the *current* (first) frame of the trace being evaluated — not "eventually." A
@@ -190,7 +190,7 @@ These are the actual bugs found this session, in the order they tend to surface:
    ...)`), whatever atom's becoming-true is what defines the *main* formula's own trap — it's
    guaranteed already `True` at the exact frame recovery starts, by construction, making the
    whole escape trivially satisfied at frame 1 before any other term is ever checked. See the
-   dedicated `recovery-ltl-design` skill (`.claude/skills/recovery-ltl-design/SKILL.md`) for the
+   recovery-LTL design notes for the
    full checklist covering both this and #8, plus how to decide whether `recovery_ltl` should
    even mean "recovery" at all for a one-shot/edge-triggered bad event (vs. a "resume tracking"
    signal instead) — worked out in full via `rc_dropped_object_was_released` and
@@ -204,7 +204,7 @@ property, a `predicate_breakdown.occurrences` list — each occurrence's `activa
 `violated_frames`, and `end` (resolved/unresolved + reason). This is a *separate,
 approximate re-derivation* done by `viewer/server.py`'s `compute_occurrences()`, not the same
 code path as the actual monitor — it can have its own bugs independent of whether the real
-classification is correct (confirmed this session: it initially treated a genuinely-recovered
+classification is correct (confirmed in practice: it initially treated a genuinely-recovered
 occurrence and a genuinely-unresolved one identically, and separately cropped its display window
 before showing a signal's real eventual transition). If the breakdown looks wrong but the
 top-level violated/satisfied verdict looks right, the bug is probably in

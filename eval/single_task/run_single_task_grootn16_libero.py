@@ -4,8 +4,7 @@ submodule, for a COMBINED (single checkpoint, all 4 suites) GR00T-N1.6
 LIBERO checkpoint -- specifically 0xAnkitSingh/GR00T-N1.6-LIBERO (see
 eval/EVAL_PROTOCOL_NOTES.md for provenance/confidence caveats: this is an
 unofficial, low-download-count personal upload, not an NVIDIA/grootn16-team
-release -- included because the user asked to try it anyway, run last/
-lowest priority).
+release -- included for completeness; run last/lowest priority).
 
 Reuses grootn16's own gr00t.eval.sim.LIBERO.libero_env.register_libero_envs
 and gr00t.eval.rollout_policy.run_gr00t_sim_policy unmodified -- both

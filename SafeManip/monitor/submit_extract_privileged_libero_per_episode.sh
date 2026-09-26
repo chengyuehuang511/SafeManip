@@ -41,7 +41,7 @@ else
 fi
 
 # NOT /tmp: node-local, invisible to whichever compute node an array task
-# actually lands on (and to this session's own shell).
+# actually lands on (and to the submitting shell).
 mkdir -p "${SCRIPT_DIR}/logs"
 PAIRS_FILE=$(mktemp "${SCRIPT_DIR}/logs/extract_privileged_libero_pairs.XXXXXX")
 for task in "${TASKS[@]}"; do

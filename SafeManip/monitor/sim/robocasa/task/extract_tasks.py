@@ -45,7 +45,7 @@ NATIVE_STRUCTURE_JSON_PATH = ATTRIBUTE_DIR / "native_structure.json"
 # for why a *pristine*, not live, robocasa checkout is used for this kind
 # of extraction).
 PRISTINE_ROBOCASA_ROOT = Path(
-    "/path/to/claude-session"
+    "/path/to/scratch"
     "/scratchpad/pristine_robocasa"
 )
 # docs/ is untouched by SafeManip either way (confirmed: only kitchen.py,

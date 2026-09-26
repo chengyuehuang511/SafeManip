@@ -31,7 +31,7 @@ set -euo pipefail
 # "shared" config -- NOT the openvla conda env's own editable-installed
 # `libero` package, which is confirmed to point at a stale/modified
 # checkout (/path/to/LIBERO, the exact source of
-# the earlier 4% RLDX-1 bug this session diagnosed) -- PYTHONPATH
+# an earlier 4% RLDX-1 bug) -- PYTHONPATH
 # prepending the shared submodule here is confirmed (via a real import
 # test) to correctly override that stale egg-link.
 #

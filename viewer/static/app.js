@@ -728,7 +728,7 @@ function buildEpisodeRow(task, ep, showTask) {
   // (2026-09-08) -- scoped to the currently-selected method, same as
   // ep.annotated's own per-method shape (server.py's
   // list_training_episodes/has_human_annotation). Deliberately excludes
-  // Claude-authored content (ai_draft/ai_draft_verdict, the structured
+  // AI-drafted content (ai_draft/ai_draft_verdict, the structured
   // entry["claude"] block) -- only counts verdict/note/entry["human"]/
   // missed_notes/overall_verdict, all only ever set by the reviewer's own
   // UI actions. A button, not just a badge, so it can jump straight into
@@ -1201,7 +1201,7 @@ function aiDraftBlock(current) {
   const wrap = document.createElement("div");
   wrap.className = "ai-draft";
   const label = DRAFT_VERDICT_LABEL[current.ai_draft_verdict] || current.ai_draft_verdict || "";
-  wrap.innerHTML = `<div class="ai-draft-head">Claude's draft take${
+  wrap.innerHTML = `<div class="ai-draft-head">AI draft${
     label ? ` — <span class="ai-draft-chip">${label}</span>` : ""
   }</div>`;
   const body = document.createElement("div");
@@ -1288,9 +1288,8 @@ function otherAnnotatorsEpisodeBlock(otherAnn) {
 // (verdict click saves immediately; note text saves 500ms after typing
 // stops -- see verdictControls/noteBox above). This doesn't replace either:
 // it's here so a reviewer gets an unambiguous, visible confirmation that a
-// note actually made it to disk, rather than trusting a silent debounce --
-// asked for after annotator_b's annotations turned out to have almost no notes
-// saved despite 32 disputed/unsure verdicts. Flushes whatever's currently
+// note actually made it to disk, rather than trusting a silent debounce.
+// Flushes whatever's currently
 // in the note box, plus the currently-active verdict button if any (never
 // force-clears an existing verdict just because none is visibly active in
 // this specific card render).
@@ -1896,15 +1895,14 @@ function repeatedViolationsBlock(rep, window) {
 }
 
 // Renders the claude/human x gt_annotation/monitor_problem structured
-// annotation schema (.claude/skills/ltl-ground-truth-annotation/SKILL.md) --
+// annotation schema --
 // separate from the existing free-text aiDraftBlock/verdictControls/noteBox
 // (the reviewer's own running verdict), this shows the *structured* record:
 // what actually happened (gt_annotation's per-occurrence trigger/resolve
 // frames, reusing the same occurrence shape predicateBreakdown already
 // renders) and whether the monitor's own reasoning was sound
-// (monitor_problem), kept as two separate questions per that skill's design.
-// Currently only "claude" is ever populated (via
-// SafeManip/monitor/populate_claude_annotations.py); "human" renders
+// (monitor_problem), kept as two separate questions.
+// Currently only the "claude" (AI draft) source is ever populated; "human" renders
 // identically whenever/if a human reviewer's own gt_annotation gets added
 // through the same save_annotations "source" patch mechanism.
 function groundTruthAnnotationSection(current, source, label) {
@@ -1983,7 +1981,7 @@ function groundTruthAnnotationBlock(current) {
   const wrap = document.createElement("div");
   wrap.className = "gt-annotation-wrap";
   let any = false;
-  for (const [source, label] of [["claude", "Claude"], ["human", "Human"]]) {
+  for (const [source, label] of [["claude", "AI draft"], ["human", "Human"]]) {
     const section = groundTruthAnnotationSection(current, source, label);
     if (section) {
       wrap.appendChild(section);

@@ -14,7 +14,7 @@ names' own docstring for why. Serves:
 Usage:
     python3 server.py [--root RESULTS_ROOT] [--port 8008]
 
-RESULTS_ROOT defaults to the "target" eval directory the user pointed at:
+RESULTS_ROOT defaults to the "target" eval directory:
     /path/to/SafeManip/results/evals/
         all_tasks_3_ckpt_50_rollouts/target_posttraining/evals/target
 
@@ -616,8 +616,8 @@ except Exception:
 _raw_info_cache = {}
 _raw_info_lock = threading.Lock()
 # Was 6 (sized for files described as "run several MB" -- see
-# _load_raw_info_data's own docstring). 2026-09-19: this session's
-# extraction runs now use call_stride=1 across every frame, and raw
+# _load_raw_info_data's own docstring). 2026-09-19: extraction
+# runs now use call_stride=1 across every frame, and raw
 # privileged_information_<N>.json files routinely run 100-500MB each --
 # confirmed the viewer's RSS climbing back toward the OOM range (1.85GB)
 # purely from this cache holding several such files at once during normal
@@ -1907,9 +1907,8 @@ def annotation_path(annotator, task, episode):
 
 def _entry_has_human_content(entry):
     """Whether a single violations/satisfied annotation entry has any real
-    *human*-authored content -- specifically excluding Claude-authored
-    content (ai_draft/ai_draft_verdict, populated by SafeManip/monitor/
-    populate_claude_annotations.py, and the structured entry["claude"]
+    *human*-authored content -- specifically excluding AI-drafted
+    content (ai_draft/ai_draft_verdict and the structured entry["claude"]
     block -- see save_annotations' own comment on the claude/human x
     gt_annotation/monitor_problem schema). Human-authored fields, all set
     only via the reviewer's own UI actions (verdictControls/noteBox/
@@ -2067,8 +2066,7 @@ def save_annotations(annotator, task, episode, patch):
                 entry["ai_draft"] = patch["ai_draft"]
             if "ai_draft_verdict" in patch:
                 entry["ai_draft_verdict"] = patch["ai_draft_verdict"]
-            # Structured claude/human x gt_annotation/monitor_problem schema
-            # (see .claude/skills/ltl-ground-truth-annotation/SKILL.md) --
+            # Structured claude/human x gt_annotation/monitor_problem schema --
             # additive, kept alongside the flat verdict/note/ai_draft fields
             # above rather than replacing them, so existing annotation files
             # stay readable. "source" is "claude" or "human"; each source's

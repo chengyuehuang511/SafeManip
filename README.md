@@ -44,7 +44,6 @@ SafeManip/
 |   |-- validate_identical_scene.py  # Checks fixed-scene rollouts share one scene
 |   `-- install_mona.sh       # MONA installer for DFA construction
 |-- examples/                 # Qualitative safety-category videos and monitor outputs
-|-- groot-identical.sh        # Fixed-scene ("identical episode") GR00T launcher
 |-- requirements.txt          # Pinned dependency snapshot (alternative to install.sh)
 |-- install_flash_attn.sh     # Helper to build/install flash-attn
 `-- install.sh                # Repository setup helper
@@ -312,13 +311,7 @@ Task lists are defined in `eval/run_scripts/sbatch_groot_test.sh` and `eval/run_
 The standard launchers vary the scene across episodes. For experiments that need
 every episode to replay the **same scene and the same initial state**
 (seed-locked, so only the policy's own stochasticity varies), use the fixed-scene
-launcher:
-
-```bash
-TASK=PackIdenticalLunches N_EPISODES=50 SEED=42 bash groot-identical.sh
-```
-
-This calls `eval/models/Isaac-GR00T/scripts/run_single_task_identical.py`, which takes the
+entry point `eval/models/Isaac-GR00T/scripts/run_single_task_identical.py`, which takes the
 same arguments as `run_single_task.py` but monkey-patches the environment factory
 so every reset reuses one seed. The scene is fully determined by `SEED`; changing
 `SEED` selects a different (but still single, repeated) scene. Outputs are written

@@ -28,8 +28,8 @@ Trade-off vs. `extract_privileged_from_dataset.py`: this produces the same
 sparse-in-time output a live rollout would (~sample_stride raw frames per
 recorded frame), rather than a per-frame-dense record -- pick whichever
 comparison point you need; both are kept side by side for exactly this
-reason (the user explicitly asked to compare them, not replace one with the
-other).
+reason (the two records are meant to be compared, not to replace one
+another).
 
 Output goes to a *separate* directory (default
 `SafeManip/monitor/output_sampled/`) so it never collides with or

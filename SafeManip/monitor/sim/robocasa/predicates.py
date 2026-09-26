@@ -450,7 +450,7 @@ SKILL_ONSET_FRAMES = 10
 # with NO natural cluster/gap (24.6% at 1 frame, decaying steadily out to
 # 148 frames max) -- unlike PERSISTENCE_FRAMES/SKILL_ONSET_FRAMES, there is
 # no evidence-based "noise vs. signal" boundary to derive here. 20 is the
-# 90th percentile of real contact durations (chosen by the user, not
+# 90th percentile of real contact durations (chosen by hand, not
 # data-derived) -- an explicit policy choice about acceptable tolerance, not
 # a bug fix or a smoothing shortcut.
 FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 20
@@ -4657,8 +4657,8 @@ def build_predicate_snapshot(
         # uncontaminated, so robot_contact_clean stopped firing at all and
         # every previously-violated episode "resolved" for the wrong reason
         # (confirmed by testing all 23 of v24's violated episodes: 23/23
-        # "resolved", which is implausibly total -- flagged by the user as
-        # suspicious, since genuine cases like placing raw meat directly onto
+        # "resolved", which is implausibly total and suspicious, since
+        # genuine cases like placing raw meat directly onto
         # a clean plate should still violate). Restricting the bypass to pairs
         # where at least one entity is genuinely "raw" (the static attribute,
         # not "already contaminated via transfer") keeps the original fix's
@@ -5112,7 +5112,7 @@ def build_predicate_snapshot(
         # through the flagged frame while the "picked" dish1 sat 25cm
         # away), KettleBoiling ep0 frame 361 and ep9 frame 483 (stove knob
         # qvel 0.48-0.95, actively being turned, while the "picked" kettle
-        # sat ~25-30cm away). This also overturns this session's earlier
+        # sat ~25-30cm away). This also overturns the earlier
         # conclusion (docs/predicate_ltl_design/CHANGES_2026-09-19.md) that
         # KettleBoiling ep9's violation was a genuine near-episode-end
         # timing edge case -- it's this same misattribution, not a
@@ -5175,7 +5175,7 @@ def build_predicate_snapshot(
     # (prev_object_grasped and not object_grasped -- a raw grasp-detection
     # flip) to object_left_gripper_edge (the rising edge of the geometric
     # AABB-overlap check). object_dropped inherits object_grasped's raw-
-    # signal fragility (confirmed this session -- PickPlaceDrawerToCounter
+    # signal fragility (confirmed on real data -- PickPlaceDrawerToCounter
     # ep2/ep9, a genuine ongoing grasp not registering as grasped at all
     # due to the bilateral-contact requirement), so it could fire place-
     # onset on a spurious grasp-detection glitch rather than a real

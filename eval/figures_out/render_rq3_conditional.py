@@ -5,7 +5,7 @@ Replaces the two surviving RQ3 figures (explicit user requests 2026-09-23):
 
   (a) Task horizon -- was RQ3_horizon_conditional_combined.png's top row, with
       both simulators now on ONE horizon axis. The old bottom row (triggered
-      events per episode) is dropped: the user wants only the violation rate.
+      events per episode) is dropped: only the violation rate is reported.
   (b) Task category -- was RQ3_task_suite_conditional_combined.png's two
       heatmaps, now a single bar panel: the bar is the all-episode rate and the
       dark tick across it is the rate among SUCCESSFUL episodes only
@@ -218,7 +218,7 @@ def rate(ep, by, pool=False, num="V"):
 
 
 def events(ep, by):
-    """Triggered events per episode. Not plotted any more (the user dropped it);
+    """Triggered events per episode. Not plotted any more;
     kept because `--validate` uses it to check this file's loader against the
     old figure's bottom row."""
     g = ep.groupby(["suite", "model"] + by, observed=True).agg(

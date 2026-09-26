@@ -453,9 +453,8 @@ FIXTURE_ARTICULATION_DELTA_THRESHOLD = 2e-3  # per-raw-frame open-fraction delta
 # sessions), not a LIBERO-specific tuning choice with its own rationale, so
 # restoring the equality this comment already asserts rather than leaving
 # it stale. Re-verified for regressions against a 20-episode spot check
-# spanning most task families in this corpus (see this session's own
-# fork-verification notes) -- no violated/satisfied flips found from this
-# change alone.
+# spanning most task families in this corpus -- no violated/satisfied
+# flips found from this change alone.
 SKILL_ONSET_FRAMES = 10         # = RoboCasa's own SKILL_ONSET_FRAMES (consecutive near-object/contact-and-articulating frames before an onset fires)
 SETTLE_TIMEOUT_FRAMES = 100     # = RoboCasa's own SETTLE_TIMEOUT_FRAMES (frames a dropped/released object has to settle before timeout) -- LIBERO's original 60 was an untuned v0 guess, confirmed too short directly: put_the_wine_bottle_on_the_rack ep0 genuinely settles (supported+stable+gripper-away) ~80 frames after release, timing out at 60 with the object already correctly at rest by 100
 FORBIDDEN_CONTACT_TOLERANCE_FRAMES = 20  # = RoboCasa's own FORBIDDEN_CONTACT_TOLERANCE_FRAMES (frames of arm-contact tolerated before "sustained")
@@ -490,7 +489,7 @@ FIXTURE_NEAR_THRESHOLD = REACH_THRESHOLD    # gripper-AABB-to-fixture-body-AABB 
 # audit) was "fixed at the raw-signal level" by ANDing bilateral contact
 # with a gripper-closed-fraction threshold, mirroring RoboCasa's own
 # (at-the-time) 2026-09-08 claim of the same thing. RoboCasa's own
-# investigation THIS session found that claim to be FALSE there -- genuine
+# later investigation found that claim to be FALSE there -- genuine
 # flicker still occurred (WashLettuce/DeliverStraw/PortionHotDogs). Re-
 # verified for LIBERO with real data (not just re-trusting the old
 # comment): confirmed 2 genuine single-frame grasp dropouts in a 4-episode
@@ -2027,9 +2026,9 @@ def _target_region_blockers(env, object_states_dict, target_name: Optional[str])
 # match RAW_NAME_SUBSTRINGS -- see build_predicate_snapshot's own
 # contamination-section comment). Verified instead via a temporary,
 # fully-reverted monkey-patch that forced one ordinary object "raw" for a
-# real extraction run -- see this session's own verification report for the
-# exact episode/frames/values checked (not duplicated here to avoid this
-# becoming stale if the constant values above ever change).
+# real extraction run (the exact episode/frames/values checked are not
+# duplicated here to avoid this becoming stale if the constant values
+# above ever change).
 #
 # Adapted to LIBERO's own conventions rather than a literal RoboCasa port:
 # RoboCasa's version is written as ~15 nested closures inside one giant
@@ -4196,8 +4195,8 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # fixture_is_opening_raw/fixture_is_closing_raw OR'd in (2026-09-21,
     # KITCHEN_SCENE4_put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_
     # and_close_it ep3): confirmed via real frame data that this was NOT a
-    # one-frame-staleness/latch bug (the hypothesis this session started
-    # with) -- robot_fixture_contact_raw stayed False for the entire
+    # one-frame-staleness/latch bug (the initial
+    # hypothesis) -- robot_fixture_contact_raw stayed False for the entire
     # frames-190-224 drawer-opening interval, not just one transition
     # frame, so no reordering of when it's computed would have helped.
     # Root cause is this module's own documented, pre-existing v0
@@ -4776,8 +4775,8 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # spots/_mark_contaminated/_entity_has_any_contamination/
     # _entity_spot_contaminated/_contact_patch_radius_from_geom, all defined
     # module-level above -- search RoboCasa's monitor/sim/robocasa/
-    # predicates.py for the same names for the original). Explicitly
-    # requested by the user for parity even though it is UNTESTABLE against
+    # predicates.py for the same names for the original). Ported
+    # for parity even though it is UNTESTABLE against
     # real LIBERO task data (verified fact: none of LIBERO's 40 in-scope
     # tasks' objects match RAW_NAME_SUBSTRINGS, so `contaminated` can never
     # read True on this corpus regardless of correctness here -- see this
@@ -4785,8 +4784,8 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     # that exercised this code path directly instead).
     #
     # An earlier pass (same day) deliberately did NOT port this geometric
-    # system, judging it untestable-and-unnecessary; the user overrode that
-    # judgment call after confirming (by inspecting this file's own already-
+    # system, judging it untestable-and-unnecessary; that
+    # judgment call was reversed after confirming (by inspecting this file's own already-
     # present _geom_aabb/mj_geomDistance/env.sim.data.contact primitives)
     # that skipping it was a choice, not a technical limitation -- LIBERO
     # runs on the identical robosuite/MuJoCo substrate RoboCasa's own spot/
@@ -4935,7 +4934,7 @@ def build_predicate_snapshot(env, static_info: Dict[str, Any], dynamic_info: Dic
     raw_contact_sustained = bool(raw_contact_streak > FORBIDDEN_CONTACT_TOLERANCE_FRAMES)
     contaminated = bool(state.get("contaminated", False) or raw_contact_sustained)
 
-    # Ordering fix (2026-09-21, found via this session's own monkey-patch
+    # Ordering fix (2026-09-21, found via a monkey-patch
     # verification run -- LIVING_ROOM_SCENE1's alphabet_soup/cream_cheese
     # task, episode 0, frames ~180-230): _mark_contaminated for this frame's
     # winning transfer_target must NOT run before the robot_contact_clean_
