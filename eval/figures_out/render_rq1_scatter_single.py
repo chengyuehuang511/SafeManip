@@ -13,7 +13,7 @@ nothing from the flash share. Only `--recompute` reloads both suites through
 the pipeline (minutes) to regenerate the CSV; run it after any monitor or
 corpus change, since the CSV does not know it is stale.
 
-Lives on testnvme because the original share is full (2026-09-23). Once the share
+Lives here because the original share is full (2026-09-23). Once the share
 has space again, fold this back into plot_combined/make_plots_conditional.
 """
 import json

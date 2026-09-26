@@ -35,7 +35,7 @@ if [[ -z "${CELL}" ]]; then
   exit 1
 fi
 
-CONDA_SH="${CONDA_SH:-${HOME}/testnvme/miniconda3/etc/profile.d/conda.sh}"
+CONDA_SH="${CONDA_SH:-${HOME}/miniconda3/etc/profile.d/conda.sh}"
 # robocasa, for BOTH suites: it is the only env here with ltlf2dfa + pydot
 # installed, and the monitor step never touches a simulator, so the LIBERO
 # episodes replay correctly under it too (verified 2026-09-22 against the

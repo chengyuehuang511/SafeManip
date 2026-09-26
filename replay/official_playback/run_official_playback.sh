@@ -15,7 +15,7 @@
 # robocasa/scripts/dataset_scripts/playback_dataset.py, which this wraps).
 #
 # Usage:
-#   DATASET=~/flash/datasets/robocasa/v1.0/target/composite/ArrangeBreadBasket/20250809/lerobot \
+#   DATASET=~/datasets/robocasa/v1.0/target/composite/ArrangeBreadBasket/20250809/lerobot \
 #     sbatch run_official_playback.sh
 # or on an interactively-allocated GPU node:
 #   DATASET=... bash run_official_playback.sh
@@ -30,7 +30,7 @@
 #                        but ground-truth state loading is the exact method)
 #   VIDEO_PATH          default: <dataset_dir_parent>/<dataset_name>.mp4
 #   CONDA_ENV_NAME      default: robocasa
-#   CONDA_SH            default: ~/testnvme/miniconda3/etc/profile.d/conda.sh
+#   CONDA_SH            default: ~/miniconda3/etc/profile.d/conda.sh
 #SBATCH --job-name=official_playback
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=l40s:1
@@ -46,7 +46,7 @@ DATASET="${DATASET:?set DATASET=/path/to/lerobot/dataset}"
 N_EPISODES="${N_EPISODES:-1}"
 USE_ACTIONS="${USE_ACTIONS:-0}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"
-CONDA_SH="${CONDA_SH:-${HOME}/testnvme/miniconda3/etc/profile.d/conda.sh}"
+CONDA_SH="${CONDA_SH:-${HOME}/miniconda3/etc/profile.d/conda.sh}"
 ROBOCASA_SCRIPTS_DIR="${ROBOCASA_SCRIPTS_DIR:-/path/to/robocasa/robocasa/scripts/dataset_scripts}"
 
 # shellcheck disable=SC1090

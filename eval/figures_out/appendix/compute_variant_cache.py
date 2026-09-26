@@ -100,7 +100,7 @@ def read_csvs(paths, what):
     """Concatenate shard CSVs, tolerating the two states a sweep leaves behind.
 
     Empty: a shard CSV is created by its array task before the first row is
-    written, and overcap tasks are preemptible, so a sweep that is still running
+    written, and preemptible-queue tasks can be killed, so a sweep that is still running
     always has a few zero-byte files in it. Those are "not done yet", not
     corrupt.
 
@@ -202,7 +202,7 @@ def load_variant_metrics(variants):
         if not fs:
             raise SystemExit(f"no metric shards for {v} in {VARIANT_SHARDS}")
         d = read_csvs(fs, f"{v} metric")
-        # Shards are disjoint by construction, but a requeued overcap task can
+        # Shards are disjoint by construction, but a requeued preemptible task can
         # re-append rows it had already written before preemption.
         d = d.drop_duplicates(["model", "task", "episode", "property_name"])
         frames.append(d)

@@ -94,7 +94,7 @@ Usage (drop-in replacement for `python scripts/serve_policy.py ...`):
         --port=8000 policy:checkpoint --policy.config=... --policy.dir=...
 
 The dataset root defaults to $ROBOCASA_DATASET_BASE_PATH if set, else
-~/flash/datasets/robocasa (this machine's actual RoboCasa v1.0 dataset
+~/datasets/robocasa (this machine's actual RoboCasa v1.0 dataset
 location, confirmed to contain v1.0/target/...).
 """
 import dataclasses
@@ -103,7 +103,7 @@ import runpy
 import sys
 from pathlib import Path
 
-DEFAULT_DATASET_BASE_PATH = os.path.expanduser("~/flash/datasets/robocasa")
+DEFAULT_DATASET_BASE_PATH = os.path.expanduser("~/datasets/robocasa")
 
 
 def _clear_data_dirs_on_all_configs() -> None:

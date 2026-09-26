@@ -23,7 +23,7 @@ libero:milk entry exactly. (Egg was dropped: robocasa metadata says
 microwavable=True, but a real egg explodes in a microwave -- wrong thing
 to showcase.)
 
-Run with ~/testnvme/miniconda3/bin/python (never /bin/python3).
+Run with ~/miniconda3/bin/python (never /bin/python3).
 """
 import os
 

@@ -12,7 +12,7 @@
 #   RESULTS_ROOT       default: the target_posttraining/evals/target dir this
 #                       repo's viewer defaults to
 #   CONDA_ENV_NAME     default: robocasa
-#   CONDA_SH           default: ~/testnvme/miniconda3/etc/profile.d/conda.sh
+#   CONDA_SH           default: ~/miniconda3/etc/profile.d/conda.sh
 #SBATCH --job-name=reconstruct_episode
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=l40s:1
@@ -30,7 +30,7 @@ TASK="${TASK:?set TASK=<TaskName>}"
 EPISODE="${EPISODE:?set EPISODE=<index>}"
 RESULTS_ROOT="${RESULTS_ROOT:-/path/to/SafeManip/results/evals/all_tasks_3_ckpt_50_rollouts/target_posttraining/evals/target}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"
-CONDA_SH="${CONDA_SH:-${HOME}/testnvme/miniconda3/etc/profile.d/conda.sh}"
+CONDA_SH="${CONDA_SH:-${HOME}/miniconda3/etc/profile.d/conda.sh}"
 
 # shellcheck disable=SC1090
 source "${CONDA_SH}"

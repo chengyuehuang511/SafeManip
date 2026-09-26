@@ -88,7 +88,7 @@ if [[ -z "${TASK}" && -n "${TASK_LIST}" ]]; then
 fi
 TASK="${TASK:-PrepareCoffee}"
 SPLIT="${SPLIT:-target}"
-MODEL_PATH="${MODEL_PATH:-${HOME}/flash/checkpoints/grootn16/checkpoint-120000}"
+MODEL_PATH="${MODEL_PATH:-${HOME}/checkpoints/grootn16/checkpoint-120000}"
 # Nested by TASK from the start (a --array sweep shares one VIDEO_DIR value
 # across all 50 tasks -- confirmed as a real collision bug the first time
 # around; baked the fix in here from day one instead).

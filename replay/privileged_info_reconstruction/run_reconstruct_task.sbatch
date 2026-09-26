@@ -21,7 +21,7 @@ set -uo pipefail  # not -e: one failed episode inside reconstruct_task.py should
 SCRIPT_DIR="/path/to/SafeManip/replay/privileged_info_reconstruction"
 TASK="${TASK:?set TASK=<TaskName> (submit_all.sh does this via --export)}"
 
-CONDA_SH="${CONDA_SH:-${HOME}/testnvme/miniconda3/etc/profile.d/conda.sh}"
+CONDA_SH="${CONDA_SH:-${HOME}/miniconda3/etc/profile.d/conda.sh}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"
 # shellcheck disable=SC1090
 source "${CONDA_SH}"

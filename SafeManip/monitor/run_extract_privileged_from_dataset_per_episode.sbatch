@@ -40,7 +40,7 @@ fi
 TASK="${PAIR_LINE%% *}"
 EPISODE="${PAIR_LINE##* }"
 
-CONDA_SH="${CONDA_SH:-${HOME}/testnvme/miniconda3/etc/profile.d/conda.sh}"
+CONDA_SH="${CONDA_SH:-${HOME}/miniconda3/etc/profile.d/conda.sh}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"
 # shellcheck disable=SC1090
 source "${CONDA_SH}"
@@ -55,7 +55,7 @@ fi
 
 mkdir -p "${SCRIPT_DIR}/logs"
 
-DATASET_ROOT="${DATASET_ROOT:-$HOME/flash/datasets/robocasa/v1.0/target}"
+DATASET_ROOT="${DATASET_ROOT:-$HOME/datasets/robocasa/v1.0/target}"
 # NOT /tmp -- SLURM jobs get their own private /tmp, invisible to any other
 # process including this same session's own shell (confirmed the hard way:
 # 3 episodes' worth of real compute silently lost to this exact mistake in

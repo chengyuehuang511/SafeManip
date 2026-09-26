@@ -21,7 +21,7 @@ Style: qualitative-figure-design skill constants (DejaVu Sans, sparse
 bold, category chip pastels, CHIP_BG brand chip, band bg); panel fills
 mimic Figure1's pale green (top) / pale blue (bottom) split.
 
-Run with ~/testnvme/miniconda3/bin/python (never /bin/python3).
+Run with ~/miniconda3/bin/python (never /bin/python3).
 """
 import glob
 import os

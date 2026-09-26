@@ -21,7 +21,7 @@ this onto a dark background. Tight margins, big fonts (user 2026-09-25).
     q_viol (red, cross)                  -- state 2: the true violation trap
 
 Transparent-background PNG (dpi 300) + PDF.
-Run with ~/testnvme/miniconda3/bin/python (never /bin/python3).
+Run with ~/miniconda3/bin/python (never /bin/python3).
 """
 import os
 

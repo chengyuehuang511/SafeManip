@@ -8,13 +8,13 @@ Shape: **until** (main), correctly `F(...)`-wrapped (recovery). Predicates: `obj
 `object_sync`, `object_dropped`.
 
 One half of the 2026-09-02 split of the old `rc_grasp_remains_safe_until_release` — see
-`CHANGES_2026-09-02.md`. This half (does the grasp stay synced while held) has been stable since
+the 2026-09-02 design changelog. This half (does the grasp stay synced while held) has been stable since
 first written; the split's problems were all on the *other* half
 (`rc_dropped_object_was_released`, see its own guide).
 
 ## What to check
 - `object_sync` is position-based (`_object_grasp_slip`, frame-to-frame, not
-  accumulated-since-onset — see `CHANGES_2026-08-31.md` items 13/15) — if debugging a
+  accumulated-since-onset — see the 2026-08-31 design changelog items 13/15) — if debugging a
   desync-flagged episode, check `object_sync`'s own trace directly rather than assuming it
   tracks velocity; it's a rigid-attachment drift check now, not a speed check.
 - **recovery's dual escape matters**: it deliberately covers *both* ways a desync episode can

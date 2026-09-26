@@ -31,16 +31,15 @@
   <!-- Annotator guide, a floating window (not a separate page) -- toggled by
        the header's "📖 guide" button, see app.js's initAnnotatorGuideModal().
        Content mirrors viewer/annotations/ANNOTATOR_GUIDE.md (the plain-text
-       source of truth Claude itself also reads), just rendered as real HTML
+       source of truth), just rendered as real HTML
        here instead of raw markdown. -->
   <div id="annotator-guide-backdrop" class="modal-backdrop hidden">
     <div id="annotator-guide-window" class="modal-window guide">
       <button id="annotator-guide-close" class="modal-close" title="Close">✕</button>
       <h1>Annotator Guide</h1>
       <p class="intro">
-        Thanks for helping build ground truth for SafeManip's safety monitor! This is the
-        human-facing version of the instructions Claude itself follows when annotating
-        (<code>.claude/skills/ltl-ground-truth-annotation/SKILL.md</code>), scoped to what's
+        Thanks for helping build ground truth for SafeManip's safety monitor! This guide
+        covers the annotation workflow, scoped to what's
         actually available in the viewer today.
       </p>
 

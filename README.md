@@ -222,11 +222,11 @@ documented fallback instead (`robocasa/utils/dataset_registry_utils.py`:
 when `DATASET_BASE_PATH is None`, it uses `<robocasa package
 parent>/datasets`, i.e. `eval/simulators/robocasa/datasets`) -- so
 `eval/simulators/robocasa/datasets` is a **symlink** to
-`~/flash/datasets/robocasa` (this machine's actual RoboCasa v1.0 dataset
+`~/datasets/robocasa` (this machine's actual RoboCasa v1.0 dataset
 location):
 
 ```bash
-ln -s ~/flash/datasets/robocasa eval/simulators/robocasa/datasets
+ln -s ~/datasets/robocasa eval/simulators/robocasa/datasets
 ```
 
 A pure Python-level patch (`eval/single_task/serve_policy_wrapper.py`,

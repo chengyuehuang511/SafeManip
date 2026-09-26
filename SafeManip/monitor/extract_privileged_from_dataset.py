@@ -174,7 +174,7 @@ predicates.py while computing it) gets the same scaling for consistency (see
 
 Usage (single episode):
     python3 extract_privileged_from_dataset.py --task ArrangeBreadBasket \
-        --episode 0 [--dataset_root ~/flash/datasets/robocasa/v1.0/target] \
+        --episode 0 [--dataset_root ~/datasets/robocasa/v1.0/target] \
         [--output_root output] [--trajectory_horizon 128] [--run_monitor]
 
 Usage (range of episodes, one env reused across them):
@@ -222,7 +222,7 @@ def _ensure_safemanip_on_syspath():
             sys.path.insert(0, p)
 
 
-DEFAULT_DATASET_ROOT = "~/flash/datasets/robocasa/v1.0/target"
+DEFAULT_DATASET_ROOT = "~/datasets/robocasa/v1.0/target"
 THIS_DIR = Path(__file__).parent
 DEFAULT_OUTPUT_ROOT = THIS_DIR / "output"
 

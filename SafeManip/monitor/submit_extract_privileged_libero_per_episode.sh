@@ -18,16 +18,16 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # nodes (confirmed via srun; see the sbatch script's own comment for the
 # full story of how this caused a silent 100%-failure array job). Also used
 # here on the login node itself for task-name discovery below, so it must be
-# readable from wherever this submit script runs too -- ~/flash/datasets/
+# readable from wherever this submit script runs too -- ~/datasets/
 # is readable both places, confirmed.
-DATASET_ROOT="${DATASET_ROOT:-${HOME}/flash/datasets/libero_raw}"
+DATASET_ROOT="${DATASET_ROOT:-${HOME}/datasets/libero_raw}"
 N_EPISODES="${N_EPISODES:-10}"
 SUITES="${SUITES:-libero_10 libero_goal libero_object libero_spatial}"
-# 2026-09-20: johnny5 observed running array tasks ~7-8x slower than a
+# 2026-09-20: one node was observed running array tasks ~7-8x slower than a
 # normally-loaded node (steady progress, not stuck, but a real slowdown) --
 # excluded by default so future sweeps don't land episodes there. Override
 # (e.g. EXCLUDE_NODES= to clear, or a different node list) as needed.
-EXCLUDE_NODES="${EXCLUDE_NODES:-johnny5}"
+EXCLUDE_NODES="${EXCLUDE_NODES:-}"
 
 if [[ $# -gt 0 ]]; then
   TASKS=("$@")

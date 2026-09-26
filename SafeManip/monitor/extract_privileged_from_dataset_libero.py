@@ -6,7 +6,7 @@ LIBERO analog of `extract_privileged_from_dataset.py`: reconstruct
 replaying the exact recorded MuJoCo `states` from LIBERO's own official demo
 hdf5s (at `/srv/datasets/libero/<suite>/<task>_demo.hdf5` -- the real
 robomimic-style LIBERO format, WITH full per-frame sim state, unlike the
-lossy HF LeRobot conversion at ~/flash/datasets/libero/), so
+lossy HF LeRobot conversion at ~/datasets/libero/), so
 `run_monitor_on_privileged.py` (unmodified) can evaluate the same 20
 `TASK_AGNOSTIC_PROPERTY_SPECS` against real LIBERO training demonstrations.
 
@@ -68,7 +68,7 @@ import numpy as np  # noqa: E402
 # direct/interactive (non-SLURM) invocation on the login node, which is how
 # this script is normally run directly, but the sbatch/submit wrapper
 # scripts explicitly override --dataset_root to a confirmed
-# compute-node-visible mirror (~/flash/datasets/libero_raw) for SLURM use --
+# compute-node-visible mirror (~/datasets/libero_raw) for SLURM use --
 # don't change this default without also checking those wrappers still pass
 # their own override.
 DEFAULT_DATASET_ROOT = "/srv/datasets/libero"

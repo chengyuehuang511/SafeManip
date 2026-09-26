@@ -68,7 +68,7 @@ task_names=(
 seed="${SEED:-42}"
 save_replay="${SAVE_REPLAY:-1}"
 n_episodes="${N_EPISODES:-50}"
-model_path="${MODEL_PATH:-${HOME}/flash/checkpoints/grootn16/checkpoint-120000}"
+model_path="${MODEL_PATH:-${HOME}/checkpoints/grootn16/checkpoint-120000}"
 video_dir="${VIDEO_OUTPUT_DIR:-${base_video_dir}}"
 
 run_env="SEED=${seed},SAVE_REPLAY=${save_replay},N_EPISODES=${n_episodes},MODEL_PATH=${model_path}"

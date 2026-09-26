@@ -39,7 +39,7 @@ selector for the Training Data tab's monitor panel).
 
 Usage (single episode):
     python3 extract_privileged_from_dataset_sampled.py --task ArrangeBreadBasket \
-        --episode 1 [--sample_stride 16] [--dataset_root ~/flash/datasets/robocasa/v1.0/target] \
+        --episode 1 [--sample_stride 16] [--dataset_root ~/datasets/robocasa/v1.0/target] \
         [--output_root output_sampled] [--trajectory_horizon 128] [--run_monitor]
 
 Usage (range of episodes, one env reused across them):
@@ -77,7 +77,7 @@ from extract_privileged_from_dataset import (  # noqa: E402
 
 _desanitize_sys_path()
 
-DEFAULT_DATASET_ROOT = "~/flash/datasets/robocasa/v1.0/target"
+DEFAULT_DATASET_ROOT = "~/datasets/robocasa/v1.0/target"
 DEFAULT_OUTPUT_ROOT = THIS_DIR / "output_sampled"
 DEFAULT_SAMPLE_STRIDE = 16
 

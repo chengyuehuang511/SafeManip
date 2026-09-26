@@ -16,7 +16,7 @@ these are literally the states the training video was rendered from.
 
 Usage:
     python3 reconstruct_training_data.py --task ArrangeBreadBasket \
-        [--dataset_root ~/flash/datasets/robocasa/v1.0/target] \
+        [--dataset_root ~/datasets/robocasa/v1.0/target] \
         [--output_root output] [--n_episodes 10] [--video_skip 2] \
         [--camera_names robot0_agentview_left robot0_agentview_right robot0_eye_in_hand] \
         [--camera_height 256] [--camera_width 256] [--skip_existing]
@@ -48,7 +48,7 @@ import imageio  # noqa: E402
 import numpy as np  # noqa: E402
 
 
-DEFAULT_DATASET_ROOT = "~/flash/datasets/robocasa/v1.0/target"
+DEFAULT_DATASET_ROOT = "~/datasets/robocasa/v1.0/target"
 DEFAULT_CAMERAS = ["robot0_agentview_left", "robot0_agentview_right", "robot0_eye_in_hand"]
 
 

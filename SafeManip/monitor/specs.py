@@ -460,7 +460,7 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
     ),
     # 2026-09-02: split from the single rc_grasp_remains_safe_until_release
     # (G(object_grasped -> (object_grasped_safe U object_released))) into
-    # two properties -- see CHANGES_2026-08-31.md. That single formula
+    # two properties -- see the 2026-08-31 design changelog. That single formula
     # conflated two different concerns: (1) did the grasp stay synced with
     # the gripper while held, and (2) was the eventual end-of-grasp actually
     # a deliberate release. Using object_released (which requires
@@ -470,7 +470,7 @@ TASK_AGNOSTIC_PROPERTY_SPECS = [
     # immediately recover) permanently violated the "until", since
     # object_released's stricter check essentially never fires on that same
     # flicker frame -- confirmed via docs/predicate_ltl_design/
-    # BILATERAL_CONTACT_FLICKER_BUG.md. object_dropped (the raw
+    # the bilateral-contact flicker investigation. object_dropped (the raw
     # grasp-ended edge, no gripper-opening/settled requirement) resolves (1)
     # cleanly on the flicker frame itself, leaving (2) to its own property.
     # recovery_ltl (not representable in this plain `ltl` field -- see

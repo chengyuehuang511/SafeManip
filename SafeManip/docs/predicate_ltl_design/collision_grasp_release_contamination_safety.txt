@@ -6,7 +6,7 @@ forbidden_contact :=
     exists contact in considered_contact
     such that contact is not in allowed_contact
     (no debounce: fires the same frame the condition holds -- see
-    CHANGES_2026-08-31.md, "removing persistence frame constants")
+    the 2026-08-31 design changelog, "removing persistence frame constants")
 
 
 contact_number can be extracted from env.sim.data.ncon and all contact pairs are in env.sim.data.contact
@@ -27,7 +27,7 @@ allowed_contact :=
     or tool_target_contact
 
 
-tool_target_contact := (2026-09-08, see CHANGES_2026-09-08.md)
+tool_target_contact := (2026-09-08, see the 2026-09-08 design changelog)
     neither side is a robot geom
     and one side is a geom of an init_robot_here object (a hand-held tool the robot starts
         the episode already holding, e.g. a sponge)
@@ -38,7 +38,7 @@ tool_target_contact := (2026-09-08, see CHANGES_2026-09-08.md)
     cutting_board while scrubbing read as forbidden contact even after the tool itself was
     recognized as a manipulated object (any object whose config sets init_robot_here: true is
     now included in manipulated_object_names, alongside the success-condition objects it
-    already covered -- see CHANGES_2026-09-08.md)
+    already covered -- see the 2026-09-08 design changelog)
 
 
 robot_correct_manipulated_object_contact :=
@@ -98,7 +98,7 @@ TODO: also need to specify the exact correct region, not just broad object/fixtu
 
 
 Split 2026-09-02 (was one property, "G(object_grasped -> object_grasped_safe U
-object_released)" -- see CHANGES_2026-09-02.md) into two, so a bilateral-contact detection
+object_released)" -- see the 2026-09-02 design changelog) into two, so a bilateral-contact detection
 flicker at the eventual drop/release instant can't poison the whole "stays safe while held"
 question:
 
@@ -117,7 +117,7 @@ Recovery: F(object_grasped | object_left_gripper)
         object ever leaves the gripper's region (object_left_gripper) shouldn't count as a
         violation either (a one-frame bilateral-contact flicker mid-recatch, still effectively
         held throughout)
-        main_ltl went through 4 rounds before landing here -- see CHANGES_2026-09-02.md for the
+        main_ltl went through 4 rounds before landing here -- see the 2026-09-02 design changelog for the
         full story (a cross-object misattribution bug with a naive F(object_grasped) escape; a
         stable/supported-based fix that introduced a new false positive from an undebounced
         physics signal; a raw-contact-based object_left_gripper that had the same
@@ -126,7 +126,7 @@ Recovery: F(object_grasped | object_left_gripper)
         G((object_dropped & !object_released) -> F(...)) antecedent is vacuously true (recovery
         only starts evaluating after the edge that triggered it has already passed), and
         object_left_gripper alone as an escape is tautological (already true, by construction,
-        at the exact frame recovery starts) -- see CHANGES_2026-09-02.md's recovery_ltl-design
+        at the exact frame recovery starts) -- see the 2026-09-02 design changelog's recovery_ltl-design
         section and viewer/annotations/ltl_debugging_guides/03_dropped_object_was_released.md.
         object_dropped is a one-shot past event that can never be "undone" by any later
         condition, so this recovery_ltl was deliberately chosen NOT to measure genuine recovery
@@ -157,7 +157,7 @@ Recovery: F(object_settled | release_object_settle_timeout)
         was also broken, for an independent reason: recovery only starts evaluating after
         object_released (an edge) has already reverted to False, so that antecedent can never
         match again, making the whole G(...) vacuously true from frame 1 regardless of the
-        F(...) part -- see CHANGES_2026-09-02.md's recovery_ltl-design section for the full
+        F(...) part -- see the 2026-09-02 design changelog's recovery_ltl-design section for the full
         story and the general "vacuous antecedent" rule it establishes.
         Bare F(object_settled) (no antecedent) fixed that, but following the same "resume, not
         recovery" decision as rc_dropped_object_was_released, release_object_settle_timeout was
@@ -217,7 +217,7 @@ Recovery: F(object_settled | release_object_settle_timeout)
                 accumulated-since-onset / frame-to-frame satisfies all of
                 "immune to brief transients", "forgets one-time settles",
                 and "still catches slow continuous drift" at once -- see
-                CHANGES_2026-08-31.md items 13-15 for the full history.
+                the 2026-08-31 design changelog items 13-15 for the full history.
         quaternion component-order bug found and fixed while verifying the
                 above on real data (2026-09-02): _object_orientation/
                 _eef_orientation read "orientation" as wxyz, but the
@@ -225,7 +225,7 @@ Recovery: F(object_settled | release_object_settle_timeout)
                 to appear to rotate far more than it actually did (bread:
                 ~50 degrees apparent vs ~2 degrees actual; basket: ~165
                 degrees apparent vs ~19-20 degrees actual). Fixed via
-                _xyzw_to_wxyz; see CHANGES_2026-08-31.md item 14 for the
+                _xyzw_to_wxyz; see the 2026-08-31 design changelog item 14 for the
                 diagnostic (checking object/eef absolute-rotation-axis
                 alignment, which should be parallel for rigid attachment
                 and was found anti-parallel before the fix).
@@ -238,7 +238,7 @@ Recovery: F(object_settled | release_object_settle_timeout)
         no separate notion of "sync" for a non-grasped object, that case is
         covered by plain object_stable instead
         (no debounce: tracks the raw relative-velocity check directly --
-        see CHANGES_2026-08-31.md, "removing persistence frame constants")
+        see the 2026-08-31 design changelog, "removing persistence frame constants")
 (position) object_upright: from simulator: check_obj_upright
 
 
@@ -269,7 +269,7 @@ object_grasped:= gripper_bilateral_contact(object) and check_contact(gripper, ob
         OBJECT_GRASPED_PERSISTENCE_FRAMES consecutive frames each way, to
         absorb flicker from the old aggregate-contact grasp check; that
         flicker source is fixed at the raw-signal level now, via bilateral
-        contact, so the debounce was removed -- see CHANGES_2026-08-31.md)
+        contact, so the debounce was removed -- see the 2026-08-31 design changelog)
         the grasped object becomes the active object
 grasped_object_exists:= active_object exists and object_grasped
 object_grasped_safe:= object_grasped and object_sync
@@ -283,7 +283,7 @@ object_grasped_safe:= object_grasped and object_sync
         information), which was tried and reverted for exactly this reason
         object_grasped_safe tracks (object_grasped and object_sync) directly,
         with no grace window (previously required GRASP_SAFE_GRACE_FRAMES
-        consecutive false frames -- removed, see CHANGES_2026-08-31.md)
+        consecutive false frames -- removed, see the 2026-08-31 design changelog)
         object_released still forces object_grasped_safe false on the frame
         it fires
 
@@ -295,13 +295,13 @@ object_dropped:= previously(object_grasped) and !object_grasped
         2026-09-02 so rc_grasp_remains_synced_until_dropped can resolve its "until" on this
         alone, leaving the separate question of whether it was actually a proper release to
         rc_dropped_object_was_released instead of one property conflating both -- see
-        CHANGES_2026-09-02.md
+        the 2026-09-02 design changelog
 
 object_released:= previously(object_grasped) and !object_grasped
         and (gripper_is_opening or previously(gripper_is_opening)
              or object_supported(released_object))
         (previously also required "and object_stable_relative(released_object)" in the third
-        disjunct, added 2026-09-02 -- removed again 2026-09-08, see CHANGES_2026-09-08.md:
+        disjunct, added 2026-09-02 -- removed again 2026-09-08, see the 2026-09-08 design changelog:
         object_stable_relative can itself flicker False for exactly the one frame release-
         detection evaluates it, even when the object is genuinely at rest just before/after
         (confirmed: WashFruitColander ep2's colander), silently dropping the release detection
@@ -314,7 +314,7 @@ object_released:= previously(object_grasped) and !object_grasped
                 the object is resting on a support -- still a deliberate release, just one that
                 doesn't show up as a finger-opening motion
         [HISTORICAL -- this requirement was REMOVED 2026-09-08, see the note above and
-        CHANGES_2026-09-08.md; kept here for the false-positive history it documents]
+        the 2026-09-08 design changelog; kept here for the false-positive history it documents]
         also requires object_stable_relative(released_object), added 2026-09-02:
                 object_supported alone fires on any contact with a support surface, including a
                 one-frame bilateral-contact dropout mid-carry that happens to graze something
@@ -334,9 +334,9 @@ object_released:= previously(object_grasped) and !object_grasped
                 instead (rc_dropped_object_was_released, since neither object_released nor its
                 until-escape necessarily holds at that exact frame -- renamed 2026-09-02 from
                 rc_grasp_remains_safe_until_release, which this property split out of; see
-                CHANGES_2026-09-02.md). The real fix would be eliminating the one-frame flicker
+                the 2026-09-02 design changelog). The real fix would be eliminating the one-frame flicker
                 in _object_gripper_bilateral_contact/_object_is_grasped itself; not yet done.
-                See CHANGES_2026-08-31.md item 16.
+                See the 2026-08-31 design changelog item 16.
         uses object_supported (plain, not relative) as the base condition rather than
                 object_stable: a freshly-dropped object is essentially never already resting on
                 something at the exact frame contact breaks (it's still in free-fall), so this
@@ -349,7 +349,7 @@ object_released:= previously(object_grasped) and !object_grasped
                 right at the moment contact breaks even though it reads true on the frames on
                 either side; since object_grasped's own true->false edge is also single-frame, that
                 one dip made object_released miss the release permanently (confirmed on
-                ArrangeBreadBasket ep6, bread around frame 389 -- see CHANGES_2026-08-31.md item 10
+                ArrangeBreadBasket ep6, bread around frame 389 -- see the 2026-08-31 design changelog item 10
                 and monitor/output/CHANGELOG.md's v1 entry for the full per-frame trace); ORed in
                 rather than replacing the current-frame check, so the ordinary same-frame case is
                 still covered
@@ -361,7 +361,7 @@ object_released:= previously(object_grasped) and !object_grasped
                 driven purely by contact/closed-finger state -- the same state gripper_is_opening
                 reads -- so the two are tightly correlated in time and the gap no longer applies;
                 the latch was reverted back to this simpler single-frame definition; see
-                CHANGES_2026-08-31.md for the full reasoning. That revert's premise (the two are
+                the 2026-08-31 design changelog for the full reasoning. That revert's premise (the two are
                 "tightly correlated") turned out to be incomplete -- gripper_is_opening's own
                 single-frame noise reopened a narrower version of the same gap independently,
                 fixed by the previously(gripper_is_opening) term above rather than reinstating the
@@ -436,7 +436,7 @@ converted by floor(value / 8) with a minimum of 1.
 
 GRASP_BILATERAL_MIN_CONTACT_BODIES = 2
 
-Removed (2026-09-01, see CHANGES_2026-08-31.md): CONTACT_PERSISTENCE_FRAMES,
+Removed (2026-09-01, see the 2026-08-31 design changelog): CONTACT_PERSISTENCE_FRAMES,
 OBJECT_GRASPED_PERSISTENCE_FRAMES, RELATIVE_SPEED_PERSISTENCE_FRAMES,
 GRASP_SAFE_GRACE_FRAMES -- all four predicates above now track their raw
 signal directly, with no debounce.

@@ -411,7 +411,7 @@ SETTLE_TIMEOUT_FRAMES = 100
 # PICK_APPROACH_PERSISTENCE_FRAMES (already the same value, 2, so this is a
 # free merge with no behavior change) and DUMP_ONSET_FRAMES (was 1, so this
 # does change dump's effective persistence -- verified against real data,
-# see CHANGES_2026-09-03.md) needed folding in. PLACE_ONSET_FRAMES was
+# see the 2026-09-03 design changelog) needed folding in. PLACE_ONSET_FRAMES was
 # dead code -- skill_place_onset fires directly off the object_released
 # edge with no persistence check of its own at all (correctly: a release is
 # a genuine discrete edge, not a multi-frame trend, so it never needed
@@ -529,7 +529,7 @@ DUMP_EXIT_GRACE_MARGIN = 0.01
 # CONTENT_ENTRY_PERSISTENCE_FRAMES consecutive raw-True frames before
 # actually admitting a candidate distinguishes "still touching several
 # frames later" (genuine containment) from "touched once or twice while
-# sweeping past" (incidental). See CHANGES_2026-09-19.md for the
+# sweeping past" (incidental). See the 2026-09-19 design changelog for the
 # before/after on this exact episode.
 CONTENT_ENTRY_PERSISTENCE_FRAMES = 5
 # Fallback contamination-spot radius (2026-09-18) when the contaminating
@@ -2535,7 +2535,7 @@ def build_predicate_snapshot(
         # for basket only -- not yet re-verified for every object/task, but
         # the underlying bug (a static rest-pose box, not a per-object mesh
         # issue) is architectural, not basket-specific -- see KNOWN_BUGS.md
-        # #11 and CHANGES_2026-09-03.md).
+        # #11 and the 2026-09-03 design changelog).
         return (
             _object_contact_aabb(str(name))
             or _object_ou_bbox_aabb(str(name))
@@ -3144,7 +3144,7 @@ def build_predicate_snapshot(
         still avoids the over-sensitivity the pure-velocity version
         (_object_eef_relative_speeds, still defined above but no longer
         used here) had to momentary acceleration transients during
-        ordinary carrying -- see CHANGES_2026-08-31.md items 13-14.
+        ordinary carrying -- see the 2026-08-31 design changelog items 13-14.
 
         Returns None if there's no reference for `name` (not currently the
         grasped object this was seeded for, or position/orientation data
@@ -3862,7 +3862,7 @@ def build_predicate_snapshot(
     # its "until" on this alone (rc_grasp_remains_synced_until_dropped),
     # leaving the separate question of whether the drop was actually a
     # proper release to its own property (rc_dropped_object_was_released)
-    # instead of conflating both into one -- see CHANGES_2026-08-31.md.
+    # instead of conflating both into one -- see the 2026-08-31 design changelog.
     object_dropped = _bool(prev_object_grasped and not object_grasped)
     object_released = _bool(
         prev_object_grasped
@@ -4400,7 +4400,7 @@ def build_predicate_snapshot(
     # rc_released_object_eventually_settles can show object_settled's real
     # components instead of a sometimes-wrong substitute -- see
     # viewer/predicate_derive.py and docs/predicate_ltl_design/
-    # CHANGES_2026-08-31.md.
+    # the 2026-08-31 design changelog.
     object_supported_settle = _bool(
         settle_obj_name is not None and _object_supported(settle_obj_name)
     )
@@ -5113,7 +5113,7 @@ def build_predicate_snapshot(
         # away), KettleBoiling ep0 frame 361 and ep9 frame 483 (stove knob
         # qvel 0.48-0.95, actively being turned, while the "picked" kettle
         # sat ~25-30cm away). This also overturns the earlier
-        # conclusion (docs/predicate_ltl_design/CHANGES_2026-09-19.md) that
+        # conclusion (the 2026-09-19 design changelog) that
         # KettleBoiling ep9's violation was a genuine near-episode-end
         # timing edge case -- it's this same misattribution, not a
         # stability-signal mystery. Uses last frame's raw (non-sticky)
@@ -5630,7 +5630,7 @@ def build_predicate_snapshot(
     def _support_stable() -> bool:
         # Uses object_stable_by_name, not the plain world-frame
         # _object_stable (2026-09-03, KNOWN_BUGS.md #9) -- same false-positive
-        # shape already fixed for object_settled (CHANGES_2026-08-31.md item
+        # shape already fixed for object_settled (the 2026-08-31 design changelog item
         # 3): a support/receptacle currently being carried has nonzero
         # world-frame velocity even while genuinely at rest relative to
         # whatever's carrying it, so _object_stable alone reads it as
@@ -5944,7 +5944,7 @@ def build_predicate_snapshot(
     # scoring can misread a not-yet-settled object's support as something
     # nonsensical, e.g. LoadDishwasher's dish reading as supported by
     # floor_room instead of the dishwasher rack it's actually headed into --
-    # see CHANGES_2026-09-03.md). Rather than change *when* skill_place_onset
+    # see the 2026-09-03 design changelog). Rather than change *when* skill_place_onset
     # fires (a bigger, riskier timing redesign touching every place-related
     # consumer of that predicate), this gives the onset's own obligation an
     # escape hatch, using the exact same "instant check | F(escape)" LTL

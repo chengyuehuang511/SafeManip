@@ -48,7 +48,7 @@ one-shot past event no later condition can undo, so the same "recovery vs. resum
 applies. Verified: resolves instantly (395→396) on ep6, matching
 `rc_dropped_object_was_released`'s pattern exactly. If you want the genuinely meaningful "how
 long did it actually take to settle" number, it's in `predicate_breakdown.occurrences`, not
-here. See `CHANGES_2026-09-02.md`'s recovery_ltl-design section and the `recovery-ltl-design`
+here. See the 2026-09-02 design changelog's recovery_ltl-design section and the `recovery-ltl-design`
 skill for the general rules established along the way (vacuous antecedents, tautological escape
 terms, when `G(edge -> F(...))` is and isn't safe).
 
@@ -58,7 +58,7 @@ terms, when `G(edge -> F(...))` is and isn't safe).
   (the object actually awaiting settle), **not** `active_object`/`obj_name` — see
   `object_supported_settle`/`object_support_type_matches_any_settle`/
   `object_stable_relative_settle` (exported specifically so the viewer's breakdown can show
-  `object_settled`'s *real* components, added 2026-09-01/02 — see `CHANGES_2026-08-31.md` item
+  `object_settled`'s *real* components, added 2026-09-01/02 — see the 2026-08-31 design changelog item
   3 and `predicate_derive.py`). If a violation explanation mentions "not settled" but the
   top-level `object_supported`/`object_stable_relative` (the `active_object`-scoped versions)
   look fine, you're looking at the wrong object's data — check the `_settle`-suffixed versions

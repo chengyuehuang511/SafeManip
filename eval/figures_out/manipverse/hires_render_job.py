@@ -29,7 +29,7 @@ ROOT = "/path/to/SafeManip"
 DEMO_RC = os.path.join(ROOT, "SafeManip", "monitor", "output",
                        "v31_2026-09-20_claude_branch_place_precondition_"
                        "hygiene_removed")
-DATA = os.path.expanduser("~/flash/datasets/robocasa/v1.0/target/composite")
+DATA = os.path.expanduser("~/datasets/robocasa/v1.0/target/composite")
 OUT = os.path.join(ROOT, "eval", "figures_out", "manipverse", "hires_frames")
 CAMS = ("robot0_agentview_left", "robot0_agentview_right")
 RES = 1024

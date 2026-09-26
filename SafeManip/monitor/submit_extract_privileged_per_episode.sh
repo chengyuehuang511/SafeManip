@@ -10,17 +10,17 @@
 #   bash submit_extract_privileged_per_episode.sh                 # all tasks, episodes 0..N_EPISODES-1
 #   bash submit_extract_privileged_per_episode.sh TaskA TaskB      # just these tasks
 #   N_EPISODES=5 bash submit_extract_privileged_per_episode.sh     # override episode count/task
-#   EXCLUDE_NODES=johnny5 bash submit_extract_privileged_per_episode.sh  # skip a known-slow/contended node
+#   EXCLUDE_NODES=<node> bash submit_extract_privileged_per_episode.sh  # skip a known-slow/contended node
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-DATASET_ROOT="${DATASET_ROOT:-$HOME/flash/datasets/robocasa/v1.0/target}"
+DATASET_ROOT="${DATASET_ROOT:-$HOME/datasets/robocasa/v1.0/target}"
 N_EPISODES="${N_EPISODES:-10}"
-# 2026-09-20: johnny5 observed running array tasks ~7-8x slower than a
+# 2026-09-20: one node was observed running array tasks ~7-8x slower than a
 # normally-loaded node (steady progress, not stuck, but a real slowdown) --
 # excluded by default so future sweeps don't land episodes there. Override
 # (e.g. EXCLUDE_NODES= to clear, or a different node list) as needed.
-EXCLUDE_NODES="${EXCLUDE_NODES:-johnny5}"
+EXCLUDE_NODES="${EXCLUDE_NODES:-}"
 
 if [[ $# -gt 0 ]]; then
   TASKS=("$@")

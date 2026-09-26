@@ -1,7 +1,7 @@
 # Exact replay via the official RoboCasa lerobot format
 
 **If you have (or can produce) data in the official RoboCasa lerobot dataset
-format — like `~/flash/datasets/robocasa/v1.0/target/composite/<Task>/<date>/lerobot`
+format — like `~/datasets/robocasa/v1.0/target/composite/<Task>/<date>/lerobot`
 — use this instead of the [privileged-info reconstruction](../privileged_info_reconstruction/README.md)
 approach.** It's exact, not an approximation: no `MobileBaseCalibrator`-style
 calibration, no fixture-position override hacks, no ~1:8 frame sparsity. That
@@ -47,7 +47,7 @@ Use `run_official_playback.sh` (sbatch wrapper matching
 the same `MUJOCO_GL=egl` / GPU-node requirement and cwd guard):
 
 ```bash
-DATASET=~/flash/datasets/robocasa/v1.0/target/composite/ArrangeBreadBasket/20250809/lerobot \
+DATASET=~/datasets/robocasa/v1.0/target/composite/ArrangeBreadBasket/20250809/lerobot \
   sbatch run_official_playback.sh
 # or interactively on a GPU node:
 DATASET=... bash run_official_playback.sh
@@ -106,7 +106,7 @@ episode with all 3 camera views concatenated side-by-side (matching what
 
 ```bash
 python3 reconstruct_training_data.py --task ArrangeBreadBasket \
-    [--dataset_root ~/flash/datasets/robocasa/v1.0/target] \
+    [--dataset_root ~/datasets/robocasa/v1.0/target] \
     [--output_root output] [--n_episodes 10] [--video_skip 2] \
     [--camera_names robot0_agentview_left robot0_agentview_right robot0_eye_in_hand] \
     [--camera_height 256] [--camera_width 256] [--skip_existing]

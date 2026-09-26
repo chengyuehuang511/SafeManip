@@ -8,11 +8,11 @@ Shape: **instant-with-until-escape**. Predicates: `object_dropped`, `object_rele
 `object_grasped`, `object_left_gripper`.
 
 The other half of the 2026-09-02 split (see `02_grasp_remains_synced_until_dropped.md`'s guide
-and `CHANGES_2026-09-02.md`) — the one that took 4 rounds to get right. This is the property to
+and the 2026-09-02 design changelog) — the one that took 4 rounds to get right. This is the property to
 read if you want the fullest worked example of the whole debugging methodology in
 `README.md`, since every category of bug in that README's Step 6 showed up here at some point.
 
-## The 4 rounds, briefly (full detail in `CHANGES_2026-09-02.md`)
+## The 4 rounds, briefly (full detail in the 2026-09-02 design changelog)
 
 1. `F(object_grasped)` escape — cross-object misattribution (a *different* object's later grasp
    satisfied it).
@@ -63,7 +63,7 @@ read if you want the fullest worked example of the whole debugging methodology i
 
 The occurrence breakdown for this property needed its own fix (`compute_occurrences`'s
 `pattern == "instant"` branch actually simulating the until/escape, `eventual_separation`
-tracking for window-sizing) — see `CHANGES_2026-09-02.md` section 8. If the breakdown table
+tracking for window-sizing) — see the 2026-09-02 design changelog section 8. If the breakdown table
 ever looks wrong again (an occurrence that resolved shown as violated, or a signal that "never"
 transitions in the displayed window), check the window bounds first before doubting the
 predicate itself.
@@ -73,7 +73,7 @@ predicate itself.
 `recovery_ltl` (separate from `main_ltl` above — see README's "two separate mechanisms" note)
 went through its own, independent iteration on 2026-09-03, after `main_ltl` was already
 settled. Two more structural bugs surfaced (see `recovery-ltl-design` skill and
-`CHANGES_2026-09-02.md`'s recovery_ltl-design section for the full story):
+the 2026-09-02 design changelog's recovery_ltl-design section for the full story):
 
 1. `G((object_dropped & !object_released) -> F(...))` — vacuously true from frame 1. Recovery
    only starts evaluating *after* the main formula's trap is confirmed (e.g. frame 455 for

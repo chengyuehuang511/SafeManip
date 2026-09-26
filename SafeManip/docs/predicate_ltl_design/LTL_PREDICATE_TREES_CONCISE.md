@@ -93,7 +93,7 @@ forbidden_contact
 │  ├─ correct_manipulated_object_correct_receive_object_contact  [if grasped_object_exists]
 │  ├─ correct_manipulated_object_original_support_contact  [if grasped_object_exists]
 │  │  └─ original_supports_by_object
-│  └─ tool_target_contact  [added 2026-09-08, see CHANGES_2026-09-08.md: an init_robot_here
+│  └─ tool_target_contact  [added 2026-09-08, see the 2026-09-08 design changelog: an init_robot_here
 │     tool (e.g. a sponge) contacting any manipulated-object geom, excluding robot-to-tool
 │     contact (already covered by robot_correct_manipulated_object_contact). Not covered by
 │     the three "if grasped_object_exists" categories above, since an init_robot_here tool
@@ -138,12 +138,12 @@ object_released
    release detection entirely -- a more disruptive failure than the false
    positive it reopens (ArrangeBreadBasket ep6 frame 445, ArrangeTea ep0
    frame 85 -- object still genuinely moving). Accepted trade-off, not a
-   resolution of either issue; see CHANGES_2026-09-08.md.)
+   resolution of either issue; see the 2026-09-08 design changelog.)
    Caveat (pre-existing, independent of the above): this closes one false
    positive (a phantom release that then never settles) but exposes the same
    underlying one-frame flicker as a different violation instead
    (rc_dropped_object_was_released, renamed 2026-09-02 from
-   rc_grasp_remains_safe_until_release -- see CHANGES_2026-09-02.md; this
+   rc_grasp_remains_safe_until_release -- see the 2026-09-02 design changelog; this
    file's trees below are not yet re-derived for the 2026-09-02 grasp-LTL
    split) -- the real fix (eliminating the
    flicker at the bilateral-contact source) isn't done yet.
@@ -156,7 +156,7 @@ object_released
    removed, see shared def) -- with object_sync gone, object_grasped's fall
    is driven purely by contact/closed-finger state, tightly correlated in
    time with gripper_is_opening, so the gap no longer applies -- see
-   CHANGES_2026-08-31.md. That premise turned out incomplete:
+   the 2026-08-31 design changelog. That premise turned out incomplete:
    gripper_is_opening's own single-frame noise reopened a narrower version of
    the same gap independently, fixed by the previously(gripper_is_opening)
    term above instead of reinstating the full latch.]

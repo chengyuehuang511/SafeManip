@@ -33,7 +33,7 @@ fi
 TASK="${PAIR_LINE%% *}"
 EPISODE="${PAIR_LINE##* }"
 
-CONDA_SH="${CONDA_SH:-${HOME}/testnvme/miniconda3/etc/profile.d/conda.sh}"
+CONDA_SH="${CONDA_SH:-${HOME}/miniconda3/etc/profile.d/conda.sh}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"
 # shellcheck disable=SC1090
 source "${CONDA_SH}"

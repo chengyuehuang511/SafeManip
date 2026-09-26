@@ -42,7 +42,7 @@ fi
 TASK="${PAIR_LINE%% *}"
 EPISODE="${PAIR_LINE##* }"
 
-CONDA_SH="${CONDA_SH:-${HOME}/testnvme/miniconda3/etc/profile.d/conda.sh}"
+CONDA_SH="${CONDA_SH:-${HOME}/miniconda3/etc/profile.d/conda.sh}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-safemanip_libero}"
 # shellcheck disable=SC1090
 source "${CONDA_SH}"
@@ -54,16 +54,16 @@ export PYTHONPATH="${SCRIPT_DIR}:$(dirname "${SCRIPT_DIR}")${PYTHONPATH:+:${PYTH
 mkdir -p "${SCRIPT_DIR}/logs"
 
 # NOT /srv/datasets/libero -- confirmed via `srun ... ls /srv/datasets/libero`
-# on the actual compute nodes this array job lands on (t1000/vicki/neo):
+# on the actual compute nodes this array job lands on:
 # that mount is login-node-only, invisible from every
 # compute node, which silently 404'd every single array task the first time
 # this job ran (all "COMPLETED" per sacct despite 100% real failure -- see
-# the exit-code fix below). ~/flash/datasets/ is the established
+# the exit-code fix below). ~/datasets/ is the established
 # cluster-wide-visible convention this repo already uses for RoboCasa's own
-# dataset (~/flash/datasets/robocasa/v1.0/target) -- confirmed THIS specific
+# dataset (~/datasets/robocasa/v1.0/target) -- confirmed THIS specific
 # mirror is visible from compute nodes too, the same way, before trusting it
-# (`srun --nodelist=<a compute node> ls ~/flash/datasets/libero_raw/libero_10`).
-DATASET_ROOT="${DATASET_ROOT:-${HOME}/flash/datasets/libero_raw}"
+# (`srun --nodelist=<a compute node> ls ~/datasets/libero_raw/libero_10`).
+DATASET_ROOT="${DATASET_ROOT:-${HOME}/datasets/libero_raw}"
 # NOT /tmp -- SLURM jobs get their own private /tmp, invisible to any other
 # process including this same session's own shell (same lesson robocasa's
 # own sbatch already learned the hard way).

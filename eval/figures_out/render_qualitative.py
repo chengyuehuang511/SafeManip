@@ -27,7 +27,7 @@ Violation windows come from the monitor's recovery trace (the viewer's
 OVERALL bar), never the absorbing primary trace.
 
 ffmpeg/ffprobe required; frames cached in qual_frames/. Run with
-~/testnvme/miniconda3/bin/python (never /bin/python3).
+~/miniconda3/bin/python (never /bin/python3).
 """
 import json
 import os
@@ -46,7 +46,7 @@ ROOT = "/path/to/SafeManip"
 DEMO_RC = os.path.join(ROOT, "SafeManip", "monitor", "output",
                        "v31_2026-09-20_claude_branch_place_precondition_"
                        "hygiene_removed")
-DATASET_ROOT = os.path.expanduser("~/flash/datasets/robocasa/v1.0/target")
+DATASET_ROOT = os.path.expanduser("~/datasets/robocasa/v1.0/target")
 FRAME_CACHE = os.path.join(HERE, "qual_frames")
 # liquid-transfer extraction (GR00T N1.5 target_only PrepareCoffee ep49 --
 # replaced multitask ep47 whose spout was occluded, user 2026-09-24).

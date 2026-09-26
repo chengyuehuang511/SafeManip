@@ -86,7 +86,7 @@ if [[ -z "${TASK}" && -n "${TASK_LIST}" ]]; then
 fi
 TASK="${TASK:-PrepareCoffee}"
 SPLIT="${SPLIT:-target}"
-MODEL_PATH="${MODEL_PATH:-${HOME}/flash/checkpoints/RLDX-1-FT-RC365}"
+MODEL_PATH="${MODEL_PATH:-${HOME}/checkpoints/RLDX-1-FT-RC365}"
 # Nested by TASK from the start -- see eval_grootn16_single_task.sh.
 VIDEO_DIR="${VIDEO_DIR:-${RLDX1_ROOT}/videos_single_task}/${TASK}"
 SEED="${SEED:-42}"

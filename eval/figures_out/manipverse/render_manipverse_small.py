@@ -21,7 +21,7 @@ Same visual language as render_manipverse_example.py: flat borderless
 pastel pills, teal/magenta/gold/indigo accents, WordNet is-a arrows
 (hyponym -> hypernym), milk carton icon, stats footer.
 
-Run with ~/testnvme/miniconda3/bin/python (never /bin/python3).
+Run with ~/miniconda3/bin/python (never /bin/python3).
 """
 import os
 

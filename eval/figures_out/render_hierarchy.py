@@ -41,7 +41,7 @@ object_grasped_raw ends = grasp contact ends; liquid_transfer_event =
 dispense/dump onset ^ content is liquid; liquid_settled = supported ^
 stable ^ support-type-matches (InIntendedReceiver in the qualitative cell).
 
-Run with ~/testnvme/miniconda3/bin/python (never /bin/python3).
+Run with ~/miniconda3/bin/python (never /bin/python3).
 """
 import os
 

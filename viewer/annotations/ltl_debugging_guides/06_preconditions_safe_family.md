@@ -36,7 +36,7 @@ set varies per skill, see each property's own `description` in `specs.py`).
   placing/stacking/acting onto a support or target that's itself currently being carried (still
   in-hand) can spuriously fail with "support/target not stable" purely from the support's own
   world-frame motion, not genuine instability — same false-positive shape as the already-fixed
-  `object_settled` case (see `CHANGES_2026-08-31.md` item 3). If a precondition violation's
+  `object_settled` case (see the 2026-08-31 design changelog item 3). If a precondition violation's
   explanation says "not stable" and the referenced object/support looks like it was actually
   being carried at that moment (check `active_object`/recent `raw_grasped_objects`), suspect
   this before suspecting anything else.

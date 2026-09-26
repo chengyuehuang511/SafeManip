@@ -234,7 +234,7 @@ server_log="${LOG_DIR}/server-${SLURM_JOB_ID:-local}-${SLURM_ARRAY_TASK_ID:-0}.l
 # own openpi.training.config import resolves it, without writing a
 # macros_private.py into the pristine robocasa submodule. See that wrapper's
 # docstring for why a plain env var isn't enough here.
-ROBOCASA_DATASET_BASE_PATH="${ROBOCASA_DATASET_BASE_PATH:-${HOME}/flash/datasets/robocasa}" \
+ROBOCASA_DATASET_BASE_PATH="${ROBOCASA_DATASET_BASE_PATH:-${HOME}/datasets/robocasa}" \
 python "${SINGLE_TASK_DIR}/serve_policy_wrapper.py" \
   --port="${PORT}" \
   policy:checkpoint \

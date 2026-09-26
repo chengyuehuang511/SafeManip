@@ -4,7 +4,7 @@
 # point: when predicates.py's code changes, this picks up the new structure
 # automatically on the next server restart -- no manual re-sync step, and no
 # way for the two to silently drift apart the way PROPERTY_META repeatedly did
-# (see docs/predicate_ltl_design/CHANGES_2026-08-31.md and this file's own
+# (see the 2026-08-31 design changelog and this file's own
 # git history for several confirmed instances: object_stable vs
 # object_stable_relative, liquid/solid_settled's copy-pasted children,
 # object_sync's stale "velocity" description, object_supported vs

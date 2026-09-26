@@ -13,7 +13,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-DATASET_ROOT="${DATASET_ROOT:-$HOME/flash/datasets/robocasa/v1.0/target}"
+DATASET_ROOT="${DATASET_ROOT:-$HOME/datasets/robocasa/v1.0/target}"
 
 if [[ $# -gt 0 ]]; then
   TASKS=("$@")

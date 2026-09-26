@@ -22,9 +22,9 @@ some point during the 2026-09-02 session.
 
 
 A distilled, reusable workflow for figuring out whether a property's formula and predicates are
-actually doing what they're supposed to — written after a long session (2026-09-02) of
-iterating on `rc_dropped_object_was_released` through 4 rounds before it was actually correct.
-That session is the running example throughout; see `CHANGES_2026-09-02.md` for the full story.
+actually doing what they're supposed to — written after a long round (2026-09-02) of
+iterating on `rc_dropped_object_was_released` through 4 revisions before it was actually correct.
+That case is the running example throughout.
 
 One file per property (or per family of properties sharing the same LTL shape) lives alongside
 this one — start there for property-specific gotchas, then come back here for the general
@@ -194,7 +194,7 @@ These are actual bugs found in practice, in the order they tend to surface:
    full checklist covering both this and #8, plus how to decide whether `recovery_ltl` should
    even mean "recovery" at all for a one-shot/edge-triggered bad event (vs. a "resume tracking"
    signal instead) — worked out in full via `rc_dropped_object_was_released` and
-   `rc_released_object_eventually_settles`, see `CHANGES_2026-09-02.md`'s recovery_ltl-design
+   `rc_released_object_eventually_settles`, see the 2026-09-02 design changelog's recovery_ltl-design
    section.
 
 ## Step 7: check the viewer's occurrence breakdown against the same raw trace
@@ -221,7 +221,7 @@ similar atoms and can legitimately disagree:
   (the main formula's *confirmed trap* frame, which can be later than the trigger frame).
 
 Conflating the two caused real, repeated confusion while designing
-`rc_dropped_object_was_released`'s recovery formula (see `CHANGES_2026-09-02.md`'s
+`rc_dropped_object_was_released`'s recovery formula (see the 2026-09-02 design changelog's
 recovery_ltl-design section) — if something described as "recovery" looks like it's working
 fine, double check which of these two you're actually looking at before drawing conclusions
 about the other one.

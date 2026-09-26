@@ -386,7 +386,7 @@ PROPERTY_META = {
     # resolve, object_released, essentially never fires on the same frame
     # as a bilateral-contact detection flicker, permanently poisoning the
     # "until" for what's usually a harmless 1-frame blip -- see
-    # docs/predicate_ltl_design/BILATERAL_CONTACT_FLICKER_BUG.md). Neither
+    # the bilateral-contact flicker investigation). Neither
     # new property's obligation/check (object_sync, object_released) has a
     # safe auto-derived decomposition -- object_sync isn't itself a
     # multi-term AND, and object_released's top-level structure is an `or`

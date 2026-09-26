@@ -30,7 +30,7 @@ if [[ -z "${TASK}" ]]; then
   exit 1
 fi
 
-CONDA_SH="${CONDA_SH:-${HOME}/testnvme/miniconda3/etc/profile.d/conda.sh}"
+CONDA_SH="${CONDA_SH:-${HOME}/miniconda3/etc/profile.d/conda.sh}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"
 # shellcheck disable=SC1090
 source "${CONDA_SH}"
@@ -50,7 +50,7 @@ fi
 mkdir -p "${SCRIPT_DIR}/logs"
 
 N_EPISODES="${N_EPISODES:-10}"
-DATASET_ROOT="${DATASET_ROOT:-$HOME/flash/datasets/robocasa/v1.0/target}"
+DATASET_ROOT="${DATASET_ROOT:-$HOME/datasets/robocasa/v1.0/target}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-${SCRIPT_DIR}/output}"
 CALL_STRIDE="${CALL_STRIDE:-1}"
 SKIP_EXISTING="${SKIP_EXISTING:-1}"  # set to 0 to force-overwrite (e.g. re-running with a corrected call_stride)
