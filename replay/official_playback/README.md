@@ -32,7 +32,7 @@ per frame — no solving, no drift possible.
 RoboCasa ships an official playback script for exactly this format:
 `robocasa/scripts/dataset_scripts/playback_dataset.py` (in the `robocasa`
 conda env's editable install, source at
-`/coc/testnvme/chuang475/projects/robocasa/robocasa/scripts/dataset_scripts/playback_dataset.py`).
+`/path/to/robocasa/robocasa/scripts/dataset_scripts/playback_dataset.py`).
 It supports two modes:
 - **Default (state loading)** — `env.sim.set_state_from_flattened(states[t])`
   per frame. Exact, guaranteed match to the original video.

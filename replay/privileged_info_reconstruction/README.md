@@ -126,7 +126,7 @@ notes if these ever need re-deriving)
   silently sampled a *different* random fixture set than the one actually
   recorded (confirmed: a whole appliance was missing from the reconstruction
   that's present in the original video). Fix: call `env.reset(seed=seed)`.
-  Cross-referenced against `github.com/chengyuehuang511/SafeManip@60d7a43`
+  Cross-referenced against `this repository@60d7a43`
   ("freeze scene functionality"), which hit the exact same issue.
 - **fps must be derived from the original video's duration, not fixed**:
   there's exactly one reconstructed frame per monitor frame, ~1:8 sparser

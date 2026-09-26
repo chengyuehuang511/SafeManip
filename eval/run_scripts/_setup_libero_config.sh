@@ -15,7 +15,7 @@
 # entirely, and never does any relative-path or env-var expansion itself.
 #
 # This machine already had a STALE ~/.libero/config.yaml from an unrelated,
-# earlier project (pointing at /coc/testnvme/chuang475/projects/LIBERO/...,
+# earlier project (pointing at /path/to/LIBERO/...,
 # a symlink to .../Inspire/LIBERO/, a modified checkout) -- confirmed by a
 # real diff across all 4 suites: every one of libero_object's 10 bddl files
 # differs there (a genuinely different scene -- table vs. floor placement,

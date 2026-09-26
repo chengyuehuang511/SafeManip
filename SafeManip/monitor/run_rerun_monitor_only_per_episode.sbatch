@@ -17,13 +17,13 @@
 #SBATCH --mem=8G
 #SBATCH --qos=debug
 #SBATCH --time=00:30:00
-#SBATCH --output=/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
+#SBATCH --output=/path/to/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
 
 set -uo pipefail  # not -e: don't want one weird exit code tearing down output flush
 
 # NOT $(dirname "${BASH_SOURCE[0]}") -- sbatch copies this script into a spool
 # dir before running it.
-SCRIPT_DIR="/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor"
+SCRIPT_DIR="/path/to/SafeManip/SafeManip/monitor"
 PAIRS_FILE="${PAIRS_FILE:?set PAIRS_FILE=<path to newline-separated 'task episode' pairs> (submit_rerun_monitor_only_per_episode.sh does this)}"
 PAIR_LINE=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" "${PAIRS_FILE}")
 if [[ -z "${PAIR_LINE}" ]]; then

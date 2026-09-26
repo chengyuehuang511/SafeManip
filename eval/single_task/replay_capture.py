@@ -64,7 +64,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 # HDF5's file-locking mechanism is known to be unreliable over NFS-mounted
-# storage (this repo's entire filesystem, /coc/testnvme/...) -- confirmed
+# storage (this repo's entire filesystem, /path/to/...) -- confirmed
 # by a real crash (`OSError: Unable to synchronously create file (unable
 # to truncate a file which is already open)`) when opening a hdf5 file for
 # writing (via gather_demonstrations_as_hdf5) that was never actually held

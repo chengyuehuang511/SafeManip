@@ -52,7 +52,7 @@ OUT_DIR = THIS_DIR / "training_audit"
 # import the rule from there rather than keeping a third copy of it here -- a
 # divergence would silently turn that figure into a comparison of two different
 # metrics.
-_CONV = ("/nethome/chuang475/testnvme/projects/SafeManip/eval/saved_eval_rollouts"
+_CONV = ("/path/to/SafeManip/eval/saved_eval_rollouts"
          "/monitor_files/0920")
 if _CONV not in sys.path:
     sys.path.insert(0, _CONV)

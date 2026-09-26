@@ -26,13 +26,13 @@
 #SBATCH --mem=16G
 #SBATCH --qos=debug
 #SBATCH --time=00:30:00
-#SBATCH --output=/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
+#SBATCH --output=/path/to/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
 
 set -uo pipefail  # not -e: don't want one weird exit code tearing down output flush
 
 # NOT $(dirname "${BASH_SOURCE[0]}") -- sbatch copies this script into a spool
 # dir before running it.
-SCRIPT_DIR="/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor"
+SCRIPT_DIR="/path/to/SafeManip/SafeManip/monitor"
 PAIRS_FILE="${PAIRS_FILE:?set PAIRS_FILE=<path to newline-separated 'task episode' pairs> (submit_extract_privileged_libero_per_episode.sh does this)}"
 PAIR_LINE=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" "${PAIRS_FILE}")
 if [[ -z "${PAIR_LINE}" ]]; then
@@ -48,14 +48,14 @@ CONDA_ENV_NAME="${CONDA_ENV_NAME:-safemanip_libero}"
 source "${CONDA_SH}"
 conda activate "${CONDA_ENV_NAME}"
 
-export LIBERO_CONFIG_PATH="${LIBERO_CONFIG_PATH:-/nethome/chuang475/testnvme/projects/SafeManip/eval/simulators/libero/.libero_config}"
+export LIBERO_CONFIG_PATH="${LIBERO_CONFIG_PATH:-/path/to/SafeManip/eval/simulators/libero/.libero_config}"
 export PYTHONPATH="${SCRIPT_DIR}:$(dirname "${SCRIPT_DIR}")${PYTHONPATH:+:${PYTHONPATH}}"
 
 mkdir -p "${SCRIPT_DIR}/logs"
 
 # NOT /srv/datasets/libero -- confirmed via `srun ... ls /srv/datasets/libero`
 # on the actual compute nodes this array job lands on (t1000/vicki/neo):
-# that mount is login-node-only (sky2.cc.gatech.edu), invisible from every
+# that mount is login-node-only, invisible from every
 # compute node, which silently 404'd every single array task the first time
 # this job ran (all "COMPLETED" per sacct despite 100% real failure -- see
 # the exit-code fix below). ~/flash/datasets/ is the established

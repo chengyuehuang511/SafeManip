@@ -15,14 +15,14 @@
 #SBATCH --mem=32G
 #SBATCH --qos=debug
 #SBATCH --time=04:00:00
-#SBATCH --output=/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
+#SBATCH --output=/path/to/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
 
 set -uo pipefail  # not -e: one failed episode inside the script shouldn't kill the whole job
 
 # NOT $(dirname "${BASH_SOURCE[0]}") -- sbatch copies this script into a spool
 # dir before running it (see replay/privileged_info_reconstruction/run_reconstruct_task.sbatch
 # for the confirmed failure mode).
-SCRIPT_DIR="/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor"
+SCRIPT_DIR="/path/to/SafeManip/SafeManip/monitor"
 TASKS_FILE="${TASKS_FILE:?set TASKS_FILE=<path to newline-separated task list> (submit_extract_privileged.sh does this)}"
 TASK=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" "${TASKS_FILE}")
 if [[ -z "${TASK}" ]]; then

@@ -15,7 +15,7 @@
 #   bash submit_hp_sweep.sh --force         # every cell, ignoring existing output
 set -uo pipefail
 
-SCRIPT_DIR="/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor"
+SCRIPT_DIR="/path/to/SafeManip/SafeManip/monitor"
 SWEEP_DIR="${SCRIPT_DIR}/hp_sweep"
 CELLS_FILE="${SWEEP_DIR}/cells.txt"
 FORCE=0
@@ -30,7 +30,7 @@ fi
 
 FORCE="${FORCE}" python3 - "${CELLS_FILE}" <<'PY'
 import json, os, sys
-sys.path.insert(0, "/nethome/chuang475/testnvme/projects/SafeManip/SafeManip")
+sys.path.insert(0, "/path/to/SafeManip/SafeManip")
 from monitor.hp_sweep_grid import cells, load_subset, SWEEP_DIR
 
 force = os.environ.get("FORCE") == "1"

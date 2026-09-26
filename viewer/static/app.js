@@ -47,7 +47,7 @@ function tdSimQS() {
 // subdirectory under viewer/annotations/, so two people's verdicts on the
 // same episode never overwrite each other. null until loadAnnotators()
 // resolves on page load (falls back to the server's DEFAULT_ANNOTATOR,
-// "chengyue", the pre-existing owner of all annotations made before this
+// "annotator_a", the pre-existing owner of all annotations made before this
 // feature existed).
 let currentAnnotator = localStorage.getItem("safemanip-annotator") || null;
 function annotatorQS() {
@@ -117,7 +117,7 @@ async function initAnnotatorPicker() {
     try {
       data = await fetchJSON("/api/annotators");
     } catch (e) {
-      data = { annotators: [], default: "chengyue" };
+      data = { annotators: [], default: "annotator_a" };
     }
     if (!currentAnnotator) {
       currentAnnotator = data.default;
@@ -1289,7 +1289,7 @@ function otherAnnotatorsEpisodeBlock(otherAnn) {
 // stops -- see verdictControls/noteBox above). This doesn't replace either:
 // it's here so a reviewer gets an unambiguous, visible confirmation that a
 // note actually made it to disk, rather than trusting a silent debounce --
-// asked for after KhangH's annotations turned out to have almost no notes
+// asked for after annotator_b's annotations turned out to have almost no notes
 // saved despite 32 disputed/unsure verdicts. Flushes whatever's currently
 // in the note box, plus the currently-active verdict button if any (never
 // force-clears an existing verdict just because none is visibly active in

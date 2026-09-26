@@ -43,7 +43,7 @@ THIS_DIR = Path(__file__).parent
 REPO_ROOT = THIS_DIR.parent
 ANNOTATIONS_DIR = REPO_ROOT.parent / "viewer" / "annotations"
 SAMPLE = THIS_DIR / "training_audit" / "agreement_sample.csv"
-ANNOTATOR = "chengyue"
+ANNOTATOR = "annotator_a"
 
 # Must match training_violation_audit.CORPORA. Duplicated as the *directory
 # name* only (not the path) because that name is the annotation key component.

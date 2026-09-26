@@ -45,7 +45,7 @@ NATIVE_STRUCTURE_JSON_PATH = ATTRIBUTE_DIR / "native_structure.json"
 # for why a *pristine*, not live, robocasa checkout is used for this kind
 # of extraction).
 PRISTINE_ROBOCASA_ROOT = Path(
-    "/tmp/claude-3337345/-nethome-chuang475/35365880-0b6c-4259-bc31-4a8d4924ae65"
+    "/path/to/claude-session"
     "/scratchpad/pristine_robocasa"
 )
 # docs/ is untouched by SafeManip either way (confirmed: only kitchen.py,
@@ -53,7 +53,7 @@ PRISTINE_ROBOCASA_ROOT = Path(
 # whichever checkout exists, preferring the pristine one for consistency.
 DOCS_ROOT = PRISTINE_ROBOCASA_ROOT / "docs"
 if not DOCS_ROOT.exists():
-    DOCS_ROOT = Path("/coc/testnvme/chuang475/projects/robocasa/docs")
+    DOCS_ROOT = Path("/path/to/robocasa/docs")
 
 ATOMIC_TASK_INDEX_JS = DOCS_ROOT / "atomic_tasks" / "atomic_task_index.js"
 COMPOSITE_TASK_ATTRIBUTES_JSON = DOCS_ROOT / "composite_tasks" / "task_attributes.json"

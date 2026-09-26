@@ -276,7 +276,7 @@ def make_env(task_name, seed, split, episode_meta, reuse=None):
     # sampling draws from. Without re-passing it here, reset() samples a *different*
     # random scene than the one actually recorded, even with set_ep_meta() called first
     # (ep_meta locks layout/style/object placement, but not everything reset() samples).
-    # Confirmed against github.com/chengyuehuang511/SafeManip commit 60d7a43 ("freeze
+    # Confirmed against this repository commit 60d7a43 ("freeze
     # scene functionality"), which hit exactly this and fixes it via env.reset(seed=...).
     env.reset(seed=seed)
     return env, raw

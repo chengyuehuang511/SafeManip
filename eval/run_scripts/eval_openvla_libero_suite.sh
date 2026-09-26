@@ -30,7 +30,7 @@ set -euo pipefail
 # GR00T-N1.6/GR00T-N1.5's LIBERO eval) via _setup_libero_config.sh's
 # "shared" config -- NOT the openvla conda env's own editable-installed
 # `libero` package, which is confirmed to point at a stale/modified
-# checkout (/coc/testnvme/chuang475/projects/LIBERO, the exact source of
+# checkout (/path/to/LIBERO, the exact source of
 # the earlier 4% RLDX-1 bug this session diagnosed) -- PYTHONPATH
 # prepending the shared submodule here is confirmed (via a real import
 # test) to correctly override that stale egg-link.

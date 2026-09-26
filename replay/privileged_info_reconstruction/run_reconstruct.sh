@@ -28,7 +28,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 TASK="${TASK:?set TASK=<TaskName>}"
 EPISODE="${EPISODE:?set EPISODE=<index>}"
-RESULTS_ROOT="${RESULTS_ROOT:-/nethome/chuang475/testnvme/projects/SafeManip/results/evals/all_tasks_3_ckpt_50_rollouts/target_posttraining/evals/target}"
+RESULTS_ROOT="${RESULTS_ROOT:-/path/to/SafeManip/results/evals/all_tasks_3_ckpt_50_rollouts/target_posttraining/evals/target}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"
 CONDA_SH="${CONDA_SH:-${HOME}/testnvme/miniconda3/etc/profile.d/conda.sh}"
 

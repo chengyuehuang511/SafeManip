@@ -55,7 +55,7 @@ CELLS_DIR = SWEEP_DIR / "cells"
 SCORES_DIR = SWEEP_DIR / "scores"
 SAMPLE = THIS_DIR / "training_audit" / "agreement_sample.csv"
 ANNOTATIONS_DIR = REPO_ROOT.parent / "viewer" / "annotations"
-ANNOTATOR = "chengyue"
+ANNOTATOR = "annotator_a"
 KEY_PREFIX = {"RoboCasa": "training__", "LIBERO": "libero_training__"}
 
 

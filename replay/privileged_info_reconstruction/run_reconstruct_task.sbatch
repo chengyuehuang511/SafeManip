@@ -10,7 +10,7 @@
 #SBATCH --qos=debug
 #SBATCH --time=02:00:00
 #SBATCH --exclude=qt-1,starrysky,chappie,hk47,deebot,conroy,clippy,chitti
-#SBATCH --output=/nethome/chuang475/testnvme/projects/SafeManip/replay/privileged_info_reconstruction/logs/%x-%A-%a.out
+#SBATCH --output=/path/to/SafeManip/replay/privileged_info_reconstruction/logs/%x-%A-%a.out
 
 set -uo pipefail  # not -e: one failed episode inside reconstruct_task.py shouldn't kill the whole job
 
@@ -18,7 +18,7 @@ set -uo pipefail  # not -e: one failed episode inside reconstruct_task.py should
 # dir (/var/lib/slurm/slurmd/job<N>/...) before running it, so BASH_SOURCE
 # resolves to that temp copy's location, not this file's real directory
 # (confirmed: caused "can't open file '.../job<N>/reconstruct_task.py'").
-SCRIPT_DIR="/nethome/chuang475/testnvme/projects/SafeManip/replay/privileged_info_reconstruction"
+SCRIPT_DIR="/path/to/SafeManip/replay/privileged_info_reconstruction"
 TASK="${TASK:?set TASK=<TaskName> (submit_all.sh does this via --export)}"
 
 CONDA_SH="${CONDA_SH:-${HOME}/testnvme/miniconda3/etc/profile.d/conda.sh}"

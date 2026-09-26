@@ -15,11 +15,11 @@
 #SBATCH --mem-per-gpu=45G
 #SBATCH --qos=debug
 #SBATCH --time=02:00:00
-#SBATCH --output=/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
+#SBATCH --output=/path/to/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
 
 set -uo pipefail  # not -e: one failed episode inside the script shouldn't kill the whole job
 
-SCRIPT_DIR="/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor"
+SCRIPT_DIR="/path/to/SafeManip/SafeManip/monitor"
 TASKS_FILE="${TASKS_FILE:?set TASKS_FILE=<path to newline-separated task list> (submit_extract_privileged_sampled.sh does this)}"
 TASK=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" "${TASKS_FILE}")
 if [[ -z "${TASK}" ]]; then

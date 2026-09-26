@@ -15,7 +15,7 @@ Usage:
     python3 server.py [--root RESULTS_ROOT] [--port 8008]
 
 RESULTS_ROOT defaults to the "target" eval directory the user pointed at:
-    /nethome/chuang475/testnvme/projects/SafeManip/results/evals/
+    /path/to/SafeManip/results/evals/
         all_tasks_3_ckpt_50_rollouts/target_posttraining/evals/target
 
 Directory layout expected under RESULTS_ROOT:
@@ -243,7 +243,7 @@ def _training_monitor_state():
     return methods, default
 
 DEFAULT_ROOT = (
-    "/nethome/chuang475/testnvme/projects/SafeManip/results/evals/"
+    "/path/to/SafeManip/results/evals/"
     "all_tasks_3_ckpt_50_rollouts/target_posttraining/evals/target"
 )
 
@@ -1854,10 +1854,10 @@ def ffprobe_info(video_path):
 # same per-(task, episode) filename scheme underneath as before --
 # annotation_path/load_annotations/save_annotations/has_human_annotation/
 # human_annotation_for_index all take a new required `annotator` arg. The
-# pre-existing flat files (all Chengyue's work) were migrated into
-# ANNOTATIONS_DIR/chengyue/ as part of this change, preserving git history
+# pre-existing flat files (all annotator_a's work) were migrated into
+# ANNOTATIONS_DIR/annotator_a/ as part of this change, preserving git history
 # via `git mv`.
-DEFAULT_ANNOTATOR = "chengyue"
+DEFAULT_ANNOTATOR = "annotator_a"
 _ALL_ANNOTATORS_SENTINEL = "__all__"
 
 

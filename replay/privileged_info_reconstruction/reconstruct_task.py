@@ -32,7 +32,7 @@ import reconstruct_video as rv  # noqa: E402 (after sys.path patch, and rv does 
 import compare_frames  # noqa: E402
 
 DEFAULT_RESULTS_ROOT = (
-    "/nethome/chuang475/testnvme/projects/SafeManip/results/evals/"
+    "/path/to/SafeManip/results/evals/"
     "all_tasks_3_ckpt_50_rollouts/target_posttraining/evals/target"
 )
 DEFAULT_OUTPUT_ROOT = str(Path(__file__).parent / "output")

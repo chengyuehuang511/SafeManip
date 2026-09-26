@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-RESULTS_ROOT="${RESULTS_ROOT:-/nethome/chuang475/testnvme/projects/SafeManip/results/evals/all_tasks_3_ckpt_50_rollouts/target_posttraining/evals/target}"
+RESULTS_ROOT="${RESULTS_ROOT:-/path/to/SafeManip/results/evals/all_tasks_3_ckpt_50_rollouts/target_posttraining/evals/target}"
 
 if [[ $# -gt 0 ]]; then
   TASKS=("$@")

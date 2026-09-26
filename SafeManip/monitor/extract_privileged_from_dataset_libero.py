@@ -74,11 +74,11 @@ import numpy as np  # noqa: E402
 DEFAULT_DATASET_ROOT = "/srv/datasets/libero"
 DEFAULT_SUITES = ("libero_10", "libero_goal", "libero_object", "libero_spatial")
 LIBERO_REPO_ROOT = Path(
-    "/nethome/chuang475/testnvme/projects/SafeManip/eval/simulators/libero"
+    "/path/to/SafeManip/eval/simulators/libero"
 )
 THIS_DIR = Path(__file__).parent
 DEFAULT_OUTPUT_ROOT = THIS_DIR / "output" / "v22_2026-09-08_libero_baseline"
-ROBOCASA365_PYTHON = "/nethome/chuang475/testnvme/miniconda3/envs/robocasa/bin/python3"
+ROBOCASA365_PYTHON = "/path/to/miniconda3/envs/robocasa/bin/python3"
 
 _PRIVILEGED_ACCUMULATOR_ATTRS = (
     "_privileged_static_cache",

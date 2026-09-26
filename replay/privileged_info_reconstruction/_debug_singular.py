@@ -1,10 +1,10 @@
 import sys
-sys.path.insert(0, "/nethome/chuang475/testnvme/projects/SafeManip/replay/privileged_info_reconstruction")
+sys.path.insert(0, "/path/to/SafeManip/replay/privileged_info_reconstruction")
 import json
 import numpy as np
 import reconstruct_video as rv
 
-p = "/nethome/chuang475/testnvme/projects/SafeManip/results/evals/all_tasks_3_ckpt_50_rollouts/target_posttraining/evals/target/ArrangeBreadBasket/rollout_data/ArrangeBreadBasket--2026_05_05-00_22_16/privileged_information_2.json"
+p = "/path/to/SafeManip/results/evals/all_tasks_3_ckpt_50_rollouts/target_posttraining/evals/target/ArrangeBreadBasket/rollout_data/ArrangeBreadBasket--2026_05_05-00_22_16/privileged_information_2.json"
 d = json.load(open(p))
 si = d["privileged_static_info"]
 episode_meta = si["task"]["episode_meta"]

@@ -47,7 +47,7 @@ N_EPISODES="${N_EPISODES:-1}"
 USE_ACTIONS="${USE_ACTIONS:-0}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-robocasa}"
 CONDA_SH="${CONDA_SH:-${HOME}/testnvme/miniconda3/etc/profile.d/conda.sh}"
-ROBOCASA_SCRIPTS_DIR="${ROBOCASA_SCRIPTS_DIR:-/coc/testnvme/chuang475/projects/robocasa/robocasa/scripts/dataset_scripts}"
+ROBOCASA_SCRIPTS_DIR="${ROBOCASA_SCRIPTS_DIR:-/path/to/robocasa/robocasa/scripts/dataset_scripts}"
 
 # shellcheck disable=SC1090
 source "${CONDA_SH}"

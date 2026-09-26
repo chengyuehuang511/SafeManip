@@ -22,12 +22,12 @@
 #SBATCH --mem=64G
 #SBATCH --qos=debug
 #SBATCH --time=04:00:00
-#SBATCH --output=/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
+#SBATCH --output=/path/to/SafeManip/SafeManip/monitor/logs/%x-%A_%a.out
 
 set -uo pipefail  # not -e: a single failed episode must not tear down the cell
 
 # NOT $(dirname "${BASH_SOURCE[0]}") -- sbatch copies this script into a spool dir.
-SCRIPT_DIR="/nethome/chuang475/testnvme/projects/SafeManip/SafeManip/monitor"
+SCRIPT_DIR="/path/to/SafeManip/SafeManip/monitor"
 CELLS_FILE="${CELLS_FILE:?set CELLS_FILE=<newline-separated cell names> (submit_hp_sweep.sh does this)}"
 CELL=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" "${CELLS_FILE}")
 if [[ -z "${CELL}" ]]; then
