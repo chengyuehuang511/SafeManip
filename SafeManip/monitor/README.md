@@ -30,3 +30,18 @@ Useful outputs:
 - `verification/ATTRIBUTE_IMPLEMENTATION_STATUS.md`: attribute grounding / inference / placeholder status.
 - `verification/*_VERIFICATION.md`: item-by-item task-note coverage reports for the current handwritten task docs.
 - `verification/TARGET50_TASK_INVENTORY.md`: target-task inventory derived from the external RoboCasa dataset registry.
+
+### RoboCasa fixture support
+
+Fixture support requires both geometric interior containment (the object's body
+position lies in any declared interior region) and an active MuJoCo contact
+below the contacted object collision geom's live center. The normal, oriented
+from support toward object, must point within 60 degrees of anti-gravity.
+All nested fixture geoms are eligible, including shelves, racks and articulated
+parts; contact is not restricted to the fixture's main body or bottom floor.
+Containment alone, side-wall contact and overhead contact do not establish
+support. Fixtures with no matching declared interior region do not qualify.
+
+This rule applies to general fixture support, correct-target fixture support
+and support-reference selection. Receptacle-object checks, simulator physics,
+grasp debounce settings and LTL formulas are unchanged.

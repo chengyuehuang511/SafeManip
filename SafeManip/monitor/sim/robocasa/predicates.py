@@ -22,6 +22,36 @@ from .attributes import (
 )
 
 
+def _has_underneath_contact(env, object_geom_ids, support_geom_ids) -> bool:
+    """Check active contact below an object with an upward support normal.
+
+    A normal within 60 degrees of anti-gravity qualifies. Position is measured
+    relative to the contacted collision geom's live center, so articulated
+    shelves and racks need not share the fixture main body's origin.
+    """
+    gravity = np.asarray(env.sim.model.opt.gravity, dtype=float)
+    magnitude = float(np.linalg.norm(gravity))
+    if magnitude == 0:
+        return False
+    upward = -gravity / magnitude
+    for contact in env.sim.data.contact[:env.sim.data.ncon]:
+        first, second = int(contact.geom1), int(contact.geom2)
+        if first in support_geom_ids and second in object_geom_ids:
+            object_geom, sign = second, 1.0
+        elif second in support_geom_ids and first in object_geom_ids:
+            object_geom, sign = first, -1.0
+        else:
+            continue
+        if contact.exclude != 0 or contact.dist > contact.includemargin:
+            continue
+        normal = sign * np.asarray(contact.frame[:3], dtype=float)
+        center = env.sim.data.geom_xpos[object_geom]
+        below_center = float(np.dot(np.asarray(contact.pos) - center, upward)) < 0
+        if below_center and float(np.dot(normal, upward)) >= 0.5:
+            return True
+    return False
+
+
 # Oriented-bounding-box (OBB) geometry core (2026-09-18, explicit user
 # decision, replacing the previous world-frame axis-aligned bounding box
 # (AABB) system used throughout this file). Found via PanTransfer ep9: a
@@ -2110,19 +2140,22 @@ def build_predicate_snapshot(
         except Exception:
             return str(geom_id)
 
+    def _fixture_support_contact(name: str, fixture_name: str) -> bool:
+        """Require interior containment and support from any fixture descendant."""
+        try:
+            inside = OU.obj_inside_of(env, name, fixture_name, partial_check=True)
+        except Exception:
+            return False
+        if not inside:
+            return False
+        return _has_underneath_contact(
+            env, _object_contact_geom_ids(str(name)),
+            _fixture_geom_ids_by_names({str(fixture_name)})
+        )
+
     def _object_supported(name: str = "obj") -> bool:
         for fixture_name in getattr(env, "fixtures", {}).keys():
-            try:
-                if OU.check_obj_fixture_contact(env, name, fixture_name):
-                    return True
-            except Exception:
-                pass
-            try:
-                if OU.obj_inside_of(env, name, fixture_name, partial_check=True):
-                    return True
-            except Exception:
-                pass
-            if _fixture_rack_contact(str(fixture_name), str(name)):
+            if _fixture_support_contact(str(name), str(fixture_name)):
                 return True
         for receptacle_name in getattr(env, "objects", {}).keys():
             receptacle_name = str(receptacle_name)
@@ -2161,17 +2194,7 @@ def build_predicate_snapshot(
             fixture_name = str(fixture_name)
             if _fixture_is_floor(fixture_name):
                 continue
-            try:
-                if OU.check_obj_fixture_contact(env, name, fixture_name):
-                    return True
-            except Exception:
-                pass
-            try:
-                if OU.obj_inside_of(env, name, fixture_name, partial_check=True):
-                    return True
-            except Exception:
-                pass
-            if _fixture_rack_contact(fixture_name, str(name)):
+            if _fixture_support_contact(str(name), fixture_name):
                 return True
         for support_name in getattr(env, "objects", {}).keys():
             support_name = str(support_name)
@@ -2195,17 +2218,7 @@ def build_predicate_snapshot(
         target_object_names: set[str],
     ) -> bool:
         for fixture_name in target_fixture_names:
-            try:
-                if OU.check_obj_fixture_contact(env, name, fixture_name):
-                    return True
-            except Exception:
-                pass
-            try:
-                if OU.obj_inside_of(env, name, fixture_name, partial_check=True):
-                    return True
-            except Exception:
-                pass
-            if _fixture_rack_contact(str(fixture_name), str(name)):
+            if _fixture_support_contact(str(name), str(fixture_name)):
                 return True
         for target_name in target_object_names:
             if str(target_name) == str(name):
@@ -2271,19 +2284,7 @@ def build_predicate_snapshot(
             ).get(str(candidate_name), {}).get("category") or ""
             return str(cat).lower() in RECEPTACLE_CATEGORIES
         for fixture_name in getattr(env, "fixtures", {}).keys():
-            try:
-                if OU.check_obj_fixture_contact(env, name, fixture_name):
-                    fixture_contacts.add(str(fixture_name))
-                    continue
-            except Exception:
-                pass
-            try:
-                if OU.obj_inside_of(env, name, fixture_name, partial_check=True):
-                    fixture_contacts.add(str(fixture_name))
-                    continue
-            except Exception:
-                pass
-            if _fixture_rack_contact(str(fixture_name), str(name)):
+            if _fixture_support_contact(str(name), str(fixture_name)):
                 fixture_contacts.add(str(fixture_name))
                 continue
         # _other_name_is_below (a world-Z "is other_name positioned at/below
