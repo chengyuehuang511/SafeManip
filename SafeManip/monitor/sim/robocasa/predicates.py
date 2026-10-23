@@ -4462,7 +4462,7 @@ def build_predicate_snapshot(
         return body_pos + body_axes @ np.asarray(local_offset, dtype=float)
 
     def _entity_spot_contaminated(
-        kind: str, name: str, position: np.ndarray | None
+        kind: str, name: str, position: np.ndarray | None, *, contact_position: bool = True
     ) -> bool:
         if position is None:
             return False
@@ -4474,7 +4474,8 @@ def build_predicate_snapshot(
             if center is None:
                 continue
             radius = float(spot.get("radius", DEFAULT_CONTAMINATION_RADIUS))
-            if float(np.linalg.norm(position - center)) <= radius:
+            delta = position - center
+            if float(np.linalg.norm(delta if contact_position else delta[:2])) <= radius:
                 return True
         return False
 
@@ -5782,13 +5783,13 @@ def build_predicate_snapshot(
         # something raw).
         if sup_kind == "fixture":
             return not _entity_spot_contaminated(
-                "fixture", str(sup_name), _object_position(str(obj_name))
+                "fixture", str(sup_name), _object_position(str(obj_name)), contact_position=False
             )
         if sup_kind == "object" and sup_name is not None:
             return "raw" not in attrs_by_name.get(
                 sup_name, set()
             ) and not _entity_spot_contaminated(
-                "object", str(sup_name), _object_position(str(obj_name))
+                "object", str(sup_name), _object_position(str(obj_name)), contact_position=False
             )
         return True
 
@@ -7701,12 +7702,12 @@ def build_predicate_snapshot(
             # as _support_hygienic's own fixture/object branches.
             content_pos = _object_position(str(content_name))
             if sup_kind == "fixture":
-                if _entity_spot_contaminated("fixture", str(sup_name), content_pos):
+                if _entity_spot_contaminated("fixture", str(sup_name), content_pos, contact_position=False):
                     return False
             elif sup_kind == "object" and sup_name is not None:
                 support_attrs = attrs_by_name.get(str(sup_name), set())
                 if "raw" in support_attrs or _entity_spot_contaminated(
-                    "object", str(sup_name), content_pos
+                    "object", str(sup_name), content_pos, contact_position=False
                 ):
                     return False
             else:
