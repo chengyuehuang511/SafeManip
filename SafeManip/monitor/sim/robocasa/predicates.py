@@ -4474,7 +4474,7 @@ def build_predicate_snapshot(
             if center is None:
                 continue
             radius = float(spot.get("radius", DEFAULT_CONTAMINATION_RADIUS))
-            if float(np.linalg.norm(position[:2] - center[:2])) <= radius:
+            if float(np.linalg.norm(position - center)) <= radius:
                 return True
         return False
 
