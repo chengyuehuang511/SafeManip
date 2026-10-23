@@ -797,6 +797,24 @@ def build_predicate_static_spec(
     }
 
 
+def _capture_grasp_loss_release_evidence(
+    monitor_state, object_name, raw_grasped_names, opening, supported, frame
+):
+    """Freeze release evidence at first raw loss, before grasp-end debounce.
+
+    Landing or opening later cannot retroactively turn a drop into a release.
+    A recovered raw grasp discards the pending evidence, preserving flicker
+    tolerance and the existing supported-withdrawal release case.
+    """
+    if object_name is None or object_name in raw_grasped_names:
+        return None
+    previous = monitor_state.get("grasp_loss_release_evidence")
+    if previous is not None and previous["object"] == object_name:
+        return previous
+    return {"object": object_name, "frame": frame, "opening": bool(opening),
+            "supported": bool(supported(object_name))}
+
+
 def build_predicate_snapshot(
     env: Any, static_info: Dict[str, Any], dynamic_info: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -3397,6 +3415,7 @@ def build_predicate_snapshot(
             "prev_object_grasped": False,
             "object_grasped_object": None,
             "object_grasp_candidate": None,
+            "grasp_loss_release_evidence": None,
             "robot_contact_raw_active": False,
             "robot_contact_raw_activated_frame": None,
             "robot_contact_raw_candidate": None,
@@ -3793,6 +3812,15 @@ def build_predicate_snapshot(
     # 490+, so the until can resolve using *any* frame in that window, not
     # just the first one.
     raw_object_grasped = _bool(raw_grasp_candidate is not None)
+    grasp_loss_release_evidence = _capture_grasp_loss_release_evidence(
+        monitor_state,
+        previous_grasped_object if prev_object_grasped else None,
+        grasped_names,
+        gripper_is_opening or prev_gripper_is_opening,
+        _object_supported,
+        current_timestep,
+    )
+    monitor_state["grasp_loss_release_evidence"] = grasp_loss_release_evidence
     # Debounced (2026-09-19, explicit user decision, reversing the
     # 2026-09-08 removal) -- see GRASP_CANDIDATE_PERSISTENCE_FRAMES' own
     # comment: that removal's assumption (bilateral contact alone already
@@ -3866,54 +3894,10 @@ def build_predicate_snapshot(
     # instead of conflating both into one -- see CHANGES_2026-08-31.md.
     object_dropped = _bool(prev_object_grasped and not object_grasped)
     object_released = _bool(
-        prev_object_grasped
-        and not object_grasped
-        and (
-            gripper_is_opening
-            # gripper_is_opening is a raw single-frame joint-velocity-sign
-            # check (mean outward velocity > 1e-4, no debounce) -- it can dip
-            # False for exactly one frame right at the moment contact breaks
-            # (fingers momentarily near-zero outward velocity) even though
-            # the gripper is opening on both the frame before and the frame
-            # after. Since object_grasped's own True->False edge is also a
-            # single frame, that one dip is enough to make the whole
-            # `prev_object_grasped and not object_grasped and (...)` check
-            # miss the release permanently (by the next frame,
-            # prev_object_grasped is already False). ORing in last frame's
-            # value closes that one-frame gap without reopening a
-            # multi-frame latch, and without dropping coverage of the
-            # ordinary case where opening and contact-loss land on the same
-            # frame (this is additive, not a replacement).
-            or prev_gripper_is_opening
-            # covers the gripper retracting away from the object without ever
-            # opening its fingers (e.g. contact breaks as the arm moves off)
-            # while the object is resting on a support -- still a deliberate
-            # release, just one that doesn't show up as a finger-opening
-            # motion.
-            #
-            # object_stable_relative deliberately dropped from this branch
-            # (2026-09-07/08, per explicit user direction: "get rid of the
-            # stable condition, just keep the supported [check], to avoid
-            # the noise" -- object_stable_relative could flicker False for
-            # exactly the one frame this branch is evaluated on even when
-            # genuinely at rest the frame before and after, e.g.
-            # WashFruitColander ep2's colander at its true release frame,
-            # permanently missing an otherwise-clean release). Known
-            # tradeoff, not a free lunch: object_stable_relative was
-            # originally added specifically to reject a one-frame
-            # bilateral-contact dropout mid-carry that happens to graze a
-            # support while the object is still clearly moving (confirmed
-            # false positives: ArrangeBreadBasket ep6 frame 445, basket
-            # still moving 0.1-0.3 m/s; ArrangeTea ep0 frame 85, object
-            # still actively held) -- object_supported alone does not
-            # reject that case, so this reopens it. Accepted anyway per
-            # explicit direction; flag here in case those two specific
-            # false positives resurface.
-            or (
-                previous_grasped_object is not None
-                and _object_supported(previous_grasped_object)
-            )
-        )
+        object_dropped
+        and grasp_loss_release_evidence is not None
+        and (grasp_loss_release_evidence["opening"]
+             or grasp_loss_release_evidence["supported"])
     )
     awaiting_settle = _bool(monitor_state.get("awaiting_settle", False))
     # Widened 2026-09-05 (explicit user decision, matching rc_released_
@@ -9262,6 +9246,7 @@ def build_predicate_snapshot(
         if (awaiting_settle or object_settle_timeout) and evidence_settle_object
         else [],
         "object_release_frame": evidence_release_frame,
+        "grasp_loss_release_evidence": grasp_loss_release_evidence,
         "object_settle_timeout_frame": evidence_timeout_frame,
         "active_object": active_object,
         "settle_obj_name": settle_obj_name,
