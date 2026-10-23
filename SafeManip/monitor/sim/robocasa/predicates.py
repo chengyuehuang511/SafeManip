@@ -4993,7 +4993,12 @@ def build_predicate_snapshot(
     nearest_gripper_object_distance = None
     if gripper_object_distances:
         nearest_gripper_object, nearest_gripper_object_distance = min(
-            gripper_object_distances.items(), key=lambda item: item[1]
+            gripper_object_distances.items(),
+            key=lambda item: (
+                item[1],
+                item[0] != monitor_state.get("pick_approach_candidate_object"),
+                item[0],
+            ),
         )
 
     gripper_near_object = _bool(
