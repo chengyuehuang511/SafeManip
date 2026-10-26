@@ -319,14 +319,14 @@ PREDICATE_DESCRIPTIONS = {
     "one_object_in_microwave": "Exactly one object identity has persisted inside the microwave interior volume.",
     "two_or_more_objects_in_microwave": "Two or more object identities have persisted inside the microwave interior volume.",
     "microwave_empty": "No object identity is inside the microwave interior volume for the microwave-empty persistence window.",
-    "object_reach_in_microwave": "The active object has newly entered the strict interior volume of the microwave specifically (object_reach_in_fixture filtered to the microwave fixture).",
+    "object_reach_in_microwave": "The active object has newly entered the strict interior volume of an actual microwave appliance.",
     "object_left_microwave": "The object that most recently triggered object_reach_in_microwave is no longer inside the microwave.",
     "reach_in_fixture": "The gripper has newly entered the strict interior volume of an openable fixture.",
     "left_fixture": "The gripper has just exited the strict interior volume of an openable fixture (symmetric edge to reach_in_fixture).",
     "gripper_in_fixture": "The gripper AABB center lies inside an openable fixture interior volume; opening-area intersection alone does not count.",
-    "object_reach_in_fixture": "The active object has newly entered the strict interior volume of an openable fixture.",
+    "object_reach_in_fixture": "The active object has newly overlapped the opening region of an openable fixture, before strict interior containment is required for placement.",
     "object_in_fixture": "The active object AABB center is inside an openable fixture interior volume.",
-    "object_in_same_fixture": "The active object is strictly inside the same fixture interior identified by the object-reach-in event.",
+    "object_in_same_fixture": "The object tracked by the object-reach-in event is strictly inside that same fixture interior.",
 }
 
 

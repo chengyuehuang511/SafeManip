@@ -14,12 +14,16 @@ import numpy as np
 from robosuite.utils.mjcf_utils import find_elements
 
 import robocasa.utils.object_utils as OU
+from robocasa.models.fixtures import Cabinet, Dishwasher, Fridge, Microwave, Oven, ToasterOven
 from .attributes import (
     infer_object_attributes,
     infer_fixture_attributes,
     RECEPTACLE_CATEGORIES,
     FOOD_TYPE_NAMES,
 )
+
+
+_INTERIOR_SUPPORT_FIXTURES = (Cabinet, Dishwasher, Fridge, Microwave, Oven, ToasterOven)
 
 
 def _has_underneath_contact(env, object_geom_ids, support_geom_ids) -> bool:
@@ -2159,13 +2163,17 @@ def build_predicate_snapshot(
             return str(geom_id)
 
     def _fixture_support_contact(name: str, fixture_name: str) -> bool:
-        """Require interior containment and support from any fixture descendant."""
-        try:
-            inside = OU.obj_inside_of(env, name, fixture_name, partial_check=True)
-        except Exception:
+        """Require underneath contact, plus containment for enclosed fixtures."""
+        fixture = _fixture_by_name(str(fixture_name))
+        if fixture is None:
             return False
-        if not inside:
-            return False
+        if isinstance(fixture, _INTERIOR_SUPPORT_FIXTURES):
+            try:
+                inside = OU.obj_inside_of(env, name, fixture_name, partial_check=True)
+            except Exception:
+                return False
+            if not inside:
+                return False
         return _has_underneath_contact(
             env, _object_contact_geom_ids(str(name)),
             _fixture_geom_ids_by_names({str(fixture_name)})
@@ -8470,7 +8478,7 @@ def build_predicate_snapshot(
     microwave_names = [
         fname
         for fname in openable_fixture_names
-        if "microwave" in _fixture_class_lower(fname) or "microwave" in fname.lower()
+        if isinstance(_fixture_by_name(fname), Microwave)
     ]
     microwave_name = microwave_names[0] if microwave_names else None
     raw_microwave_objects = []
@@ -8590,6 +8598,7 @@ def build_predicate_snapshot(
     monitor_state["prev_gripper_in_fixture"] = gripper_in_fixture
 
     object_interior_by_object = {}
+    object_reach_by_object = {}
     for object_name in sorted(str(name) for name in manipulated_object_names):
         interior_candidates = [
             fname
@@ -8598,6 +8607,14 @@ def build_predicate_snapshot(
         ]
         object_interior_by_object[object_name] = (
             interior_candidates[0] if interior_candidates else None
+        )
+        reach_candidates = [
+            fname
+            for fname in openable_fixture_names
+            if _object_reaches_fixture_opening(object_name, fname)
+        ]
+        object_reach_by_object[object_name] = (
+            reach_candidates[0] if reach_candidates else None
         )
 
     object_reach_fixture_candidates = []
@@ -8608,8 +8625,8 @@ def build_predicate_snapshot(
             active_object_name
         )
         object_reach_fixture_candidates = (
-            [object_interior_fixture_name_for_active]
-            if object_interior_fixture_name_for_active is not None
+            [object_reach_by_object[active_object_name]]
+            if object_reach_by_object.get(active_object_name) is not None
             else []
         )
         object_interior_fixture_candidates = (
@@ -8646,6 +8663,7 @@ def build_predicate_snapshot(
     )
     if object_reach_in_fixture:
         monitor_state["access_object_fixture"] = object_reach_fixture_name
+        monitor_state["access_object_name"] = active_object_name
     # Added 2026-09-16 (explicit user decision) for
     # rc_microwave_single_object_until_empty: object_reach_in_fixture is
     # generic across ANY openable fixture (drawer, cabinet, oven, etc.), not
@@ -8653,10 +8671,16 @@ def build_predicate_snapshot(
     # main_ltl meant that property was (mis)triggered by reaching into any
     # fixture at all, not just the microwave. object_reach_in_microwave
     # filters to exactly the microwave case.
+    previous_object_interior_by_object = monitor_state.get(
+        "access_object_interior_by_object", {}
+    )
+    if not isinstance(previous_object_interior_by_object, dict):
+        previous_object_interior_by_object = {}
     object_reach_in_microwave = _bool(
-        object_reach_in_fixture
+        active_object_name in previous_object_interior_by_object
+        and previous_object_interior_by_object[active_object_name] is None
         and microwave_name is not None
-        and object_reach_fixture_name == str(microwave_name)
+        and object_interior_by_object.get(active_object_name) == str(microwave_name)
     )
     if object_reach_in_microwave:
         monitor_state["microwave_reach_object"] = active_object_name
@@ -8667,18 +8691,20 @@ def build_predicate_snapshot(
             str(microwave_reach_object), str(microwave_name)
         )
     access_object_fixture = monitor_state.get("access_object_fixture")
+    access_object_name = monitor_state.get("access_object_name")
     object_in_same_fixture = False
-    if active_object is not None and access_object_fixture is not None:
+    if access_object_name is not None and access_object_fixture is not None:
         object_in_same_fixture = _object_inside_fixture_interior(
-            str(active_object), str(access_object_fixture)
+            str(access_object_name), str(access_object_fixture)
         )
     if object_released or object_in_same_fixture:
         monitor_state["access_object_fixture"] = access_object_fixture
     if not object_reaching_fixture and not object_grasped:
         monitor_state["access_object_fixture"] = None
+        monitor_state["access_object_name"] = None
     monitor_state["prev_object_in_fixture"] = object_in_fixture
     monitor_state["prev_object_reaching_fixture"] = object_reaching_fixture
-    monitor_state["access_object_reach_by_object"] = object_interior_by_object
+    monitor_state["access_object_reach_by_object"] = object_reach_by_object
     monitor_state["access_object_interior_by_object"] = object_interior_by_object
 
     # ---------------------------------------------------------------------------
