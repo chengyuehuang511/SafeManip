@@ -2162,22 +2162,65 @@ def build_predicate_snapshot(
         except Exception:
             return str(geom_id)
 
+    def _live_fixture_contains_object(name: str, fixture) -> bool | None:
+        position = _object_position(str(name))
+        if position is None:
+            return False
+        try:
+            region_names = fixture.get_reset_region_names()
+        except Exception:
+            return None
+        try:
+            sites = fixture.get_site_info(env.sim)
+        except Exception:
+            sites = {}
+        found_region = False
+        for region_name in region_names:
+            volume = None
+            try:
+                corners = [np.asarray(sites[f"{fixture.naming_prefix}{region_name}_{key}"], dtype=float)
+                           for key in ("p0", "px", "py", "pz")]
+                volume = _obb_from_corner_sites(*corners)
+            except Exception:
+                pass
+            if volume is None or np.any(np.asarray(volume[2]) < 0.01):
+                try:
+                    region = fixture._regions[region_name]
+                    geom_id = env.sim.model.geom_name2id(f"{fixture.naming_prefix}reg_{region_name}")
+                    body_id = int(env.sim.model.geom_bodyid[geom_id])
+                    body_pos, body_axes = _spot_body_pose(body_id)
+                    corners = [body_pos + body_axes @ np.asarray(region[key], dtype=float)
+                               for key in ("p0", "px", "py", "pz")]
+                    volume = _obb_from_corner_sites(*corners)
+                except Exception:
+                    continue
+            if volume is None or np.any(np.asarray(volume[2]) < 0.01):
+                continue
+            found_region = True
+            if _obb_point_distance(volume, position) == 0:
+                return True
+        return False if found_region else None
+
     def _fixture_support_contact(name: str, fixture_name: str) -> bool:
         """Require underneath contact, plus containment for enclosed fixtures."""
         fixture = _fixture_by_name(str(fixture_name))
         if fixture is None:
             return False
-        if isinstance(fixture, _INTERIOR_SUPPORT_FIXTURES):
-            try:
-                inside = OU.obj_inside_of(env, name, fixture_name, partial_check=True)
-            except Exception:
-                return False
-            if not inside:
-                return False
-        return _has_underneath_contact(
+        if not _has_underneath_contact(
             env, _object_contact_geom_ids(str(name)),
             _fixture_geom_ids_by_names({str(fixture_name)})
-        )
+        ):
+            return False
+        if isinstance(fixture, _INTERIOR_SUPPORT_FIXTURES):
+            inside = _live_fixture_contains_object(str(name), fixture)
+            if inside is None:
+                try:
+                    inside = OU.obj_inside_of(env, name, fixture_name, partial_check=True)
+                except Exception:
+                    return False
+            if not inside:
+                return False
+        return True
 
     def _object_supported(name: str = "obj") -> bool:
         for fixture_name in getattr(env, "fixtures", {}).keys():
