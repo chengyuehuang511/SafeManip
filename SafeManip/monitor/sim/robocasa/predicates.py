@@ -2188,7 +2188,8 @@ def build_predicate_snapshot(
                     region = fixture._regions[region_name]
                     geom_id = env.sim.model.geom_name2id(f"{fixture.naming_prefix}reg_{region_name}")
                     body_id = int(env.sim.model.geom_bodyid[geom_id])
-                    body_pos, body_axes = _spot_body_pose(body_id)
+                    body_pos = np.asarray(env.sim.data.body_xpos[body_id], dtype=float)
+                    body_axes = np.asarray(env.sim.data.body_xmat[body_id], dtype=float).reshape(3, 3)
                     corners = [body_pos + body_axes @ np.asarray(region[key], dtype=float)
                                for key in ("p0", "px", "py", "pz")]
                     volume = _obb_from_corner_sites(*corners)
