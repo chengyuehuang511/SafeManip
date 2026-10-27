@@ -26,6 +26,20 @@ from .attributes import (
 _INTERIOR_SUPPORT_FIXTURES = (Cabinet, Dishwasher, Fridge, Microwave, Oven, ToasterOven)
 
 
+def _support_point_in_footprint(position, center, axes, half_extents) -> bool:
+    position = np.asarray(position, dtype=float)
+    center = np.asarray(center, dtype=float)
+    axes = np.asarray(axes, dtype=float)
+    half_extents = np.asarray(half_extents, dtype=float)
+    if not all(np.all(np.isfinite(value)) for value in
+               (position, center, axes, half_extents)) or np.any(half_extents < 0):
+        return False
+    local_xy = (axes.T @ (position - center))[:2]
+    scale = (np.abs(axes).T @ (np.abs(position) + np.abs(center)))[:2]
+    roundoff = 16 * np.finfo(float).eps * (scale + half_extents[:2])
+    return bool(np.all(np.abs(local_xy) <= half_extents[:2] + roundoff))
+
+
 def _has_underneath_contact(env, object_geom_ids, support_geom_ids) -> bool:
     """Check active contact below an object with an upward support normal.
 
@@ -5743,10 +5757,7 @@ def build_predicate_snapshot(
             if fixture_aabb is None:
                 return False
             f_center, f_axes, f_half = fixture_aabb
-            local_xy = (f_axes.T @ (np.asarray(support_pos, dtype=float) - f_center))[:2]
-            return _bool(
-                abs(local_xy[0]) <= f_half[0] and abs(local_xy[1]) <= f_half[1]
-            )
+            return _bool(_support_point_in_footprint(support_pos, f_center, f_axes, f_half))
         return False
 
     _STRUCTURAL_FIXTURE_CLASSES = {
