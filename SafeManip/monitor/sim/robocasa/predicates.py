@@ -15,6 +15,7 @@ from robosuite.utils.mjcf_utils import find_elements
 
 import robocasa.utils.object_utils as OU
 from robocasa.models.fixtures import Cabinet, Dishwasher, Fridge, Microwave, Oven, ToasterOven
+from robocasa.models.fixtures.blender import Blender, BlenderLid
 from .attributes import (
     infer_object_attributes,
     infer_fixture_attributes,
@@ -24,6 +25,25 @@ from .attributes import (
 
 
 _INTERIOR_SUPPORT_FIXTURES = (Cabinet, Dishwasher, Fridge, Microwave, Oven, ToasterOven)
+
+
+def _task_linked_blender_lids(env, fixture_names) -> set[str]:
+    fixtures = getattr(env, "fixtures", {})
+    linked_names = set()
+    for fixture_name in fixture_names:
+        fixture = fixtures.get(str(fixture_name))
+        if not isinstance(fixture, Blender):
+            continue
+        lid = getattr(fixture, "blender_lid", None)
+        if not isinstance(lid, BlenderLid):
+            continue
+        worldbody = getattr(lid, "worldbody", None)
+        if worldbody is None or not any(
+            joint.get("type") == "free" for joint in worldbody.iter("joint")
+        ):
+            continue
+        linked_names.update(str(name) for name, candidate in fixtures.items() if candidate is lid)
+    return linked_names
 
 
 def _support_point_in_footprint(position, center, axes, half_extents) -> bool:
@@ -2036,6 +2056,7 @@ def build_predicate_snapshot(
         """Fixture component geoms the robot is allowed to touch for actions."""
         geom_ids = set()
         actions_by_fixture = {}
+        linked_lids = _task_linked_blender_lids(env, _task_ref_names())
         for fixture_name in fixture_names:
             fixture_name = str(fixture_name)
             fixture = getattr(env, "fixtures", {}).get(fixture_name)
@@ -2055,6 +2076,9 @@ def build_predicate_snapshot(
             if not keywords:
                 continue
             fixture_geom_ids = _fixture_geom_ids_by_names({fixture_name})
+            if fixture_name in linked_lids:
+                geom_ids.update(fixture_geom_ids)
+                continue
             for geom_id in fixture_geom_ids:
                 try:
                     geom_name = str(env.sim.model.geom_id2name(int(geom_id)) or "")
@@ -4036,6 +4060,9 @@ def build_predicate_snapshot(
         for name in _task_ref_names()
         if str(name) in getattr(env, "fixtures", {})
     }
+    contact_policy_action_fixture_names.update(
+        _task_linked_blender_lids(env, contact_policy_action_fixture_names)
+    )
 
     manipulated_geom_ids = set()
     for geom_ids in manipulated_geom_ids_by_name.values():
