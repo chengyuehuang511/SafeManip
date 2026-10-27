@@ -2162,7 +2162,7 @@ def build_predicate_snapshot(
         except Exception:
             return str(geom_id)
 
-    def _live_fixture_contains_object(name: str, fixture) -> bool | None:
+    def _live_fixture_contains_object(name: str, fixture, partial_check=False) -> bool | None:
         position = _object_position(str(name))
         if position is None:
             return False
@@ -2198,6 +2198,11 @@ def build_predicate_snapshot(
             if volume is None or np.any(np.asarray(volume[2]) < 0.01):
                 continue
             found_region = True
+            if partial_check:
+                bounds = _object_aabb(str(name))
+                if bounds is not None and _obb_intersects(bounds, volume):
+                    return True
+                continue
             if _obb_point_distance(volume, position) == 0:
                 return True
         return False if found_region else None
@@ -8403,16 +8408,13 @@ def build_predicate_snapshot(
         return _object_center_in_fixture(str(oname), str(fname))
 
     def _object_reaches_fixture_opening(oname: str, fname: str) -> bool:
-        object_aabb = _object_aabb(str(oname))
-        fixture_aabb = _fixture_aabb(str(fname))
-        if object_aabb is not None and fixture_aabb is not None:
-            return _aabb_intersects(object_aabb, fixture_aabb)
-        try:
-            return _bool(
-                OU.obj_inside_of(env, str(oname), str(fname), partial_check=True)
-            )
-        except Exception:
-            return _object_center_in_fixture(str(oname), str(fname))
+        fixture = _fixture_by_name(str(fname))
+        if fixture is None:
+            return False
+        inside = _live_fixture_contains_object(str(oname), fixture, partial_check=True)
+        if inside is not None:
+            return _bool(inside)
+        return _object_partly_inside_fixture_interior(str(oname), str(fname))
 
     def _microwave_countable_content(oname: str) -> bool:
         attrs = attrs_by_name.get(str(oname), set())
