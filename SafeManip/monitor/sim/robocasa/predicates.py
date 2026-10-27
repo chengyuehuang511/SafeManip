@@ -6833,17 +6833,6 @@ def build_predicate_snapshot(
         fixture = _fixture_by_name(fname)
         if fixture is None:
             return {}
-        update = getattr(fixture, "update_state", None)
-        if update is not None:
-            try:
-                update(env)
-            except TypeError:
-                try:
-                    update()
-                except Exception:
-                    pass
-            except Exception:
-                pass
         method = getattr(fixture, "get_state", None)
         if method is None:
             return {}
@@ -7983,17 +7972,6 @@ def build_predicate_snapshot(
         fixture = _fixture_by_name(fname)
         if fixture is None:
             return False, None
-        try:
-            update = getattr(fixture, "update_state", None)
-            if update is not None:
-                update(env)
-        except TypeError:
-            try:
-                update()
-            except Exception:
-                pass
-        except Exception:
-            pass
         fclass = _fixture_class_lower(fname)
         if "sink" in fclass:
             get_handle_state = getattr(fixture, "get_handle_state", None)
