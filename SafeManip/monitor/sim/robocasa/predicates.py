@@ -6862,8 +6862,8 @@ def build_predicate_snapshot(
         for key in keys:
             if key in state:
                 value = state.get(key)
-                if isinstance(value, bool):
-                    return value
+                if isinstance(value, (bool, np.bool_)):
+                    return bool(value)
                 if isinstance(value, (int, float)):
                     return bool(value)
         return default

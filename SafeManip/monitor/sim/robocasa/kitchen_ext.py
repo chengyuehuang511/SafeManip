@@ -49,6 +49,8 @@ def get_privileged_information(
     """
 
     def _to_serializable(value):
+        if isinstance(value, np.bool_):
+            return bool(value)
         if isinstance(value, np.ndarray):
             return value.tolist()
         if isinstance(value, (list, tuple)):
