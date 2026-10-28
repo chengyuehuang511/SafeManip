@@ -2246,9 +2246,14 @@ def build_predicate_snapshot(
         if position is None:
             return False
         try:
-            region_names = fixture.get_reset_region_names()
+            region_names = list(fixture.get_reset_region_names())
         except Exception:
             return None
+        for region_name in getattr(fixture, "_regions", {}):
+            if (
+                region_name == "int" or str(region_name).startswith("int_")
+            ) and region_name not in region_names:
+                region_names.append(region_name)
         try:
             sites = fixture.get_site_info(env.sim)
         except Exception:
