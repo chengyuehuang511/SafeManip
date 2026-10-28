@@ -2130,12 +2130,14 @@ def build_predicate_snapshot(
                 except Exception:
                     continue
             if selected_body_ids:
-                geom_ids.update(
-                    int(geom_id)
-                    for geom_id, body_id in enumerate(env.sim.model.geom_bodyid)
-                    if int(body_id) in selected_body_ids
-                    and int(geom_id) in fixture_geom_ids
-                )
+                for geom_id, body_id in enumerate(env.sim.model.geom_bodyid):
+                    if int(geom_id) not in fixture_geom_ids:
+                        continue
+                    component_body_id = int(body_id)
+                    while component_body_id > 0 and component_body_id not in selected_body_ids:
+                        component_body_id = int(env.sim.model.body_parentid[component_body_id])
+                    if component_body_id in selected_body_ids:
+                        geom_ids.add(int(geom_id))
         return geom_ids, actions_by_fixture
 
     def _fixture_geom_ids_by_name_map(
