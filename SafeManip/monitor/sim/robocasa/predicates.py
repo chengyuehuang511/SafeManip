@@ -14,7 +14,7 @@ import numpy as np
 from robosuite.utils.mjcf_utils import find_elements
 
 import robocasa.utils.object_utils as OU
-from robocasa.models.fixtures import Cabinet, Dishwasher, Fridge, Microwave, Oven, ToasterOven
+from robocasa.models.fixtures import Cabinet, Counter, Dishwasher, Fridge, Microwave, Oven, ToasterOven
 from robocasa.models.fixtures.blender import Blender, BlenderLid
 from .attributes import (
     infer_object_attributes,
@@ -1703,6 +1703,12 @@ def build_predicate_snapshot(
                 func_name = getattr(func, "attr", None) or getattr(func, "id", None)
                 if func_name == "check_obj_in_receptacle" and len(node.args) >= 3:
                     add_object_targets(node.args[1], node.args[2], bindings)
+                elif func_name == "check_obj_any_counter_contact" and len(node.args) >= 2:
+                    objs = _literal_string_set(node.args[1], bindings).intersection(object_names)
+                    counters = {str(name) for name, fixture in getattr(env, "fixtures", {}).items()
+                                if isinstance(fixture, Counter)}
+                    for obj in objs:
+                        fixture_targets[obj].update(counters)
                 elif (
                     func_name in {"obj_inside_of", "check_obj_fixture_contact"}
                     and len(node.args) >= 3
