@@ -2288,7 +2288,12 @@ def build_predicate_snapshot(
                         and _object_collision_region_overlap(str(name), volume) is not False):
                     return True
                 continue
-            if _obb_point_distance(volume, position) == 0:
+            center, axes, half = (np.asarray(value, dtype=float) for value in volume)
+            local = axes.T @ (position - center)
+            roundoff = 16 * np.finfo(float).eps * (
+                np.abs(axes).T @ (np.abs(position) + np.abs(center)) + np.abs(half)
+            )
+            if np.all(np.abs(local) <= half + roundoff):
                 return True
         return False if found_region else None
 
