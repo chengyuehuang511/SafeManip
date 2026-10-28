@@ -2204,7 +2204,7 @@ def build_predicate_snapshot(
         center, axes, half = (np.asarray(value, dtype=float) for value in volume)
         tested = False
         uncertain = False
-        for geom_id in _object_geom_ids(str(name)):
+        for geom_id in _object_contact_geom_ids(str(name)):
             try:
                 kind = int(env.sim.model.geom_type[geom_id])
                 if kind == int(mujoco.mjtGeom.mjGEOM_MESH):
