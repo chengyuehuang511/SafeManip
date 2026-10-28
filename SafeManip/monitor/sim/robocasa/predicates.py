@@ -6343,6 +6343,12 @@ def build_predicate_snapshot(
             or task_ref_fixture_names
             or task_fixture_names
         )
+        action_fixture_names = {_split_target_id(target_id)[1] for target_id in fixture_candidates}
+        for names in (set(active_target_fixture_names), set(target_fixture_names),
+                      task_ref_fixture_names, task_fixture_names):
+            if names & action_fixture_names:
+                preferred_names = names
+                break
         target_fixture_filtered = [
             target_id
             for target_id in fixture_candidates
