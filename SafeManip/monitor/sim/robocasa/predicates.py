@@ -1557,6 +1557,8 @@ def build_predicate_snapshot(
         except Exception:
             return object_targets, fixture_targets
 
+        parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+
         def add_object_targets(obj_expr: ast.AST, target_expr: ast.AST, bindings):
             objs = _literal_string_set(obj_expr, bindings).intersection(object_names)
             targets = _literal_string_set(target_expr, bindings).intersection(
@@ -1704,11 +1706,18 @@ def build_predicate_snapshot(
                 if func_name == "check_obj_in_receptacle" and len(node.args) >= 3:
                     add_object_targets(node.args[1], node.args[2], bindings)
                 elif func_name == "check_obj_any_counter_contact" and len(node.args) >= 2:
-                    objs = _literal_string_set(node.args[1], bindings).intersection(object_names)
-                    counters = {str(name) for name, fixture in getattr(env, "fixtures", {}).items()
-                                if isinstance(fixture, Counter)}
-                    for obj in objs:
-                        fixture_targets[obj].update(counters)
+                    ancestor = node
+                    negations = 0
+                    while ancestor in parents:
+                        ancestor = parents[ancestor]
+                        if isinstance(ancestor, ast.UnaryOp) and isinstance(ancestor.op, ast.Not):
+                            negations += 1
+                    if negations % 2 == 0:
+                        objs = _literal_string_set(node.args[1], bindings).intersection(object_names)
+                        counters = {str(name) for name, fixture in getattr(env, "fixtures", {}).items()
+                                    if isinstance(fixture, Counter)}
+                        for obj in objs:
+                            fixture_targets[obj].update(counters)
                 elif (
                     func_name in {"obj_inside_of", "check_obj_fixture_contact"}
                     and len(node.args) >= 3
