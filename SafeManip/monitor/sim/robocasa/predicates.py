@@ -2200,6 +2200,47 @@ def build_predicate_snapshot(
         except Exception:
             return str(geom_id)
 
+    def _object_collision_region_overlap(name: str, volume) -> bool | None:
+        center, axes, half = (np.asarray(value, dtype=float) for value in volume)
+        tested = False
+        uncertain = False
+        for geom_id in _object_geom_ids(str(name)):
+            try:
+                kind = int(env.sim.model.geom_type[geom_id])
+                if kind == int(mujoco.mjtGeom.mjGEOM_MESH):
+                    mesh_id = int(env.sim.model.geom_dataid[geom_id])
+                    if mesh_id < 0:
+                        uncertain = True
+                        continue
+                    start = int(env.sim.model.mesh_vertadr[mesh_id])
+                    count = int(env.sim.model.mesh_vertnum[mesh_id])
+                    vertices = np.asarray(env.sim.model.mesh_vert[start:start + count], dtype=float)
+                    rotation = np.asarray(env.sim.data.geom_xmat[geom_id], dtype=float).reshape(3, 3)
+                    points = vertices @ rotation.T + np.asarray(env.sim.data.geom_xpos[geom_id])
+                elif kind == int(mujoco.mjtGeom.mjGEOM_BOX):
+                    bounds = _geom_aabb(geom_id)
+                    if bounds is None:
+                        uncertain = True
+                        continue
+                    points = _obb_corners(bounds)
+                else:
+                    uncertain = True
+                    continue
+                if points.ndim != 2 or points.shape[1] != 3 or not len(points) or not np.isfinite(points).all():
+                    uncertain = True
+                    continue
+                local = (points - center) @ axes
+                roundoff = 16 * np.finfo(float).eps * (
+                    (np.abs(points) + np.abs(center)) @ np.abs(axes) + np.abs(half))
+                tested = True
+                separated = np.any(np.max(local + roundoff, axis=0) < -half) or np.any(
+                    np.min(local - roundoff, axis=0) > half)
+                if not separated:
+                    return True
+            except Exception:
+                uncertain = True
+        return None if uncertain or not tested else False
+
     def _live_fixture_contains_object(name: str, fixture, partial_check=False) -> bool | None:
         position = _object_position(str(name))
         if position is None:
@@ -2238,7 +2279,8 @@ def build_predicate_snapshot(
             found_region = True
             if partial_check:
                 bounds = _object_aabb(str(name))
-                if bounds is not None and _obb_intersects(bounds, volume):
+                if (bounds is not None and _obb_intersects(bounds, volume)
+                        and _object_collision_region_overlap(str(name), volume) is not False):
                     return True
                 continue
             if _obb_point_distance(volume, position) == 0:
