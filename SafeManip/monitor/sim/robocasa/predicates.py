@@ -8445,6 +8445,13 @@ def build_predicate_snapshot(
             return False
 
     def _object_inside_fixture_interior(oname: str, fname: str) -> bool:
+        fixture = _fixture_by_name(str(fname))
+        if (
+            fixture is not None
+            and _live_fixture_contains_object(str(oname), fixture)
+            and _fixture_support_contact(str(oname), str(fname))
+        ):
+            return True
         try:
             if OU.obj_inside_of(env, str(oname), str(fname), partial_check=False):
                 return True
