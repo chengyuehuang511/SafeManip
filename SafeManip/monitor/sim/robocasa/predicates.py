@@ -8630,6 +8630,11 @@ def build_predicate_snapshot(
     microwave_entering_payload_exclusions = set()
     if object_grasped and active_object is not None:
         microwave_entering_payload_exclusions.add(str(active_object))
+    if (
+        active_object is not None
+        and _object_is_receptacle(str(active_object))
+        and monitor_state.get("grasped_receptacle_content_source") == active_object
+    ):
         microwave_entering_payload_exclusions.update(current_grasped_receptacle_contents)
     if microwave_name is not None:
         raw_microwave_objects = [
