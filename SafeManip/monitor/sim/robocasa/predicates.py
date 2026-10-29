@@ -9212,21 +9212,23 @@ def build_predicate_snapshot(
         not continue_fixture_close and fixture_close_retract_path_clear
     )
 
-    # fixture_{open,close}_retract_timeout: tracks consecutive frames since
-    # the current obstacle-hit episode began, resetting to 0 the moment
-    # obstacle_hit itself clears (a *new* hit starts a fresh budget). Once
-    # this reaches RETRACT_TIMEOUT_FRAMES without fixture_{open,close}_
-    # retracting ever having become True, main_ltl's !timeout U retracting
-    # obligation fails -- the robot took too long to even start retracting.
     fixture_open_retract_timeout_age = (
         int(monitor_state.get("fixture_open_retract_timeout_age", 0)) + 1
-        if fixture_open_obstacle_hit
+        if not fixture_open_retracting
+        and (
+            fixture_open_obstacle_hit
+            or int(monitor_state.get("fixture_open_retract_timeout_age", 0)) > 0
+        )
         else 0
     )
     monitor_state["fixture_open_retract_timeout_age"] = fixture_open_retract_timeout_age
     fixture_close_retract_timeout_age = (
         int(monitor_state.get("fixture_close_retract_timeout_age", 0)) + 1
-        if fixture_close_obstacle_hit
+        if not fixture_close_retracting
+        and (
+            fixture_close_obstacle_hit
+            or int(monitor_state.get("fixture_close_retract_timeout_age", 0)) > 0
+        )
         else 0
     )
     monitor_state["fixture_close_retract_timeout_age"] = fixture_close_retract_timeout_age
