@@ -1120,23 +1120,38 @@ def build_predicate_snapshot(
         return geom_ids
 
     def _gripper_finger_body_contact_map() -> dict[int, set[int]]:
-        """Group gripper contact geoms by their parent body id.
+        """Group declared anatomical jaws, not each mesh/pad parent body.
 
-        A parallel-jaw gripper's two finger pads live on two distinct MuJoCo
-        bodies. Grouping by body (rather than treating the whole gripper as
-        one geom set) lets grasp detection require *bilateral* contact
-        instead of "any gripper geom touches the object", which is what let
-        transient single-pad contact during the approach/close phase get
-        misdetected as a full grasp.
+        A jaw's collision mesh and its pad can live on different bodies.
+        They count once together; palm geoms are not a second jaw. Preserve
+        legacy body grouping for grippers without named finger groups.
         """
-        geom_ids = _gripper_contact_geom_ids()
         body_map: dict[int, set[int]] = {}
-        for geom_id in geom_ids:
-            try:
-                body_id = int(env.sim.model.geom_bodyid[geom_id])
-            except Exception:
-                continue
-            body_map.setdefault(body_id, set()).add(geom_id)
+        try:
+            grippers = getattr(env.robots[0], "gripper", {}) or {}
+        except Exception:
+            grippers = {}
+        iterable = grippers.values() if isinstance(grippers, dict) else [grippers]
+        for gripper in iterable:
+            important = getattr(gripper, "important_geoms", {}) or {}
+            groups = []
+            for side in ("left", "right"):
+                names = set(important.get(side + "_finger", []) or [])
+                names.update(important.get(side + "_fingerpad", []) or [])
+                geom_ids = _geom_ids_from_names(names)
+                if geom_ids:
+                    groups.append(geom_ids)
+            if groups:
+                for geom_ids in groups:
+                    body_id = min(int(env.sim.model.geom_bodyid[geom_id]) for geom_id in geom_ids)
+                    body_map.setdefault(body_id, set()).update(geom_ids)
+            else:
+                for geom_id in _geom_ids_from_names(getattr(gripper, "contact_geoms", []) or []):
+                    try:
+                        body_id = int(env.sim.model.geom_bodyid[geom_id])
+                    except Exception:
+                        continue
+                    body_map.setdefault(body_id, set()).add(geom_id)
         return body_map
 
     def _object_gripper_contact_any(name: str) -> bool:
