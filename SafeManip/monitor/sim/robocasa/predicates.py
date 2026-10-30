@@ -2306,7 +2306,7 @@ def build_predicate_snapshot(
                     half = np.asarray(env.sim.model.geom_size[geom_id], dtype=float)
                     if geom_type == 5:
                         half = half[[0, 0, 1]]
-                    elif geom_type != 6:
+                    elif geom_type not in (4, 6):
                         continue
                     volume = _obb_make(
                         env.sim.data.geom_xpos[geom_id],
