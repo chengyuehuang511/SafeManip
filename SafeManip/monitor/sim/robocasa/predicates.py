@@ -2301,14 +2301,17 @@ def build_predicate_snapshot(
                 pass
             if volume is None or np.any(np.asarray(volume[2]) < 0.01):
                 try:
-                    region = fixture._regions[region_name]
                     geom_id = env.sim.model.geom_name2id(f"{fixture.naming_prefix}reg_{region_name}")
-                    body_id = int(env.sim.model.geom_bodyid[geom_id])
-                    body_pos = np.asarray(env.sim.data.body_xpos[body_id], dtype=float)
-                    body_axes = np.asarray(env.sim.data.body_xmat[body_id], dtype=float).reshape(3, 3)
-                    corners = [body_pos + body_axes @ np.asarray(region[key], dtype=float)
-                               for key in ("p0", "px", "py", "pz")]
-                    volume = _obb_from_corner_sites(*corners)
+                    geom_type = int(env.sim.model.geom_type[geom_id])
+                    half = np.asarray(env.sim.model.geom_size[geom_id], dtype=float)
+                    if geom_type == 5:
+                        half = half[[0, 0, 1]]
+                    elif geom_type != 6:
+                        continue
+                    volume = _obb_make(
+                        env.sim.data.geom_xpos[geom_id],
+                        env.sim.data.geom_xmat[geom_id], half
+                    )
                 except Exception:
                     continue
             if volume is None or np.any(np.asarray(volume[2]) < 0.01):
