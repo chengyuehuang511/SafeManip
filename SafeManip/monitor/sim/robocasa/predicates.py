@@ -27,20 +27,17 @@ from .attributes import (
 _INTERIOR_SUPPORT_FIXTURES = (Cabinet, Dishwasher, Fridge, Microwave, Oven, ToasterOven)
 
 
-def _point_in_live_sink_basin(env, position) -> bool:
-    if position is None:
-        return False
-    position = np.asarray(position, dtype=float)
-    if position.shape != (3,) or not np.all(np.isfinite(position)):
-        return False
+def _live_sink_ownership_volumes(env):
+    volumes = []
     for fixture in getattr(env, "fixtures", {}).values():
         if not isinstance(fixture, Sink):
             continue
         try:
-            region_names = fixture.get_reset_region_names()
+            region_names = list(fixture.get_reset_region_names())
         except Exception:
-            continue
-        for region_name in region_names:
+            region_names = []
+        fixture_volumes = []
+        for region_name in dict.fromkeys(["main", *region_names]):
             try:
                 geom = env.sim.model.geom_name2id(f"{fixture.naming_prefix}reg_{region_name}")
                 if int(env.sim.model.geom_type[geom]) != 6:
@@ -53,12 +50,87 @@ def _point_in_live_sink_basin(env, position) -> bool:
             if (not all(np.all(np.isfinite(value)) for value in (center, axes, half))
                     or np.any(half <= 0)):
                 continue
-            local = axes.T @ (position - center)
-            roundoff = 16 * np.finfo(float).eps * (
-                np.abs(axes).T @ (np.abs(position) + np.abs(center)) + np.abs(half)
-            )
-            if np.all(np.abs(local) <= half + roundoff):
-                return True
+            fixture_volumes.append((center, axes, half))
+            if region_name == "main":
+                break
+        volumes.extend(fixture_volumes)
+    return volumes
+
+
+def _point_in_live_sink_volume(env, position) -> bool:
+    if position is None:
+        return False
+    position = np.asarray(position, dtype=float)
+    if position.shape != (3,) or not np.all(np.isfinite(position)):
+        return False
+    for center, axes, half in _live_sink_ownership_volumes(env):
+        local = axes.T @ (position - center)
+        roundoff = 16 * np.finfo(float).eps * (
+            np.abs(axes).T @ (np.abs(position) + np.abs(center)) + np.abs(half)
+        )
+        if np.all(np.abs(local) <= half + roundoff):
+            return True
+    return False
+
+
+def _convex_box_intersection_vertices(vertices, volume):
+    from scipy.spatial import ConvexHull, QhullError
+
+    vertices = np.asarray(vertices, dtype=float)
+    center, axes, half = [np.asarray(value, dtype=float) for value in volume]
+    if (vertices.ndim != 2 or vertices.shape[1] != 3 or len(vertices) < 4
+            or not all(np.isfinite(value).all() for value in (vertices, center, axes, half))):
+        return None
+    points = np.unique((vertices - center) @ axes, axis=0)
+    roundoff = 16 * np.finfo(float).eps * (
+        np.max((np.abs(vertices) + np.abs(center)) @ np.abs(axes), axis=0) + np.abs(half))
+    for axis in range(3):
+        for sign in (-1, 1):
+            distance = sign * points[:, axis] - (half[axis] + roundoff[axis])
+            inside = distance <= 0
+            if inside.all():
+                continue
+            if not inside.any():
+                return np.empty((0, 3))
+            try:
+                faces = ConvexHull(points).simplices
+            except QhullError:
+                return None
+            edges = np.unique(np.sort(np.concatenate([
+                faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]]), axis=1), axis=0)
+            crossing = edges[inside[edges[:, 0]] != inside[edges[:, 1]]]
+            first, second = crossing[:, 0], crossing[:, 1]
+            fraction = distance[first] / (distance[first] - distance[second])
+            intersections = points[first] + fraction[:, None] * (points[second] - points[first])
+            points = np.unique(np.concatenate([points[inside], intersections]), axis=0)
+    return points @ axes.T + center
+
+
+def _convex_intersection_owned_by_regions(vertices, volume, owners) -> bool:
+    vertices = np.asarray(vertices, dtype=float)
+    corners = _obb_corners(volume)
+    for center, axes, half in owners:
+        local = (vertices - center) @ axes
+        region_local = (corners - center) @ axes
+        lower = np.maximum(np.min(local, axis=0), np.min(region_local, axis=0))
+        upper = np.minimum(np.max(local, axis=0), np.max(region_local, axis=0))
+        scale = np.max((np.abs(np.concatenate([vertices, corners])) + np.abs(center)) @ np.abs(axes), axis=0)
+        roundoff = 16 * np.finfo(float).eps * (scale + np.abs(half))
+        if np.any(lower > upper + roundoff):
+            return True
+        if np.all(lower >= -half - roundoff) and np.all(upper <= half + roundoff):
+            return True
+    clipped = _convex_box_intersection_vertices(vertices, volume)
+    if clipped is None:
+        return False
+    if not len(clipped):
+        return True
+    for center, axes, half in owners:
+        local = (clipped - center) @ axes
+        roundoff = 16 * np.finfo(float).eps * (
+            (np.abs(clipped) + np.abs(center)) @ np.abs(axes) + np.abs(half))
+        if np.all(np.abs(local) <= half + roundoff):
+            return True
     return False
 
 
@@ -2267,7 +2339,7 @@ def build_predicate_snapshot(
         except Exception:
             return str(geom_id)
 
-    def _object_collision_region_overlap(name: str, volume) -> bool | None:
+    def _object_collision_region_overlap(name: str, volume, excluded_regions=()) -> bool | None:
         center, axes, half = (np.asarray(value, dtype=float) for value in volume)
         tested = False
         uncertain = False
@@ -2303,6 +2375,8 @@ def build_predicate_snapshot(
                 separated = np.any(np.max(local + roundoff, axis=0) < -half) or np.any(
                     np.min(local - roundoff, axis=0) > half)
                 if not separated:
+                    if excluded_regions and _convex_intersection_owned_by_regions(points, volume, excluded_regions):
+                        continue
                     return True
             except Exception:
                 uncertain = True
@@ -2313,8 +2387,9 @@ def build_predicate_snapshot(
         if position is None:
             return False
         if (not partial_check and isinstance(fixture, Cabinet)
-                and _point_in_live_sink_basin(env, position)):
+                and _point_in_live_sink_volume(env, position)):
             return False
+        excluded_regions = _live_sink_ownership_volumes(env) if partial_check and isinstance(fixture, Cabinet) else ()
         try:
             region_names = list(fixture.get_reset_region_names())
         except Exception:
@@ -2357,9 +2432,13 @@ def build_predicate_snapshot(
             found_region = True
             if partial_check:
                 bounds = _object_aabb(str(name))
-                if (bounds is not None and _obb_intersects(bounds, volume)
-                        and _object_collision_region_overlap(str(name), volume) is not False):
-                    return True
+                if bounds is not None and _obb_intersects(bounds, volume):
+                    overlap = (
+                        _object_collision_region_overlap(str(name), volume, excluded_regions)
+                        if excluded_regions else _object_collision_region_overlap(str(name), volume)
+                    )
+                    if overlap is not False:
+                        return True
                 continue
             center, axes, half = (np.asarray(value, dtype=float) for value in volume)
             local = axes.T @ (position - center)
@@ -8591,7 +8670,7 @@ def build_predicate_snapshot(
         fixture_aabb = _fixture_aabb(str(fname))
         gripper_position = gripper_aabb[0] if gripper_aabb is not None else _eef_position()
         if (isinstance(_fixture_by_name(str(fname)), Cabinet)
-                and _point_in_live_sink_basin(env, gripper_position)):
+                and _point_in_live_sink_volume(env, gripper_position)):
             return False
         if gripper_aabb is not None and fixture_aabb is not None:
             inner = _obb_shrink_interior(fixture_aabb)
