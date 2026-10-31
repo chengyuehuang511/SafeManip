@@ -8408,49 +8408,12 @@ def build_predicate_snapshot(
     # ---------------------------------------------------------------------------
 
     def _true_openable_enclosure_fixture(fname: str) -> bool:
-        lname = str(fname).lower()
-        fclass = _fixture_class_lower(str(fname))
-        attrs = _fixture_attrs(str(fname))
-        support_only_tokens = (
-            "sink",
-            "stack",
-            "shelf",
-            "shelves",
-            "counter",
-            "stove",
-            "stovetop",
-            "burner",
-            "island",
-            "table",
-            "rack",
-            "toaster",
-            "coffee",
-            "kettle",
-        )
-        if any(token in lname or token in fclass for token in support_only_tokens):
-            return False
-        enclosure_tokens = (
-            "cabinet",
-            "drawer",
-            "fridge",
-            "freezer",
-            "microwave",
-            "dishwasher",
-            "oven",
-        )
-        if not any(token in lname or token in fclass for token in enclosure_tokens):
-            return False
         fixture = _fixture_by_name(str(fname))
-        joint_names = []
-        if fixture is not None:
-            joint_names = list(getattr(fixture, "door_joint_names", []) or [])
-            joint_names += list(getattr(fixture, "joint_names", []) or [])
-        has_openable_boundary = _bool(
-            joint_names
-            or {"openable", "closeable"} & attrs
-            or any(token in fclass for token in enclosure_tokens)
-        )
-        return has_openable_boundary
+        if not isinstance(fixture, _INTERIOR_SUPPORT_FIXTURES):
+            return False
+        boundary_joints = getattr(fixture, "door_joint_names", [])
+        registered_joints = getattr(fixture, "_joint_infos", {})
+        return _bool(any(name in registered_joints for name in boundary_joints))
 
     def _openable_fixture_names() -> list[str]:
         names = []
