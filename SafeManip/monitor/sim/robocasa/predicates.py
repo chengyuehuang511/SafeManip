@@ -8460,9 +8460,16 @@ def build_predicate_snapshot(
 
     def _object_inside_fixture_interior(oname: str, fname: str) -> bool:
         fixture = _fixture_by_name(str(fname))
+        inside = (
+            _live_fixture_contains_object(str(oname), fixture)
+            if fixture is not None
+            else None
+        )
+        if inside is False:
+            return False
         if (
             fixture is not None
-            and _live_fixture_contains_object(str(oname), fixture)
+            and inside
             and _fixture_support_contact(str(oname), str(fname))
         ):
             return True
