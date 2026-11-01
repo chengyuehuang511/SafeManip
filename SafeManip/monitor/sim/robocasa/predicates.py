@@ -2013,6 +2013,15 @@ def build_predicate_snapshot(
             receive_names.update(targets)
         return receive_names
 
+    def _task_progress_grasp_names():
+        try:
+            return _counter_progress_grasp_names(
+                inspect.getsource(getattr(env.__class__, "_check_success", None)),
+                inspect.getsource(getattr(env.__class__, "update_state", None)),
+            )
+        except (OSError, TypeError):
+            return set()
+
     def _manipulated_object_names(
         configs: dict[str, dict], receive_names: set[str]
     ) -> set[str]:
@@ -2072,13 +2081,7 @@ def build_predicate_snapshot(
             _name = str(_name)
             if _name in object_names and _cfg.get("graspable") is True:
                 names.add(_name)
-        try:
-            progress_names = _counter_progress_grasp_names(
-                inspect.getsource(getattr(env.__class__, "_check_success", None)),
-                inspect.getsource(getattr(env.__class__, "update_state", None)),
-            )
-        except (OSError, TypeError):
-            progress_names = set()
+        progress_names = _task_progress_grasp_names()
         for name in progress_names & object_names:
             if configs.get(name, {}).get("graspable") is not False:
                 names.add(name)
@@ -3859,6 +3862,9 @@ def build_predicate_snapshot(
         for _name, _cfg in object_configs.items()
         if str(_name) in manipulated_object_names and _cfg.get("init_robot_here")
     }
+    task_tool_object_names = init_robot_here_object_names | (
+        _task_progress_grasp_names() & manipulated_object_names
+    )
 
     def _new_monitor_state() -> dict:
         return {
@@ -4135,9 +4141,9 @@ def build_predicate_snapshot(
     manipulated_geom_ids_by_name = {
         str(name): _object_geom_ids(name) for name in manipulated_object_names
     }
-    init_robot_here_geom_ids = set()
-    for _name in init_robot_here_object_names:
-        init_robot_here_geom_ids.update(manipulated_geom_ids_by_name.get(str(_name), set()))
+    task_tool_geom_ids = set()
+    for _name in task_tool_object_names:
+        task_tool_geom_ids.update(manipulated_geom_ids_by_name.get(str(_name), set()))
     robot_contacted_names = set()
     for contact_idx in range(contact_number):
         try:
@@ -4587,7 +4593,7 @@ def build_predicate_snapshot(
             geom1 not in robot_geom_ids
             and geom2 not in robot_geom_ids
             and _pair_matches(
-                geom1, geom2, init_robot_here_geom_ids, manipulated_geom_ids
+                geom1, geom2, task_tool_geom_ids, manipulated_geom_ids
             )
         )
         object_active_target_fixture = (
