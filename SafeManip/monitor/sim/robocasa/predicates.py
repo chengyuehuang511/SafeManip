@@ -29,6 +29,105 @@ from .attributes import (
 _INTERIOR_SUPPORT_FIXTURES = (Cabinet, Dishwasher, Fridge, Microwave, Oven, ToasterOven)
 
 
+def _counter_progress_grasp_names(success_source, update_source):
+    try:
+        success = ast.parse(textwrap.dedent(success_source)).body[0]
+        update = ast.parse(textwrap.dedent(update_source)).body[0]
+    except (SyntaxError, IndexError):
+        return set()
+    if not all(isinstance(method, ast.FunctionDef) for method in (success, update)):
+        return set()
+
+    def positive_fields(expression, negated=False):
+        if isinstance(expression, ast.UnaryOp) and isinstance(expression.op, ast.Not):
+            return positive_fields(expression.operand, not negated)
+        if isinstance(expression, ast.BoolOp):
+            return set().union(*(positive_fields(value, negated) for value in expression.values))
+        if (not negated and isinstance(expression, ast.Compare) and len(expression.ops) == 1
+                and isinstance(expression.ops[0], (ast.Gt, ast.GtE))
+                and isinstance(expression.left, ast.Attribute)
+                and isinstance(expression.left.value, ast.Name) and expression.left.value.id == "self"
+                and isinstance(expression.comparators[0], ast.Constant)
+                and type(expression.comparators[0].value) in (int, float)
+                and expression.comparators[0].value > 0):
+            return {expression.left.attr}
+        return set()
+
+    def own_nodes(node):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+            return
+        yield node
+        for child in ast.iter_child_nodes(node):
+            yield from own_nodes(child)
+
+    fields = set()
+    for statement in success.body:
+        for node in own_nodes(statement):
+            if isinstance(node, ast.Return):
+                fields.update(positive_fields(node.value))
+    if not fields:
+        return set()
+
+    def grasp_names(expression, bindings, negated=False, seen=frozenset()):
+        if isinstance(expression, ast.Name) and expression.id in bindings and expression.id not in seen:
+            return grasp_names(bindings[expression.id], bindings, negated, seen | {expression.id})
+        if isinstance(expression, ast.UnaryOp) and isinstance(expression.op, ast.Not):
+            return grasp_names(expression.operand, bindings, not negated, seen)
+        if isinstance(expression, ast.BoolOp):
+            return set().union(*(grasp_names(value, bindings, negated, seen)
+                                 for value in expression.values))
+        if (isinstance(expression, ast.Compare) and len(expression.ops) == 1
+                and isinstance(expression.comparators[0], ast.Constant)
+                and type(expression.comparators[0].value) is bool
+                and isinstance(expression.ops[0], (ast.Eq, ast.NotEq, ast.Is, ast.IsNot))):
+            inverted = not expression.comparators[0].value
+            if isinstance(expression.ops[0], (ast.NotEq, ast.IsNot)):
+                inverted = not inverted
+            return grasp_names(expression.left, bindings, negated != inverted, seen)
+        if (not negated and isinstance(expression, ast.Call)
+                and getattr(expression.func, "attr", None) == "check_obj_grasped"
+                and len(expression.args) >= 2 and isinstance(expression.args[0], ast.Name)
+                and expression.args[0].id == "self"):
+            argument = expression.args[1]
+            visited = set()
+            while isinstance(argument, ast.Name) and argument.id in bindings and argument.id not in visited:
+                visited.add(argument.id)
+                argument = bindings[argument.id]
+            if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+                return {argument.value}
+        return set()
+
+    names = set()
+
+    def visit_body(statements, bindings, guards):
+        for statement in statements:
+            if isinstance(statement, (ast.Return, ast.Raise, ast.Break, ast.Continue)):
+                break
+            if (isinstance(statement, ast.Assign) and len(statement.targets) == 1
+                    and isinstance(statement.targets[0], ast.Name)):
+                bindings[statement.targets[0].id] = statement.value
+            elif isinstance(statement, ast.If):
+                visit_body(statement.body, dict(bindings),
+                           guards | grasp_names(statement.test, bindings))
+                visit_body(statement.orelse, dict(bindings),
+                           guards | grasp_names(statement.test, bindings, True))
+                for node in ast.walk(statement):
+                    if isinstance(node, ast.Assign):
+                        for target in node.targets:
+                            if isinstance(target, ast.Name):
+                                bindings.pop(target.id, None)
+            elif (isinstance(statement, ast.AugAssign) and isinstance(statement.op, ast.Add)
+                    and isinstance(statement.target, ast.Attribute)
+                    and isinstance(statement.target.value, ast.Name)
+                    and statement.target.value.id == "self" and statement.target.attr in fields
+                    and isinstance(statement.value, ast.Constant)
+                    and type(statement.value.value) in (int, float) and statement.value.value > 0):
+                names.update(guards)
+
+    visit_body(update.body, {}, set())
+    return names
+
+
 def _snapshot_query_cache(function):
     cache = {}
 
@@ -1973,6 +2072,16 @@ def build_predicate_snapshot(
             _name = str(_name)
             if _name in object_names and _cfg.get("graspable") is True:
                 names.add(_name)
+        try:
+            progress_names = _counter_progress_grasp_names(
+                inspect.getsource(getattr(env.__class__, "_check_success", None)),
+                inspect.getsource(getattr(env.__class__, "update_state", None)),
+            )
+        except (OSError, TypeError):
+            progress_names = set()
+        for name in progress_names & object_names:
+            if configs.get(name, {}).get("graspable") is not False:
+                names.add(name)
         container_groups = {
             "receptacle",
             "cookware",
