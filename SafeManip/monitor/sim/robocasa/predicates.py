@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import ast
+import copy
+import functools
 import inspect
 import textwrap
 import xml.etree.ElementTree as ET
@@ -25,6 +27,23 @@ from .attributes import (
 
 
 _INTERIOR_SUPPORT_FIXTURES = (Cabinet, Dishwasher, Fridge, Microwave, Oven, ToasterOven)
+
+
+def _snapshot_query_cache(function):
+    cache = {}
+
+    @functools.wraps(function)
+    def cached(*args, **kwargs):
+        key = (args, tuple(kwargs.items()))
+        try:
+            hash(key)
+        except TypeError:
+            return function(*args, **kwargs)
+        if key not in cache:
+            cache[key] = copy.deepcopy(function(*args, **kwargs))
+        return copy.deepcopy(cache[key])
+
+    return cached
 
 
 def _contact_backed_place_exit(monitor_state, object_name, overlaps, contact):
@@ -2471,6 +2490,7 @@ def build_predicate_snapshot(
                 return True
         return False if found_region else None
 
+    @_snapshot_query_cache
     def _fixture_support_contact(name: str, fixture_name: str) -> bool:
         """Require underneath contact, plus containment for enclosed fixtures."""
         fixture = _fixture_by_name(str(fixture_name))
@@ -2882,6 +2902,7 @@ def build_predicate_snapshot(
             or _object_bbox_aabb(str(name))
         )
 
+    @_snapshot_query_cache
     def _geom_aabb(geom_id: int):
         # Returns a true per-geom OBB (2026-09-18): center=geom_xpos,
         # axes=geom_xmat (the geom's own live rotation), half=geom_size --
@@ -2965,9 +2986,11 @@ def build_predicate_snapshot(
             upper = np.maximum(upper, o_upper)
         return _obb_from_minmax(lower, upper)
 
+    @_snapshot_query_cache
     def _object_contact_aabb(name: str):
         return _geom_ids_obb(_object_contact_geom_ids(str(name)))
 
+    @_snapshot_query_cache
     def _gripper_contact_aabb():
         return _geom_ids_obb(_gripper_contact_geom_ids())
 
@@ -2980,6 +3003,7 @@ def build_predicate_snapshot(
         except Exception:
             return set()
 
+    @_snapshot_query_cache
     def _fixture_contact_aabb(name: str):
         return _geom_ids_obb(_fixture_contact_geom_ids(str(name)))
 
