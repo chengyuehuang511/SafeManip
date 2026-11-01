@@ -27,6 +27,15 @@ from .attributes import (
 _INTERIOR_SUPPORT_FIXTURES = (Cabinet, Dishwasher, Fridge, Microwave, Oven, ToasterOven)
 
 
+def _contact_backed_place_exit(monitor_state, object_name, overlaps, contact):
+    same_object = object_name is not None and monitor_state.get("place_overlap_object") == object_name
+    had_contact = same_object and bool(monitor_state.get("place_overlap_had_contact", False))
+    contact_backed_exit = bool(not overlaps and had_contact)
+    monitor_state["place_overlap_object"] = object_name if overlaps else None
+    monitor_state["place_overlap_had_contact"] = bool(overlaps and (had_contact or contact))
+    return contact_backed_exit
+
+
 def _live_sink_ownership_volumes(env):
     volumes = []
     for fixture in getattr(env, "fixtures", {}).values():
@@ -1274,6 +1283,19 @@ def build_predicate_snapshot(
                 geom2 = int(env.sim.data.contact[contact_idx].geom2)
             except Exception:
                 continue
+            if (geom1 in gripper_geom_ids and geom2 in object_geom_ids) or (
+                geom2 in gripper_geom_ids and geom1 in object_geom_ids
+            ):
+                return True
+        return False
+
+    def _object_gripper_active_contact(name: str) -> bool:
+        object_geom_ids = _object_geom_ids(name)
+        gripper_geom_ids = _gripper_contact_geom_ids()
+        for contact in env.sim.data.contact[:int(env.sim.data.ncon)]:
+            if int(contact.exclude) != 0 or float(contact.dist) > float(contact.includemargin):
+                continue
+            geom1, geom2 = int(contact.geom1), int(contact.geom2)
             if (geom1 in gripper_geom_ids and geom2 in object_geom_ids) or (
                 geom2 in gripper_geom_ids and geom1 in object_geom_ids
             ):
@@ -4642,6 +4664,10 @@ def build_predicate_snapshot(
     prev_object_left_gripper = _bool(monitor_state.get("prev_object_left_gripper", False))
     monitor_state["prev_object_left_gripper"] = object_left_gripper
     object_left_gripper_edge = _bool(object_left_gripper and not prev_object_left_gripper)
+    contact_backed_place_exit = _contact_backed_place_exit(
+        monitor_state, obj_name, _gripper_object_overlap,
+        _gripper_object_overlap and _object_gripper_active_contact(str(obj_name)),
+    )
     # No debounce: object_sync tracks the raw relative-velocity check directly.
     # This used to require RELATIVE_SPEED_PERSISTENCE_FRAMES consecutive false
     # frames before flipping, but object_sync is now an independent, meaningful
@@ -5515,7 +5541,7 @@ def build_predicate_snapshot(
     # every other episode checked (MakeIceLemonade, HeatKebabSandwich,
     # SteamInMicrowave, SearingMeat). object_left_gripper_edge alone
     # remains the single correct trigger.
-    place_onset_cond = object_left_gripper_edge
+    place_onset_cond = object_left_gripper_edge and contact_backed_place_exit
     prev_place_count = int(monitor_state.get("skill_place_onset_candidate_count", 0))
     place_onset_count = prev_place_count + 1 if place_onset_cond else 0
     monitor_state["skill_place_onset_candidate_count"] = place_onset_count
