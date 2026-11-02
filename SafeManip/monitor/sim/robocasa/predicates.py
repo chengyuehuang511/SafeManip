@@ -462,13 +462,16 @@ def _obb_sat_intersects(a, b) -> tuple[bool, float]:
 
     best_slack = None
 
-    def _check(ra: float, rb: float, proj: float) -> bool:
+    def _check(ra: float, rb: float, proj: float, axis_length: float = 1.0) -> bool:
         nonlocal best_slack
         slack = (ra + rb) - abs(proj)
         if slack < 0.0:
             return False
-        if best_slack is None or slack < best_slack:
-            best_slack = slack
+        if axis_length <= np.finfo(float).eps:
+            return True
+        depth = slack / axis_length
+        if best_slack is None or depth < best_slack:
+            best_slack = depth
         return True
 
     for i in range(3):
@@ -489,7 +492,8 @@ def _obb_sat_intersects(a, b) -> tuple[bool, float]:
             ra = float(a_h[i1] * abs_r[i2, j] + a_h[i2] * abs_r[i1, j])
             rb = float(b_h[j1] * abs_r[i, j2] + b_h[j2] * abs_r[i, j1])
             proj = float(t_a[i2] * R[i1, j] - t_a[i1] * R[i2, j])
-            if not _check(ra, rb, proj):
+            axis_length = float(np.linalg.norm(np.cross(a_ax[:, i], b_ax[:, j])))
+            if not _check(ra, rb, proj, axis_length):
                 return False, 0.0
     return True, float(best_slack if best_slack is not None else 0.0)
 
